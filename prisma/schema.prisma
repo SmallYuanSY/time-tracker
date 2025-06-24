@@ -21,6 +21,8 @@ model User {
   createdAt DateTime  @default(now())
   workLogs  workLog[]
   clocks    clock[]
+  requestedLeaves LeaveRequest[] @relation("Requester")
+  agentLeaves     LeaveRequest[] @relation("Agent")
 }
 
 model clock {
@@ -46,4 +48,25 @@ model workLog {
   projectName String
   category    String
   content     String
+}
+
+model LeaveRequest {
+  id          String    @id @default(cuid())
+  requesterId String
+  requester   User      @relation("Requester", fields: [requesterId], references: [id])
+  agentId     String
+  agent       User      @relation("Agent", fields: [agentId], references: [id])
+  status      LeaveStatus @default(PENDING_AGENT)
+  reason      String
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+enum LeaveStatus {
+  PENDING_AGENT
+  PENDING_ADMIN
+  APPROVED
+  REJECTED
 }
