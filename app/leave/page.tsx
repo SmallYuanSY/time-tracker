@@ -1,18 +1,64 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/layouts/DashboardLayout'
 import { Button } from '@/components/ui/button'
 
 export default function LeavePage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
+  const router = useRouter()
   const [agentEmail, setAgentEmail] = useState('')
   const [reason, setReason] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+
+  // 身份驗證檢查
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login')
+    }
+    // 檢查用戶是否在資料庫中存在
+    if (status === 'authenticated' && session?.user) {
+      const checkUserExists = async () => {
+        try {
+          const response = await fetch('/api/users')
+          if (!response.ok) {
+            console.error('用戶不存在，重新導向到登入頁面')
+            router.push('/login')
+          }
+        } catch (error) {
+          console.error('檢查用戶狀態失敗:', error)
+          router.push('/login')
+        }
+      }
+      checkUserExists()
+    }
+  }, [status, session, router])
+
+  // 載入中狀態
+  if (status === 'loading') {
+    return (
+      <DashboardLayout>
+        <div className="text-white/60">載入中...</div>
+      </DashboardLayout>
+    )
+  }
+
+  // 未登入狀態
+  if (status === 'unauthenticated') {
+    return (
+      <DashboardLayout>
+        <div className="text-white text-center">
+          <div className="text-lg mb-2">🔐 需要登入</div>
+          <div>正在重新導向至登入頁面...</div>
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   const submitRequest = async () => {
     if (!session?.user) return

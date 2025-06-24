@@ -48,21 +48,19 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('[POST /api/worklog] 嘗試建立工作記錄...')
-    const createData: any = {
-      userId,
-      startTime: startDate,
-      projectCode,
-      projectName,
-      category,
-      content,
-    }
-    
-    if (endDate) {
-      createData.endTime = endDate
-    }
+    console.log('[POST /api/worklog] startDate:', startDate)
+    console.log('[POST /api/worklog] endDate:', endDate)
     
     const result = await prisma.workLog.create({
-      data: createData,
+      data: {
+        userId,
+        startTime: startDate,
+        endTime: endDate as any,
+        projectCode,
+        projectName,
+        category,
+        content,
+      },
     })
 
     console.log('[POST /api/worklog] 成功建立工作記錄:', result.id)

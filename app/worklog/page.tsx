@@ -22,7 +22,7 @@ interface WorkLog {
 }
 
 export default function WorkLogPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [showModal, setShowModal] = useState(false)
   const [editingLog, setEditingLog] = useState<WorkLog | null>(null)
   const refreshLogsRef = useRef<(() => Promise<void>) | null>(null)
@@ -34,6 +34,29 @@ export default function WorkLogPage() {
     setIsClient(true)
     setToday(new Date())
   }, [])
+
+  // 身份驗證檢查
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      window.location.href = '/login'
+    }
+    // 檢查用戶是否在資料庫中存在
+    if (status === 'authenticated' && session?.user) {
+      const checkUserExists = async () => {
+        try {
+          const response = await fetch('/api/users')
+          if (!response.ok) {
+            console.error('用戶不存在，重新導向到登入頁面')
+            window.location.href = '/login'
+          }
+        } catch (error) {
+          console.error('檢查用戶狀態失敗:', error)
+          window.location.href = '/login'
+        }
+      }
+      checkUserExists()
+    }
+  }, [status, session])
 
   const handleAddWork = () => {
     setShowModal(true)

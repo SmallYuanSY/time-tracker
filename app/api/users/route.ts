@@ -2,11 +2,42 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcrypt"
 import { Novu } from '@novu/api'
+import { getServerSession } from "next-auth"
 
 // 初始化 Novu 客戶端
 const novu = new Novu({ 
   secretKey: process.env.NOVU_SECRET_KEY || process.env.NOVU_API_KEY
 })
+
+export async function GET(req: Request) {
+  try {
+    const session = await getServerSession()
+    
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: "未登入" }, { status: 401 })
+    }
+
+    // 檢查用戶是否在資料庫中存在
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true
+      }
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: "用戶不存在" }, { status: 404 })
+    }
+
+    return NextResponse.json({ user })
+  } catch (error) {
+    console.error('[GET /api/users]', error)
+    return NextResponse.json({ error: "伺服器內部錯誤" }, { status: 500 })
+  }
+}
 
 export async function POST(req: Request) {
   try {
