@@ -63,6 +63,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
       <div className="flex flex-col flex-1">
         <main className="flex-1 p-4 overflow-auto">
+          {/* 移除原本的 showEndOfDay 控制，改由主頁控制 */}
           {children}
         </main>
       </div>

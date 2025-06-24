@@ -120,3 +120,75 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Novu 彈出視窗的 z-index 修正 */
+@layer components {
+  /* Novu Inbox 彈出視窗樣式 */
+  [data-novu-popover],
+  [data-novu-popover-content],
+  [data-novu-dropdown],
+  [data-novu-dropdown-content] {
+    z-index: 9999 !important;
+  }
+  
+  /* 確保 Novu 所有彈出元件都有高 z-index */
+  .novu-popover,
+  .novu-popover-content,
+  .novu-dropdown,
+  .novu-dropdown-content {
+    z-index: 9999 !important;
+  }
+
+  /* Novu 彈出視窗靠右對齊 */
+  [data-novu-popover-content],
+  [data-radix-popper-content-wrapper],
+  [data-radix-popper-content] {
+    transform-origin: top right !important;
+    right: 0 !important;
+    left: auto !important;
+    z-index: 9999 !important;
+    position: fixed !important;
+  }
+
+  /* 針對 Novu Inbox 的彈出內容 */
+  .novu-popover-content,
+  .novu-inbox-popover,
+  [class*="popover"] {
+    transform-origin: top right !important;
+    right: 0 !important;
+    left: auto !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+    z-index: 9999 !important;
+    position: fixed !important;
+    background: rgba(255, 255, 255, 0.7) !important;
+    backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  }
+
+  /* 針對 Radix UI 的彈出元素 (Novu 可能使用) */
+  [data-radix-popper-content-wrapper] > * {
+    right: 0 !important;
+    left: auto !important;
+    z-index: 9999 !important;
+    position: fixed !important;
+  }
+
+  /* 強制修正 Novu 彈出視窗樣式 - 更具體的選擇器 */
+  body [data-radix-popper-content-wrapper],
+  body [data-state="open"],
+  body [role="dialog"] {
+    z-index: 9999 !important;
+    position: fixed !important;
+  }
+
+  /* Novu 彈出內容的毛玻璃效果 */
+  [role="dialog"],
+  [data-state="open"] > div,
+  div[style*="position: fixed"] {
+    background: rgba(255, 255, 255, 0.7) !important;
+    backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 12px !important;
+  }
+}
