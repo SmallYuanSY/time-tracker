@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter, usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -11,22 +12,32 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
+  Bell,
 } from "lucide-react"
 
 const sidebarItems = [
-  { name: "總覽", icon: <LayoutDashboard className="w-4 h-4 mr-2" />, href: "#" },
-  { name: "紀錄", icon: <FileClock className="w-4 h-4 mr-2" />, href: "#" },
+  { name: "總覽", icon: <LayoutDashboard className="w-4 h-4 mr-2" />, href: "/" },
+  { name: "工作記錄", icon: <FileClock className="w-4 h-4 mr-2" />, href: "/worklog" },
+  { name: "通知", icon: <Bell className="w-4 h-4 mr-2" />, href: "/notifications" },
   { name: "設定", icon: <Settings className="w-4 h-4 mr-2" />, href: "#" },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession()
+  const router = useRouter()
+  const pathname = usePathname()
 
   const handleLogout = async () => {
     await signOut({ 
       callbackUrl: '/login',
       redirect: true 
     })
+  }
+
+  const handleNavigation = (href: string) => {
+    if (href !== "#") {
+      router.push(href)
+    }
   }
 
   return (
@@ -38,12 +49,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <ScrollArea className="flex-1 px-2 py-4">
             <nav className="grid gap-1">
-              {sidebarItems.map((item) => (
-                <Button key={item.name} variant="ghost" className="w-full justify-start">
-                  {item.icon}
-                  {item.name}
-                </Button>
-              ))}
+              {sidebarItems.map((item) => {
+                const isActive = pathname === item.href
+                return (
+                  <Button 
+                    key={item.name} 
+                    variant={isActive ? "secondary" : "ghost"}
+                    className={cn(
+                      "w-full justify-start",
+                      isActive && "bg-accent text-accent-foreground"
+                    )}
+                    onClick={() => handleNavigation(item.href)}
+                  >
+                    {item.icon}
+                    {item.name}
+                  </Button>
+                )
+              })}
             </nav>
           </ScrollArea>
           <div className="mt-auto p-4 border-t">

@@ -3,6 +3,9 @@
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import PunchCardWidget from "@/components/ui/PunchCardWidget";
 import NovuInbox from "@/app/components/ui/inbox/NovuInbox";
+import TodayWorkSummary from "@/components/TodayWorkSummary";
+import TimeDisplayCard from "@/components/TimeDisplayCard";
+import TodayStatsCard from "@/components/TodayStatsCard";
 import { Portal } from "@/components/ui/portal";
 
 export default function HomePage() {
@@ -17,13 +20,26 @@ export default function HomePage() {
       </Portal>
 
       <div className="space-y-6 p-6">
-        {/* 打卡系統 - 橫向大卡片 */}
-        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6 relative">
-          {/* 打卡系統主要內容 */}
-          <div className="flex justify-center items-center h-full min-h-[200px]">
+        {/* 頂部功能區域 - 分成多個卡片 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* 時間和日期卡片 */}
+          <div className="lg:col-span-1">
+            <TimeDisplayCard />
+          </div>
+          
+          {/* 打卡系統卡片 */}
+          <div className="lg:col-span-1">
             <PunchCardWidget />
           </div>
+          
+          {/* 今日統計卡片 */}
+          <div className="lg:col-span-1">
+            <TodayStatsCard />
+          </div>
         </div>
+
+        {/* 今日工作摘要 */}
+        <TodayWorkSummary />
 
         {/* 快速操作區域 */}
         <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
