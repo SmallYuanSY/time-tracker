@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { SimpleTimePicker } from '@/components/ui/simple-time-picker'
 import { Portal } from '@/components/ui/portal'
@@ -13,6 +13,12 @@ interface WorkLog {
   content: string
   startTime: string
   endTime: string | null
+}
+
+interface Project {
+  projectCode: string
+  projectName: string
+  category: string
 }
 
 interface WorkLogModalProps {
@@ -37,10 +43,120 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
   })
   const [errors, setErrors] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // 案件選擇相關狀態
+  const [projects, setProjects] = useState<Project[]>([])
+  const [filteredProjects, setFilteredProjects] = useState<Project[]>([])
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false)
+  const [isNewProject, setIsNewProject] = useState(false)
+  const [loadingProject, setLoadingProject] = useState(false)
+
+  // 載入用戶的案件列表
+  useEffect(() => {
+    const loadProjects = async () => {
+      if (!session?.user) return
+
+      try {
+        const userId = (session.user as any).id
+        const response = await fetch(`/api/projects?userId=${userId}`)
+        if (response.ok) {
+          const data = await response.json()
+          setProjects(data)
+        }
+      } catch (error) {
+        console.error('載入案件列表失敗:', error)
+      }
+    }
+
+    loadProjects()
+  }, [session])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
+
+  // 處理案件編號輸入
+  const handleProjectCodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const code = e.target.value
+    setFormData({ ...formData, projectCode: code })
+
+    // 當輸入兩位數或更多時，嘗試搜尋案件
+    if (code.length >= 2) {
+      setLoadingProject(true)
+      
+      // 搜尋現有案件（精確匹配開頭）
+      const matchingProjects = projects.filter(p => 
+        p.projectCode.toLowerCase().startsWith(code.toLowerCase())
+      )
+      
+      setFilteredProjects(matchingProjects)
+      
+      if (matchingProjects.length > 0) {
+        setShowProjectDropdown(true)
+        setIsNewProject(false)
+        
+        // 如果只有一個完全匹配的案件，自動選擇
+        const exactMatch = matchingProjects.find(p => 
+          p.projectCode.toLowerCase() === code.toLowerCase()
+        )
+        if (exactMatch) {
+          selectProject(exactMatch)
+        }
+      } else {
+        // 沒有找到現有案件，顯示新建案件模式
+        setIsNewProject(true)
+        setShowProjectDropdown(false)
+        setFormData({
+          ...formData,
+          projectCode: code,
+          projectName: '',
+          category: ''
+        })
+      }
+      
+      setLoadingProject(false)
+    } else {
+      setShowProjectDropdown(false)
+      setIsNewProject(false)
+      
+      // 清空案件名稱和分類（如果不是編輯模式）
+      if (!editData) {
+        setFormData({
+          ...formData,
+          projectCode: code,
+          projectName: '',
+          category: ''
+        })
+      }
+    }
+  }
+
+  // 選擇現有案件
+  const selectProject = (project: Project) => {
+    setFormData({
+      ...formData,
+      projectCode: project.projectCode,
+      projectName: project.projectName,
+      category: project.category
+    })
+    setShowProjectDropdown(false)
+    setIsNewProject(false)
+  }
+
+  // 點擊外部關閉下拉選單
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (!target.closest('.project-dropdown-container')) {
+        setShowProjectDropdown(false)
+      }
+    }
+
+    if (showProjectDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showProjectDropdown])
 
   const validateForm = () => {
     const newErrors: string[] = []
@@ -165,12 +281,92 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
           )}
 
           <div className="space-y-3">
-            <input name="projectCode" placeholder="案件編號" value={formData.projectCode} onChange={handleChange}
-              className="w-full rounded-xl bg-white/20 border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none" />
-            <input name="projectName" placeholder="案件名稱" value={formData.projectName} onChange={handleChange}
-              className="w-full rounded-xl bg-white/20 border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none" />
-            <input name="category" placeholder="分類" value={formData.category} onChange={handleChange}
-              className="w-full rounded-xl bg-white/20 border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none" />
+            {/* 智能案件選擇 */}
+            <div className="relative project-dropdown-container">
+              <input 
+                name="projectCode" 
+                placeholder="案件編號 (輸入2位數自動搜尋)" 
+                value={formData.projectCode} 
+                onChange={handleProjectCodeChange}
+                className="w-full rounded-xl bg-white/20 border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none"
+              />
+              
+              {/* 載入指示器 */}
+              {loadingProject && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+                </div>
+              )}
+              
+              {/* 案件下拉選單 */}
+              {showProjectDropdown && filteredProjects.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white/95 backdrop-blur border border-white/30 rounded-xl max-h-40 overflow-y-auto z-10 shadow-lg">
+                  <div className="px-4 py-2 bg-blue-500/20 text-blue-800 text-xs font-medium border-b border-white/20">
+                    找到 {filteredProjects.length} 個相關案件
+                  </div>
+                  {filteredProjects.map((project, index) => (
+                    <div
+                      key={index}
+                      onClick={() => selectProject(project)}
+                      className="px-4 py-3 hover:bg-blue-500/20 cursor-pointer border-b border-white/20 last:border-b-0 transition-colors"
+                    >
+                      <div className="text-gray-800 font-bold text-sm">{project.projectCode}</div>
+                      <div className="text-gray-700 text-sm font-medium">{project.projectName}</div>
+                      <div className="text-gray-500 text-xs mt-1 bg-gray-100 px-2 py-1 rounded inline-block">{project.category}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* 案件名稱 - 根據是否為新案件決定是否可編輯 */}
+            <div className="relative">
+              <input 
+                name="projectName" 
+                placeholder="案件名稱" 
+                value={formData.projectName} 
+                onChange={handleChange}
+                disabled={!isNewProject && formData.projectName !== ''}
+                className={`w-full rounded-xl border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none ${
+                  !isNewProject && formData.projectName !== '' 
+                    ? 'bg-white/10 cursor-not-allowed' 
+                    : 'bg-white/20'
+                }`}
+              />
+              {!isNewProject && formData.projectName !== '' && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/60 text-sm">
+                  🔒
+                </div>
+              )}
+            </div>
+            
+            {/* 分類 - 根據是否為新案件決定是否可編輯 */}
+            <div className="relative">
+              <input 
+                name="category" 
+                placeholder="分類" 
+                value={formData.category} 
+                onChange={handleChange}
+                disabled={!isNewProject && formData.category !== ''}
+                className={`w-full rounded-xl border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none ${
+                  !isNewProject && formData.category !== '' 
+                    ? 'bg-white/10 cursor-not-allowed' 
+                    : 'bg-white/20'
+                }`}
+              />
+              {!isNewProject && formData.category !== '' && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/60 text-sm">
+                  🔒
+                </div>
+              )}
+            </div>
+            
+            {/* 新案件提示 */}
+            {isNewProject && (
+              <div className="bg-blue-500/20 border border-blue-400/30 rounded-xl p-3 text-blue-100 text-sm">
+                💡 這是新案件，請填寫案件名稱和分類
+              </div>
+            )}
             <textarea name="content" placeholder="工作內容" rows={3} value={formData.content} onChange={handleChange}
               className="w-full rounded-xl bg-white/20 border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none" />
             <div className="grid grid-cols-2 gap-4">

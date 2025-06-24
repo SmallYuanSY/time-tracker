@@ -1,15 +1,68 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import DashboardLayout from "@/components/layouts/DashboardLayout"
 import NovuInbox from "@/app/components/ui/inbox/NovuInbox"
 import { Button } from "@/components/ui/button"
 
 export default function NotificationsPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+
+  // 身份驗證檢查
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login')
+    }
+    // 檢查用戶是否在資料庫中存在
+    if (status === 'authenticated' && session?.user) {
+      const checkUserExists = async () => {
+        try {
+          const response = await fetch('/api/users')
+          if (!response.ok) {
+            console.error('用戶不存在，重新導向到登入頁面')
+            router.push('/login')
+          }
+        } catch (error) {
+          console.error('檢查用戶狀態失敗:', error)
+          router.push('/login')
+        }
+      }
+      checkUserExists()
+    }
+  }, [status, session, router])
+
+  // 載入中狀態
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center">
+        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-3xl p-8">
+          <div className="text-white text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-white/30 border-t-white mx-auto mb-4"></div>
+            <div>載入中...</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // 未登入狀態
+  if (status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center">
+        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-3xl p-8">
+          <div className="text-white text-center">
+            <div className="text-lg mb-2">🔐 需要登入</div>
+            <div>正在重新導向至登入頁面...</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const sendTestNotification = async () => {
     if (!session?.user) return
