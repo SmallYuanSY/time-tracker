@@ -21,6 +21,9 @@ function currentTime() {
 export function TimePicker({ value = "09:00", onChange, label }: TimePickerProps) {
   const [open, setOpen] = React.useState(false)
   const [internalValue, setInternalValue] = React.useState(value)
+  
+  // 生成唯一的 ID 用於關聯 label 和 button
+  const fieldId = React.useId()
 
   const [hour, minute] = internalValue.split(":")
   if (!minute || !hour) {
@@ -35,43 +38,92 @@ export function TimePicker({ value = "09:00", onChange, label }: TimePickerProps
   }
 
   return (
-    <div className="grid gap-2">
-      {label && <label className="text-sm text-muted-foreground">{label}</label>}
+    <div className="space-y-2">
+      {label && (
+        <label 
+          htmlFor={fieldId}
+          className="text-sm text-white font-medium block bg-transparent"
+        >
+          {label}
+        </label>
+      )}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" className="w-full justify-start text-left font-normal backdrop-blur bg-white/10 border border-white/30 text-white">
+          <Button 
+            id={fieldId}
+            variant="outline" 
+            className={cn(
+              "w-full justify-start text-left font-normal backdrop-blur bg-white/10 border border-white/30 text-white hover:bg-white/20 hover:text-white focus:ring-2 focus:ring-white/30",
+              open && "ring-2 ring-blue-400 bg-white/20"
+            )}
+            aria-label={label ? `${label}: ${internalValue}` : `時間選擇器: ${internalValue}`}
+            aria-expanded={open}
+          >
             {internalValue || "選擇時間"}
+            {open && <span className="ml-auto text-white/60">⌄</span>}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-2 flex space-x-2 bg-white/10 backdrop-blur border border-white/20 rounded-xl">
-          <ScrollArea className="h-40 w-16">
-            {hours.map((h) => (
-              <div
-                key={h}
-                className={cn(
-                  "px-2 py-1 rounded hover:bg-white/10 cursor-pointer text-center",
-                  h === hour && "bg-white/20 text-white font-bold"
-                )}
-                onClick={() => setTime(h, minute)}
+        <PopoverContent 
+          className="w-auto p-3 bg-white/10 backdrop-blur border border-white/20 rounded-xl"
+          sideOffset={8}
+          align="start"
+          side="bottom"
+          role="dialog"
+          aria-label="時間選擇器"
+          avoidCollisions={true}
+          sticky="always"
+        >
+          <div className="flex space-x-2">
+            {/* 小時選擇器 */}
+            <div className="flex flex-col items-center">
+              <div className="text-xs text-white/70 mb-1">時</div>
+              <ScrollArea 
+                className="h-40 w-16 rounded-lg border border-white/20 overflow-hidden"
+                aria-label="選擇小時"
               >
-                {h}
-              </div>
-            ))}
-          </ScrollArea>
-          <ScrollArea className="h-40 w-16">
-            {minutes.map((m) => (
-              <div
-                key={m}
-                className={cn(
-                  "px-2 py-1 rounded hover:bg-white/10 cursor-pointer text-center",
-                  m === minute && "bg-white/20 text-white font-bold"
-                )}
-                onClick={() => setTime(hour, m)}
+                <div className="p-1 space-y-0.5">
+                  {hours.map((h) => (
+                    <div
+                      key={h}
+                      className={cn(
+                        "px-2 py-1 rounded cursor-pointer text-center text-white transition-all duration-150 select-none text-sm",
+                        "hover:bg-white/20",
+                        h === hour ? "bg-white/30 font-bold shadow-sm" : "hover:bg-white/10"
+                      )}
+                      onClick={() => setTime(h, minute)}
+                    >
+                      {h}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+            
+            {/* 分鐘選擇器 */}
+            <div className="flex flex-col items-center">
+              <div className="text-xs text-white/70 mb-1">分</div>
+              <ScrollArea 
+                className="h-40 w-16 rounded-lg border border-white/20 overflow-hidden"
+                aria-label="選擇分鐘"
               >
-                {m}
-              </div>
-            ))}
-          </ScrollArea>
+                <div className="p-1 space-y-0.5">
+                  {minutes.map((m) => (
+                    <div
+                      key={m}
+                      className={cn(
+                        "px-2 py-1 rounded cursor-pointer text-center text-white transition-all duration-150 select-none text-sm",
+                        "hover:bg-white/20",
+                        m === minute ? "bg-white/30 font-bold shadow-sm" : "hover:bg-white/10"
+                      )}
+                      onClick={() => setTime(hour, m)}
+                    >
+                      {m}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
         </PopoverContent>
       </Popover>
     </div>
