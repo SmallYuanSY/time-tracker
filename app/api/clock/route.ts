@@ -1,6 +1,7 @@
 // app/api/clock/route.ts
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,6 +9,11 @@ export async function POST(req: NextRequest) {
 
     if (!userId || !type) {
       return new NextResponse('Missing userId or type', { status: 400 })
+    }
+
+    const session = await getServerSession()
+    if (!session?.user?.id || session.user.id !== userId) {
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
     // 如果是下班打卡，需要先結算所有進行中的工作記錄
@@ -72,6 +78,11 @@ export async function GET(req: NextRequest) {
 
     if (!userId) {
       return new NextResponse('Missing userId', { status: 400 })
+    }
+
+    const session = await getServerSession()
+    if (!session?.user?.id || session.user.id !== userId) {
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
     // 獲取今日日期範圍
