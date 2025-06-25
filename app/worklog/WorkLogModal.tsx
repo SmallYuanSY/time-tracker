@@ -49,7 +49,6 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([])
   const [showProjectDropdown, setShowProjectDropdown] = useState(false)
   const [isNewProject, setIsNewProject] = useState(false)
-  const [loadingProject, setLoadingProject] = useState(false)
 
   // 載入用戶的案件列表
   useEffect(() => {
@@ -82,7 +81,6 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
 
     // 當輸入兩位數或更多時，嘗試搜尋案件
     if (code.length >= 2) {
-      setLoadingProject(true)
       
       // 搜尋現有案件（精確匹配開頭）
       const matchingProjects = projects.filter(p => 
@@ -114,7 +112,6 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
         })
       }
       
-      setLoadingProject(false)
     } else {
       setShowProjectDropdown(false)
       setIsNewProject(false)
@@ -290,13 +287,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
                 onChange={handleProjectCodeChange}
                 className="w-full rounded-xl bg-white/20 border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none"
               />
-              
-              {/* 載入指示器 */}
-              {loadingProject && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
-                </div>
-              )}
+
               
               {/* 案件下拉選單 */}
               {showProjectDropdown && filteredProjects.length > 0 && (

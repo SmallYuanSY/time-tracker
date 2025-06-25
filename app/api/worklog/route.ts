@@ -5,7 +5,9 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    console.log('[POST /api/worklog] 收到的資料:', body)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[POST /api/worklog] 收到的資料:', body)
+    }
     
     const {
       userId,
@@ -29,7 +31,9 @@ export async function POST(req: NextRequest) {
       if (!category) missingFields.push('category')
       if (!content) missingFields.push('content')
       
-      console.error('[POST /api/worklog] 缺少必要欄位:', missingFields)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[POST /api/worklog] 缺少必要欄位:', missingFields)
+      }
       return new NextResponse(`缺少必要欄位: ${missingFields.join(', ')}`, { status: 400 })
     }
 
@@ -47,9 +51,11 @@ export async function POST(req: NextRequest) {
       return new NextResponse('無效的結束時間格式', { status: 400 })
     }
 
-    console.log('[POST /api/worklog] 嘗試建立工作記錄...')
-    console.log('[POST /api/worklog] startDate:', startDate)
-    console.log('[POST /api/worklog] endDate:', endDate)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[POST /api/worklog] 嘗試建立工作記錄...')
+      console.log('[POST /api/worklog] startDate:', startDate)
+      console.log('[POST /api/worklog] endDate:', endDate)
+    }
     
     const result = await prisma.workLog.create({
       data: {
@@ -63,7 +69,9 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    console.log('[POST /api/worklog] 成功建立工作記錄:', result.id)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[POST /api/worklog] 成功建立工作記錄:', result.id)
+    }
     return NextResponse.json(result)
   } catch (error) {
     console.error('[POST /api/worklog] 錯誤詳情:', error)
