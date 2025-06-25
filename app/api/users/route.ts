@@ -4,41 +4,35 @@ import bcrypt from "bcrypt"
 import { Novu } from '@novu/api'
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { NextRequest } from 'next/server'
 
 // 初始化 Novu 客戶端
 const novu = new Novu({ 
   secretKey: process.env.NOVU_SECRET_KEY || process.env.NOVU_API_KEY
 })
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: "未登入" }, { status: 401 })
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
-    // 檢查用戶是否在資料庫中存在
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+    const users = await prisma.user.findMany({
       select: {
         id: true,
-        email: true,
         name: true,
-        createdAt: true
-      }
+        email: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
     })
 
-    if (!user) {
-      return NextResponse.json({ error: "用戶不存在" }, { status: 404 })
-    }
-
-    return NextResponse.json({ user })
+    return NextResponse.json(users)
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('[GET /api/users]', error)
-    }
-    return NextResponse.json({ error: "伺服器內部錯誤" }, { status: 500 })
+    console.error('[GET /api/users]', error)
+    return new NextResponse('伺服器內部錯誤', { status: 500 })
   }
 }
 
