@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import bcrypt from "bcrypt"
 import { Novu } from '@novu/api'
 import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
 
 // 初始化 Novu 客戶端
 const novu = new Novu({ 
@@ -11,7 +12,7 @@ const novu = new Novu({
 
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession()
+    const session = await getServerSession(authOptions)
     
     if (!session?.user?.email) {
       return NextResponse.json({ error: "未登入" }, { status: 401 })
