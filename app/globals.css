@@ -201,9 +201,10 @@
   }
 
   /* Novu 彈出內容的毛玻璃效果 */
-  [role="dialog"],
-  [data-state="open"] > div,
-  div[style*="position: fixed"] {
+  [data-novu-popover] [role="dialog"],
+  [data-novu-dropdown] [role="dialog"],
+  .novu-popover [role="dialog"],
+  .novu-dropdown [role="dialog"] {
     background: rgba(255, 255, 255, 0.7) !important;
     backdrop-filter: blur(12px) !important;
     border: 1px solid rgba(255, 255, 255, 0.3) !important;

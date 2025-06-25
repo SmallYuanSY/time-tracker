@@ -13,11 +13,15 @@ import {
   LogOut,
   Settings,
   Bell,
+  Briefcase,
+  Users,
 } from "lucide-react"
 
 const sidebarItems = [
   { name: "總覽", icon: <LayoutDashboard className="w-4 h-4 mr-2" />, href: "/" },
   { name: "工作記錄", icon: <FileClock className="w-4 h-4 mr-2" />, href: "/worklog" },
+  { name: "案件管理", icon: <Briefcase className="w-4 h-4 mr-2" />, href: "/projects" },
+  { name: "聯絡人", icon: <Users className="w-4 h-4 mr-2" />, href: "/contacts" },
   { name: "請假", icon: <FileClock className="w-4 h-4 mr-2" />, href: "/leave" },
   { name: "通知", icon: <Bell className="w-4 h-4 mr-2" />, href: "/notifications" },
   { name: "設定", icon: <Settings className="w-4 h-4 mr-2" />, href: "#" },

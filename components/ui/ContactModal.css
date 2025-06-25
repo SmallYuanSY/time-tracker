@@ -1,0 +1,7 @@
+@import "@radix-ui/colors/black-alpha.css";
+@import "@radix-ui/colors/white-alpha.css";
+
+.DialogContent {
+  background-color: var(--black-a9);
+  color: var(--white-a9);
+}

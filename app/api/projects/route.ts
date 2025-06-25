@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 // 獲取用戶的案件列表
 export async function GET(req: NextRequest) {
@@ -7,6 +9,44 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const userId = searchParams.get('userId')
     const projectCode = searchParams.get('projectCode')
+    const includeContacts = searchParams.get('includeContacts') === 'true'
+
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 })
+    }
+
+    // 如果是案件管理頁面（不需要 userId）
+    if (!userId && includeContacts) {
+      // 取得所有已使用的案件及其聯絡人資訊
+      const distinctProjects = await prisma.workLog.groupBy({
+        by: ['projectCode', 'projectName', 'category'],
+        orderBy: {
+          projectCode: 'asc',
+        },
+      })
+
+      // 對每個案件查找關聯的 Project 記錄和聯絡人
+      const projectsWithContacts = await Promise.all(
+        distinctProjects.map(async (project) => {
+          const projectRecord = await prisma.project.findUnique({
+            where: { code: project.projectCode },
+            include: {
+              contact: true,
+            },
+          })
+
+          return {
+            projectCode: project.projectCode,
+            projectName: project.projectName,
+            category: project.category,
+            contact: projectRecord?.contact || null,
+          }
+        })
+      )
+
+      return NextResponse.json(projectsWithContacts)
+    }
 
     if (!userId) {
       return new NextResponse('缺少 userId', { status: 400 })
