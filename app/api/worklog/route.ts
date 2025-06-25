@@ -96,23 +96,47 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const userId = searchParams.get('userId')
     const dateStr = searchParams.get('date') // 格式應為 YYYY-MM-DD
+    const fromStr = searchParams.get('from') // ISO 字串
+    const toStr = searchParams.get('to') // ISO 字串
+    const ongoingOnly = searchParams.get('ongoingOnly') === 'true'
 
-    if (!userId || !dateStr) {
-      return new NextResponse('缺少 userId 或 date', { status: 400 })
+    if (!userId) {
+      return new NextResponse('缺少 userId', { status: 400 })
     }
 
-    const date = new Date(dateStr)
-    const nextDay = new Date(date)
-    nextDay.setDate(date.getDate() + 1)
+    let startDate: Date
+    let endDate: Date
+
+    // 支援兩種查詢模式：按日期 或 按時間範圍
+    if (fromStr && toStr) {
+      // 使用 from/to 範圍查詢
+      startDate = new Date(fromStr)
+      endDate = new Date(toStr)
+    } else if (dateStr) {
+      // 使用日期查詢（向後兼容）
+      startDate = new Date(dateStr)
+      endDate = new Date(startDate)
+      endDate.setDate(startDate.getDate() + 1)
+    } else {
+      return new NextResponse('缺少 date 或 from/to 參數', { status: 400 })
+    }
+
+    // 建立查詢條件
+    const whereConditions: any = {
+      userId,
+      startTime: {
+        gte: startDate,
+        lt: endDate,
+      },
+    }
+
+    // 如果只要進行中的記錄（沒有結束時間）
+    if (ongoingOnly) {
+      whereConditions.endTime = null
+    }
 
     const results = await prisma.workLog.findMany({
-      where: {
-        userId,
-        startTime: {
-          gte: date,
-          lt: nextDay,
-        },
-      },
+      where: whereConditions,
       orderBy: {
         startTime: 'asc',
       },

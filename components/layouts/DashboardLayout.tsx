@@ -42,9 +42,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex min-h-screen w-full bg-muted/40">
-      <div className="hidden border-r bg-background md:block w-64">
-        <div className="flex h-full max-h-screen flex-col gap-2">
+    <div className="flex h-screen w-full bg-muted/40">
+      {/* 固定側邊欄 - 只在桌面版顯示 */}
+      <div className="hidden border-r bg-background md:block w-64 h-screen fixed z-40">
+        <div className="flex h-full flex-col gap-2">
           <div className="flex h-14 items-center border-b px-4">
             <span className="text-lg font-semibold">工作日誌</span>
           </div>
@@ -84,9 +85,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </div>
-      <div className="flex flex-col flex-1">
-        <main className="flex-1 p-4 overflow-auto">
-          {/* 移除原本的 showEndOfDay 控制，改由主頁控制 */}
+      
+      {/* 主內容區域 - 左邊留出側邊欄空間（桌面版），手機版全寬 */}
+      <div className="flex flex-col flex-1 md:ml-64">
+        <main className="flex-1 h-screen overflow-y-auto">
           {children}
         </main>
       </div>

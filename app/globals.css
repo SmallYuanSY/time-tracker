@@ -121,6 +121,24 @@
   }
 }
 
+/* 打卡翻轉動畫 */
+@keyframes flip {
+  0% {
+    transform: perspective(600px) rotateY(0deg);
+  }
+  50% {
+    transform: perspective(600px) rotateY(180deg);
+  }
+  100% {
+    transform: perspective(600px) rotateY(360deg);
+  }
+}
+
+.flip {
+  animation: flip 0.6s ease-in-out;
+  transform-style: preserve-3d;
+}
+
 /* Novu 彈出視窗的 z-index 修正 */
 @layer components {
   /* Novu Inbox 彈出視窗樣式 */

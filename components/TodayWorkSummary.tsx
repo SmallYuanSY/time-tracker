@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -19,9 +19,10 @@ interface WorkLog {
 
 interface TodayWorkSummaryProps {
   onRefresh?: () => void
+  refreshTrigger?: number // 外部觸發刷新的信號
 }
 
-export default function TodayWorkSummary({ onRefresh }: TodayWorkSummaryProps) {
+export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWorkSummaryProps) {
   const { data: session } = useSession()
   const [logs, setLogs] = useState<WorkLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -37,7 +38,7 @@ export default function TodayWorkSummary({ onRefresh }: TodayWorkSummaryProps) {
     setToday(new Date().toISOString().split("T")[0])
   }, [])
 
-  const fetchWorkLogs = async () => {
+  const fetchWorkLogs = useCallback(async () => {
     if (!session?.user || !isClient || !today) {
       setLoading(false)
       return
@@ -57,13 +58,20 @@ export default function TodayWorkSummary({ onRefresh }: TodayWorkSummaryProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [session?.user, isClient, today])
 
   useEffect(() => {
-    if (isClient && today) {
+    if (isClient && today && session?.user) {
       fetchWorkLogs()
     }
-  }, [session, today, isClient])
+  }, [session, today, isClient, fetchWorkLogs])
+
+  // 監聽外部刷新觸發
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      fetchWorkLogs()
+    }
+  }, [refreshTrigger, fetchWorkLogs])
 
   const handleEdit = (log: WorkLog) => {
     setEditingLog(log)
@@ -199,6 +207,11 @@ export default function TodayWorkSummary({ onRefresh }: TodayWorkSummaryProps) {
           initialMode={editingLog || copyingLog ? "full" : "quick"}
           onClose={handleCloseModal}
           onSave={handleSave}
+          onNext={async () => {
+            // 「儲存並新增」時也要刷新資料
+            await fetchWorkLogs()
+            if (onRefresh) onRefresh()
+          }}
           editData={editingLog}
           copyData={copyingLog}
           showNext={!!copyingLog || (!editingLog && !copyingLog)} // 複製模式或新增模式下顯示「儲存並新增」

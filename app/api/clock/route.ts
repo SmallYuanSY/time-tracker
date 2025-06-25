@@ -10,6 +10,47 @@ export async function POST(req: NextRequest) {
       return new NextResponse('Missing userId or type', { status: 400 })
     }
 
+    // 如果是下班打卡，需要先結算所有進行中的工作記錄
+    if (type === 'OUT') {
+      // 獲取今日日期範圍
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+
+      // 查找今日所有沒有結束時間的工作記錄
+      const ongoingWorkLogs = await prisma.workLog.findMany({
+        where: {
+          userId,
+          startTime: {
+            gte: today,
+            lt: tomorrow,
+          },
+          endTime: null, // 沒有結束時間的記錄
+        },
+      })
+
+      // 取得當前時間作為結束時間
+      const now = new Date()
+
+      // 批量更新所有進行中的工作記錄，設定結束時間
+      if (ongoingWorkLogs.length > 0) {
+        await prisma.workLog.updateMany({
+          where: {
+            id: {
+              in: ongoingWorkLogs.map(log => log.id)
+            }
+          },
+          data: {
+            endTime: now
+          }
+        })
+
+        console.log(`下班打卡：自動結算了 ${ongoingWorkLogs.length} 個進行中的工作記錄`)
+      }
+    }
+
+    // 執行打卡記錄
     const result = await prisma.clock.create({
       data: {
         userId,

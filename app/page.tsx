@@ -76,7 +76,7 @@ export default function HomePage() {
         </div>
       </Portal>
 
-      <div className="space-y-6 p-6">
+      <div className="min-h-full bg-gradient-to-br from-slate-900 via-indigo-900 to-purple-900 space-y-6 p-6">
         {/* 頂部功能區域 - 分成多個卡片 */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 時間和日期卡片 */}
@@ -86,7 +86,7 @@ export default function HomePage() {
           
           {/* 打卡系統卡片 */}
           <div className="lg:col-span-1">
-            <PunchCardWidget />
+            <PunchCardWidget onWorkLogSaved={() => setSummaryKey(k => k + 1)} />
           </div>
           
           {/* 今日統計卡片 */}
@@ -96,7 +96,11 @@ export default function HomePage() {
         </div>
 
         {/* 今日工作摘要 */}
-        <TodayWorkSummary key={summaryKey} onRefresh={() => setSummaryKey(k => k + 1)} />
+        <TodayWorkSummary 
+          key={summaryKey} 
+          onRefresh={() => setSummaryKey(k => k + 1)}
+          refreshTrigger={summaryKey}
+        />
 
         {/* 快速操作區域 */}
         <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
