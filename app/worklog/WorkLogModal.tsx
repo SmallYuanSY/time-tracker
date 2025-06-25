@@ -26,7 +26,7 @@ interface WorkLogModalProps {
   onSave?: () => void
   onNext?: () => void
   showNext?: boolean
-  initialMode?: 'start' | 'full' | 'end'
+  initialMode?: 'start' | 'full' | 'end' | 'quick'
   editData?: WorkLog | null
   copyData?: WorkLog | null // 複製模式，只複製基本資訊，不複製時間
 }
@@ -38,7 +38,11 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
     projectName: editData?.projectName || copyData?.projectName || '',
     category: editData?.category || copyData?.category || '',
     content: editData?.content || copyData?.content || '',
-    startTime: editData ? new Date(editData.startTime).toTimeString().slice(0, 5) : '09:00',
+    startTime: editData
+      ? new Date(editData.startTime).toTimeString().slice(0, 5)
+      : initialMode === 'quick'
+        ? ''
+        : '09:00',
     endTime: editData?.endTime ? new Date(editData.endTime).toTimeString().slice(0, 5) : '',
   })
   const [errors, setErrors] = useState<string[]>([])
@@ -162,7 +166,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
     if (!formData.projectName.trim()) newErrors.push('案件名稱為必填欄位')
     if (!formData.category.trim()) newErrors.push('分類為必填欄位')
     if (!formData.content.trim()) newErrors.push('工作內容為必填欄位')
-    if (!formData.startTime) newErrors.push('開始時間為必填欄位')
+    if (initialMode !== 'quick' && !formData.startTime) newErrors.push('開始時間為必填欄位')
     if (initialMode === 'full' || initialMode === 'end') {
       if (!formData.endTime) newErrors.push('結束時間為必填欄位')
 
@@ -191,44 +195,51 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
     setErrors([])
 
     try {
-      const today = new Date().toISOString().split('T')[0]
-      const startTime = formData.startTime || '09:00'
-      const fullStart = `${today}T${startTime}:00`
-      
-      // 只有在 full 或 end 模式，或是編輯模式時才處理結束時間
-      let fullEnd = null
-      if (initialMode === 'full' || initialMode === 'end' || editData) {
-        const endTime = formData.endTime
-        if (endTime) {
-          fullEnd = `${today}T${endTime}:00`
+      let url = '/api/worklog'
+      let method: 'POST' | 'PUT' = 'POST'
+      let payload: any
+
+      if (initialMode === 'quick') {
+        payload = {
+          userId: (session.user as any).id,
+          projectCode: formData.projectCode,
+          projectName: formData.projectName,
+          category: formData.category,
+          content: formData.content,
+        }
+        url = '/api/worklog/quick'
+      } else {
+        const today = new Date().toISOString().split('T')[0]
+        const startTime = formData.startTime || '09:00'
+        const fullStart = `${today}T${startTime}:00`
+
+        let fullEnd = null
+        if (initialMode === 'full' || initialMode === 'end' || editData) {
+          const endTime = formData.endTime
+          if (endTime) {
+            fullEnd = `${today}T${endTime}:00`
+          }
+        }
+
+        payload = {
+          ...formData,
+          userId: (session.user as any).id,
+          startTime: fullStart,
+          ...(fullEnd && { endTime: fullEnd }),
+        }
+        if (editData) {
+          method = 'PUT'
+          url = `/api/worklog/${editData.id}`
         }
       }
 
-      const data = {
-        ...formData,
-        userId: (session.user as any).id,
-        startTime: fullStart,
-        ...(fullEnd && { endTime: fullEnd }),
-      }
+      console.log('[提交工作紀錄]', payload)
 
-      console.log('[提交工作紀錄]', data)
-      
-      let response;
-      if (editData) {
-        // 編輯模式 - 使用 PUT 請求
-        response = await fetch(`/api/worklog/${editData.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        })
-      } else {
-        // 新增模式 - 使用 POST 請求
-        response = await fetch('/api/worklog', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        })
-      }
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
 
       if (!response.ok) {
         const errorData = await response.text()
@@ -242,7 +253,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
           projectName: '',
           category: '',
           content: '',
-          startTime: formData.endTime || '17:00',
+          startTime: initialMode === 'quick' ? '' : formData.endTime || '17:00',
           endTime: '',
         })
         onNext()
@@ -360,19 +371,23 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
             )}
             <textarea name="content" placeholder="工作內容" rows={3} value={formData.content} onChange={handleChange}
               className="w-full rounded-xl bg-white/20 border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none" />
-            <div className="grid grid-cols-2 gap-4">
-              <SimpleTimePicker label="開始時間" value={formData.startTime} onChange={(time: string) => setFormData({ ...formData, startTime: time })} />
-              {(initialMode === 'full' || initialMode === 'end') ? (
-                <SimpleTimePicker label="結束時間" value={formData.endTime} onChange={(time: string) => setFormData({ ...formData, endTime: time })} />
-              ) : (
-                <div className="space-y-2">
-                  <div className="text-sm text-white font-medium block">結束時間</div>
-                  <div className="w-full rounded-xl bg-white/10 border border-white/20 px-4 py-3 text-white/60 text-center">
-                    {initialMode === 'start' ? '下班時填寫' : '請選擇結束時間'}
+            {initialMode === 'quick' ? (
+              <div className="text-white/60 text-sm">開始與結束時間將自動填入</div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <SimpleTimePicker label="開始時間" value={formData.startTime} onChange={(time: string) => setFormData({ ...formData, startTime: time })} />
+                {(initialMode === 'full' || initialMode === 'end') ? (
+                  <SimpleTimePicker label="結束時間" value={formData.endTime} onChange={(time: string) => setFormData({ ...formData, endTime: time })} />
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-sm text-white font-medium block">結束時間</div>
+                    <div className="w-full rounded-xl bg-white/10 border border-white/20 px-4 py-3 text-white/60 text-center">
+                      {initialMode === 'start' ? '下班時填寫' : '請選擇結束時間'}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="mt-6 flex justify-between gap-2">
