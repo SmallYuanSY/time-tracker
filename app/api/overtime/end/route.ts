@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     }
 
     const session = await getServerSession()
-    if (!session?.user?.id || session.user.id !== userId) {
+    if (!session?.user || !(session.user as any).id || (session.user as any).id !== userId) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 

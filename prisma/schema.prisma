@@ -23,6 +23,8 @@ model User {
   clocks    clock[]
   requestedLeaves LeaveRequest[] @relation("Requester")
   agentLeaves     LeaveRequest[] @relation("Agent")
+  overtimes Overtime[]
+  projects  Project[]  // 用戶可以管理的專案
 }
 
 model clock {
@@ -42,10 +44,12 @@ model workLog {
   id          String    @id @default(cuid())
   userId      String
   user        User      @relation(fields: [userId], references: [id])
+  projectId   String?   // 專案ID（可選，兼容舊資料）
+  project     Project?  @relation(fields: [projectId], references: [id])
   startTime   DateTime
   endTime     DateTime?
-  projectCode String
-  projectName String
+  projectCode String    // 保留舊欄位以兼容
+  projectName String    // 保留舊欄位以兼容
   category    String
   content     String
 }
@@ -69,4 +73,43 @@ enum LeaveStatus {
   PENDING_ADMIN
   APPROVED
   REJECTED
+}
+
+model Overtime {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id])
+  startTime DateTime
+  endTime   DateTime?
+  reason    String?      // 加班原因
+  status    OvertimeStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+enum OvertimeStatus {
+  PENDING     // 進行中
+  COMPLETED   // 已完成
+  CANCELLED   // 已取消
+}
+
+model Project {
+  id          String    @id @default(cuid())
+  code        String    @unique  // 專案編號
+  name        String              // 專案名稱
+  description String?             // 專案描述
+  category    String              // 專案分類
+  status      ProjectStatus @default(ACTIVE)
+  managerId   String              // 專案負責人
+  manager     User      @relation(fields: [managerId], references: [id])
+  workLogs    workLog[]           // 相關工作記錄
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+enum ProjectStatus {
+  ACTIVE      // 進行中
+  COMPLETED   // 已完成
+  SUSPENDED   // 暫停
+  CANCELLED   // 已取消
 }

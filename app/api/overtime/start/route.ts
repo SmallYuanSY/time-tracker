@@ -4,25 +4,23 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await req.json()
+    const { userId, reason } = await req.json()
 
     if (!userId) {
       return new NextResponse('Missing userId', { status: 400 })
     }
 
     const session = await getServerSession()
-    if (!session?.user?.id || session.user.id !== userId) {
+    if (!session?.user || !(session.user as any).id || (session.user as any).id !== userId) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
-    const result = await prisma.workLog.create({
+    const result = await prisma.overtime.create({
       data: {
         userId,
         startTime: new Date(),
-        projectCode: 'OT',
-        projectName: 'Overtime',
-        category: 'overtime',
-        content: '加班',
+        reason: reason || '加班',
+        status: 'PENDING',
       },
     })
 

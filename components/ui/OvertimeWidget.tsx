@@ -6,7 +6,11 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useSession } from 'next-auth/react'
 import { format } from 'date-fns'
 
-export default function OvertimeWidget() {
+interface OvertimeWidgetProps {
+  onStatusChange?: () => void
+}
+
+export default function OvertimeWidget({ onStatusChange }: OvertimeWidgetProps) {
   const { data: session } = useSession()
   const [loading, setLoading] = useState(true)
   const [ongoing, setOngoing] = useState(false)
@@ -46,6 +50,7 @@ export default function OvertimeWidget() {
     })
     if (res.ok) {
       await loadStatus()
+      if (onStatusChange) onStatusChange()
     }
   }
 
@@ -59,6 +64,7 @@ export default function OvertimeWidget() {
     })
     if (res.ok) {
       await loadStatus()
+      if (onStatusChange) onStatusChange()
     }
   }
 

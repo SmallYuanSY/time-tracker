@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from "@/components/layouts/DashboardLayout";
-import PunchCardWidget from "@/components/ui/PunchCardWidget";
+import SmartPunchWidget from "@/components/ui/SmartPunchWidget";
 import NovuInbox from "@/app/components/ui/inbox/NovuInbox";
 import TodayWorkSummary from "@/components/TodayWorkSummary";
 import TimeDisplayCard from "@/components/TimeDisplayCard";
@@ -84,9 +84,9 @@ export default function HomePage() {
             <TimeDisplayCard />
           </div>
           
-          {/* 打卡系統卡片 */}
+          {/* 智能打卡系統卡片 */}
           <div className="lg:col-span-1">
-            <PunchCardWidget onWorkLogSaved={() => setSummaryKey(k => k + 1)} />
+            <SmartPunchWidget onWorkLogSaved={() => setSummaryKey(k => k + 1)} />
           </div>
           
           {/* 今日統計卡片 */}
