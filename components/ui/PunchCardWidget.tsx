@@ -10,7 +10,11 @@ import { EndOfDayModal } from "@/components/ui/EndOfDayModal"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 
-export default function PunchCardWidget() {
+interface PunchCardWidgetProps {
+  onWorkLogSaved?: () => void
+}
+
+export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps) {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [clockedIn, setClockedIn] = useState(false)
@@ -19,6 +23,19 @@ export default function PunchCardWidget() {
   const [showWorkLogModal, setShowWorkLogModal] = useState(false)
   const [showEndOfDayModal, setShowEndOfDayModal] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [isFlipping, setIsFlipping] = useState(false)
+  
+  // 確保動畫狀態能正確重置
+  useEffect(() => {
+    if (isFlipping) {
+      // 如果動畫開始，設定一個保險的重置機制
+      const resetTimer = setTimeout(() => {
+        setIsFlipping(false)
+      }, 700) // 比動畫時間多一點
+      
+      return () => clearTimeout(resetTimer)
+    }
+  }, [isFlipping])
   
   // 使用 useEffect 來處理路由導航，避免在渲染期間呼叫
   useEffect(() => {
@@ -122,7 +139,11 @@ export default function PunchCardWidget() {
   }
 
   const confirmClockIn = async () => {
-    // 呼叫上班打卡 API
+    setShowWorkLogModal(false)
+    
+    // 觸發翻轉動畫
+    setIsFlipping(true)
+    
     try {
       const response = await fetch('/api/clock', {
         method: 'POST',
@@ -134,14 +155,19 @@ export default function PunchCardWidget() {
       })
       
       if (response.ok) {
-        // 重新載入狀態
-        await reloadClockStatus()
+        // 在動畫進行中更新狀態
+        setTimeout(async () => {
+          await reloadClockStatus()
+        }, 300)
       }
     } catch (error) {
       console.error('上班打卡失敗:', error)
     }
     
-    setShowWorkLogModal(false)
+    // 600ms 後重置動畫狀態（與 CSS 動畫時長一致）
+    setTimeout(() => {
+      setIsFlipping(false)
+    }, 600)
   }
 
   const handleClockOut = () => {
@@ -150,7 +176,11 @@ export default function PunchCardWidget() {
   }
 
   const confirmClockOut = async () => {
-    // 呼叫下班打卡 API
+    setShowEndOfDayModal(false)
+    
+    // 觸發翻轉動畫
+    setIsFlipping(true)
+    
     try {
       const response = await fetch('/api/clock', {
         method: 'POST',
@@ -162,19 +192,26 @@ export default function PunchCardWidget() {
       })
       
       if (response.ok) {
-        // 重新載入狀態
-        await reloadClockStatus()
+        // 在動畫進行中更新狀態
+        setTimeout(async () => {
+          await reloadClockStatus()
+          // 下班打卡後也通知主頁刷新今日工作摘要（因為會結算進行中的工作）
+          if (onWorkLogSaved) onWorkLogSaved()
+        }, 300)
       }
     } catch (error) {
       console.error('下班打卡失敗:', error)
     }
     
-    setShowEndOfDayModal(false)
+    // 600ms 後重置動畫狀態（與 CSS 動畫時長一致）
+    setTimeout(() => {
+      setIsFlipping(false)
+    }, 600)
   }
 
   return (
     <>
-      <Card className="bg-gradient-to-br from-purple-500/20 to-pink-600/20 border-purple-400/30 backdrop-blur-lg shadow-xl h-full">
+      <Card className={`bg-gradient-to-br from-purple-500/20 to-pink-600/20 border-purple-400/30 backdrop-blur-lg shadow-xl h-full ${isFlipping ? 'flip' : ''}`}>
         <CardContent className="flex flex-col justify-center items-center p-8 h-full min-h-[200px] gap-6">
           {/* 打卡系統標題 */}
           <h3 className="text-white text-2xl font-bold text-center">⏰ 打卡系統</h3>
@@ -226,8 +263,9 @@ export default function PunchCardWidget() {
             // 取消時不執行打卡
           }}
           onSave={() => {
-            setShowWorkLogModal(false)
             confirmClockIn() // 只有儲存時才執行打卡
+            // 通知主頁刷新今日工作摘要
+            if (onWorkLogSaved) onWorkLogSaved()
           }}
         />
       )}
@@ -237,6 +275,7 @@ export default function PunchCardWidget() {
         <EndOfDayModal 
           onClose={() => setShowEndOfDayModal(false)}
           onConfirm={confirmClockOut}
+          userId={(session?.user as any)?.id}
         />
       )}
     </>
