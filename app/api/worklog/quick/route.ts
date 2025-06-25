@@ -19,17 +19,23 @@ export async function POST(req: NextRequest) {
 
     const now = new Date()
 
-    // 結束上一筆未完成的紀錄
-    const lastLog = await prisma.workLog.findFirst({
+    // 結束所有未完成的紀錄
+    const ongoingLogs = await prisma.workLog.findMany({
       where: { userId, endTime: null },
-      orderBy: { startTime: 'desc' },
     })
 
-    if (lastLog) {
-      await prisma.workLog.update({
-        where: { id: lastLog.id },
+    if (ongoingLogs.length > 0) {
+      await prisma.workLog.updateMany({
+        where: { 
+          userId, 
+          endTime: null 
+        },
         data: { endTime: now },
       })
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[快速新增] 結束了 ${ongoingLogs.length} 個進行中的工作記錄`)
+      }
     }
 
     const result = await prisma.workLog.create({

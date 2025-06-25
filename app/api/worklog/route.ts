@@ -62,6 +62,82 @@ export async function POST(req: NextRequest) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
+    // 時間衝突檢查
+    if (endDate) {
+      // 查找與新時間區間有衝突的工作記錄
+      const conflictingLogs = await prisma.workLog.findMany({
+        where: {
+          userId,
+          OR: [
+            // 現有記錄的開始時間在新記錄時間範圍內
+            {
+              startTime: {
+                gte: startDate,
+                lt: endDate,
+              },
+            },
+            // 現有記錄的結束時間在新記錄時間範圍內
+            {
+              endTime: {
+                gt: startDate,
+                lte: endDate,
+              },
+            },
+            // 現有記錄完全包含新記錄
+            {
+              startTime: {
+                lte: startDate,
+              },
+              endTime: {
+                gte: endDate,
+              },
+            },
+            // 現有記錄跨越新記錄開始時間（進行中的記錄）
+            {
+              startTime: {
+                lt: endDate,
+              },
+              endTime: null,
+            },
+          ],
+        },
+      })
+
+      // 如果有衝突，返回衝突資訊讓前端確認
+      if (conflictingLogs.length > 0) {
+        const conflictDetails = conflictingLogs.map(log => {
+          let action = ''
+          if (!log.endTime) {
+            action = `結束時間設為 ${startDate.toTimeString().slice(0, 5)}`
+          } else if (log.startTime < startDate && log.endTime > endDate) {
+            action = `分割為兩段：${log.startTime.toTimeString().slice(0, 5)}-${startDate.toTimeString().slice(0, 5)} 和 ${endDate.toTimeString().slice(0, 5)}-${log.endTime.toTimeString().slice(0, 5)}`
+          } else if (log.startTime < startDate) {
+            action = `縮短結束時間至 ${startDate.toTimeString().slice(0, 5)}`
+          } else if (log.endTime > endDate) {
+            action = `調整開始時間至 ${endDate.toTimeString().slice(0, 5)}`
+          } else {
+            action = '完全刪除'
+          }
+          
+          return {
+            id: log.id,
+            projectCode: log.projectCode,
+            projectName: log.projectName,
+            category: log.category,
+            content: log.content,
+            startTime: log.startTime.toTimeString().slice(0, 5),
+            endTime: log.endTime ? log.endTime.toTimeString().slice(0, 5) : '進行中',
+            action
+          }
+        })
+
+        return NextResponse.json({
+          conflicts: conflictDetails,
+          message: '檢測到時間衝突，需要確認處理方式'
+        }, { status: 409 })
+      }
+    }
+
     if (process.env.NODE_ENV !== 'production') {
       console.log('[POST /api/worklog] 嘗試建立工作記錄...')
       console.log('[POST /api/worklog] startDate:', startDate)

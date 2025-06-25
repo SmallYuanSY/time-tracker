@@ -137,7 +137,7 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
           </div>
         ) : (
           <div className="space-y-3">
-            {logs.slice(0, 6).map((log) => {
+            {logs.slice(-6).map((log) => {
               const start = format(parseISO(log.startTime), "HH:mm")
               const end = log.endTime ? format(parseISO(log.endTime), "HH:mm") : "進行中"
               const bgColor = isOvertime(log.startTime) 
