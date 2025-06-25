@@ -1,6 +1,8 @@
 // app/api/worklog/route.ts
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,7 +10,7 @@ export async function POST(req: NextRequest) {
     if (process.env.NODE_ENV !== 'production') {
       console.log('[POST /api/worklog] 收到的資料:', body)
     }
-    
+
     const {
       userId,
       startTime,
@@ -49,6 +51,11 @@ export async function POST(req: NextRequest) {
     if (endTime && isNaN(endDate!.getTime())) {
       console.error('[POST /api/worklog] 無效的結束時間:', endTime)
       return new NextResponse('無效的結束時間格式', { status: 400 })
+    }
+
+    const session = await getServerSession(authOptions)
+    if (!session?.user || !(session.user as any).id || (session.user as any).id !== userId) {
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
     if (process.env.NODE_ENV !== 'production') {
