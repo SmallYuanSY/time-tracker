@@ -105,7 +105,7 @@ export default function HomePage() {
         {/* 快速操作區域 */}
         <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
           <h2 className="text-xl font-semibold text-white mb-4">快速操作</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <a
               href="/worklog"
               className="bg-blue-600/20 hover:bg-blue-600/30 border border-blue-400/30 rounded-xl p-4 text-center transition-colors"
@@ -131,6 +131,15 @@ export default function HomePage() {
               <div className="text-green-300 text-2xl mb-2">🧪</div>
               <div className="text-white font-medium">測試通知</div>
               <div className="text-white/60 text-sm">發送測試通知</div>
+            </a>
+
+            <a
+              href="/overtime"
+              className="bg-orange-600/20 hover:bg-orange-600/30 border border-orange-400/30 rounded-xl p-4 text-center transition-colors"
+            >
+              <div className="text-orange-300 text-2xl mb-2">⏱</div>
+              <div className="text-white font-medium">加班模式</div>
+              <div className="text-white/60 text-sm">紀錄加班開始與結束</div>
             </a>
           </div>
         </div>
