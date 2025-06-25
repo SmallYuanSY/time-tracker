@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from "@/components/layouts/DashboardLayout";
@@ -10,10 +10,12 @@ import TodayWorkSummary from "@/components/TodayWorkSummary";
 import TimeDisplayCard from "@/components/TimeDisplayCard";
 import TodayStatsCard from "@/components/TodayStatsCard";
 import { Portal } from "@/components/ui/portal";
+import QuickWorkLogWidget from "@/components/QuickWorkLogWidget";
 
 export default function HomePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [summaryKey, setSummaryKey] = useState(0);
 
   // 身份驗證檢查
   useEffect(() => {
@@ -94,7 +96,10 @@ export default function HomePage() {
         </div>
 
         {/* 今日工作摘要 */}
-        <TodayWorkSummary />
+        <TodayWorkSummary key={summaryKey} />
+
+        {/* 快速工作紀錄 */}
+        <QuickWorkLogWidget onSaved={() => setSummaryKey(k => k + 1)} />
 
         {/* 快速操作區域 */}
         <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
