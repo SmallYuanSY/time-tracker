@@ -87,6 +87,12 @@ export default function TodayWorkSummary({ onRefresh }: TodayWorkSummaryProps) {
     handleCloseModal()
   }
 
+  const handleQuickAdd = () => {
+    setEditingLog(null)
+    setCopyingLog(null)
+    setShowModal(true)
+  }
+
   const isOvertime = (startTime: string) => {
     const t = parseISO(startTime)
     return t.getHours() >= 18 || t.getHours() < 6
@@ -106,7 +112,15 @@ export default function TodayWorkSummary({ onRefresh }: TodayWorkSummaryProps) {
       <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-white">📋 今日工作</h2>
-          <span className="text-white/60 text-sm">{logs.length} 項工作</span>
+          <div className="flex items-center gap-3">
+            <span className="text-white/60 text-sm">{logs.length} 項工作</span>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm"
+              onClick={handleQuickAdd}
+            >
+              ➕ 快速紀錄
+            </Button>
+          </div>
         </div>
 
         {logs.length === 0 ? (
@@ -179,15 +193,15 @@ export default function TodayWorkSummary({ onRefresh }: TodayWorkSummaryProps) {
         )}
       </div>
 
-      {/* 編輯/複製工作紀錄彈窗 */}
+      {/* 編輯/複製/新增工作紀錄彈窗 */}
       {showModal && (
         <WorkLogModal
-          initialMode="full"
+          initialMode={editingLog || copyingLog ? "full" : "quick"}
           onClose={handleCloseModal}
           onSave={handleSave}
           editData={editingLog}
           copyData={copyingLog}
-          showNext={!!copyingLog} // 複製模式下顯示「儲存並新增」
+          showNext={!!copyingLog || (!editingLog && !copyingLog)} // 複製模式或新增模式下顯示「儲存並新增」
         />
       )}
     </>

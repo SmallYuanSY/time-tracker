@@ -10,7 +10,7 @@ import TodayWorkSummary from "@/components/TodayWorkSummary";
 import TimeDisplayCard from "@/components/TimeDisplayCard";
 import TodayStatsCard from "@/components/TodayStatsCard";
 import { Portal } from "@/components/ui/portal";
-import QuickWorkLogWidget from "@/components/QuickWorkLogWidget";
+
 
 export default function HomePage() {
   const { data: session, status } = useSession();
@@ -96,10 +96,7 @@ export default function HomePage() {
         </div>
 
         {/* 今日工作摘要 */}
-        <TodayWorkSummary key={summaryKey} />
-
-        {/* 快速工作紀錄 */}
-        <QuickWorkLogWidget onSaved={() => setSummaryKey(k => k + 1)} />
+        <TodayWorkSummary key={summaryKey} onRefresh={() => setSummaryKey(k => k + 1)} />
 
         {/* 快速操作區域 */}
         <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
