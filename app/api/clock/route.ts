@@ -2,6 +2,7 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,8 +12,8 @@ export async function POST(req: NextRequest) {
       return new NextResponse('Missing userId or type', { status: 400 })
     }
 
-    const session = await getServerSession()
-    if (!session?.user?.id || session.user.id !== userId) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user || !(session.user as any).id || (session.user as any).id !== userId) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
@@ -100,8 +101,8 @@ export async function GET(req: NextRequest) {
       return new NextResponse('Missing userId', { status: 400 })
     }
 
-    const session = await getServerSession()
-    if (!session?.user?.id || session.user.id !== userId) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user || !(session.user as any).id || (session.user as any).id !== userId) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
@@ -110,6 +111,10 @@ export async function GET(req: NextRequest) {
     today.setHours(0, 0, 0, 0)
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
+
+    // 獲取昨日日期範圍（用於跨日判斷）
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
 
     // 獲取今日的打卡記錄，按時間排序
     const todayClocks = await prisma.clock.findMany({
@@ -121,7 +126,21 @@ export async function GET(req: NextRequest) {
         },
       },
       orderBy: {
-        timestamp: 'desc', // 最新的在前面
+        timestamp: 'desc',
+      },
+    })
+
+    // 獲取昨日的打卡記錄（用於跨日判斷）
+    const yesterdayClocks = await prisma.clock.findMany({
+      where: {
+        userId,
+        timestamp: {
+          gte: yesterday,
+          lt: today,
+        },
+      },
+      orderBy: {
+        timestamp: 'desc',
       },
     })
 
@@ -130,7 +149,7 @@ export async function GET(req: NextRequest) {
     let lastClockIn = null
     let lastClockOut = null
 
-    // 找到最後的上班和下班記錄
+    // 先從今日記錄中找最後的上班和下班
     for (const clock of todayClocks) {
       if (clock.type === 'IN' && !lastClockIn) {
         lastClockIn = clock
@@ -140,15 +159,50 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // 判斷當前時間
+    const now = new Date()
+    const hour = now.getHours()
+
     // 判斷當前是否為上班狀態
     if (lastClockIn && lastClockOut) {
-      // 如果都有記錄，比較時間
+      // 今日都有上班和下班記錄，比較時間
       clockedIn = lastClockIn.timestamp > lastClockOut.timestamp
     } else if (lastClockIn && !lastClockOut) {
-      // 只有上班記錄，沒有下班記錄
+      // 今日只有上班記錄，沒有下班記錄
       clockedIn = true
+    } else if (!lastClockIn && !lastClockOut) {
+      // 今日沒有任何打卡記錄
+      // 如果現在是早上（0-8點），需要檢查昨天的狀態
+      if (hour < 8) {
+        // 檢查昨天最後的打卡記錄
+        let yesterdayLastClockIn = null
+        let yesterdayLastClockOut = null
+        
+        for (const clock of yesterdayClocks) {
+          if (clock.type === 'IN' && !yesterdayLastClockIn) {
+            yesterdayLastClockIn = clock
+          }
+          if (clock.type === 'OUT' && !yesterdayLastClockOut) {
+            yesterdayLastClockOut = clock
+          }
+        }
+        
+                 // 如果昨天有上班但沒下班，可能還在上班狀態
+         if (yesterdayLastClockIn && !yesterdayLastClockOut) {
+           clockedIn = true
+         } else if (yesterdayLastClockIn && yesterdayLastClockOut) {
+           // 昨天都有記錄，比較時間
+           clockedIn = new Date(yesterdayLastClockIn.timestamp) > new Date(yesterdayLastClockOut.timestamp)
+         } else {
+           // 昨天沒有記錄或只有下班記錄
+           clockedIn = false
+         }
+      } else {
+        // 白天或晚上，沒有打卡記錄就是下班狀態
+        clockedIn = false
+      }
     } else {
-      // 沒有上班記錄或只有下班記錄
+      // 今日只有下班記錄，沒有上班記錄
       clockedIn = false
     }
 
@@ -157,6 +211,7 @@ export async function GET(req: NextRequest) {
       lastClockIn: lastClockIn?.timestamp || null,
       lastClockOut: lastClockOut?.timestamp || null,
       todayClocks,
+      yesterdayClocks, // 提供昨日記錄供前端參考
     })
   } catch (error) {
     console.error('[GET /api/clock]', error)

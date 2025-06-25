@@ -14,7 +14,28 @@ export async function GET(req: NextRequest) {
 
     // 如果提供了案件編號，搜尋特定案件
     if (projectCode) {
-      const project = await prisma.workLog.findFirst({
+      // 先從 Project 表查找
+      const project = await prisma.project.findUnique({
+        where: { code: projectCode },
+        select: {
+          code: true,
+          name: true,
+          category: true,
+          status: true,
+        },
+      })
+
+      if (project) {
+        return NextResponse.json({
+          projectCode: project.code,
+          projectName: project.name,
+          category: project.category,
+          status: project.status,
+        })
+      }
+
+      // 如果 Project 表沒有，回退到 workLog 表（兼容舊資料）
+      const workLogProject = await prisma.workLog.findFirst({
         where: {
           userId,
           projectCode,
@@ -26,72 +47,104 @@ export async function GET(req: NextRequest) {
         },
       })
 
-      return NextResponse.json(project)
+      return NextResponse.json(workLogProject)
     }
 
-    // 獲取用戶所有的案件列表（去重）
-    const workLogs = await prisma.workLog.findMany({
+    // 獲取用戶所有的案件列表
+    // 先從 Project 表取得所有專案
+    const projects = await prisma.project.findMany({
       where: {
-        userId,
+        OR: [
+          { managerId: userId },
+          { workLogs: { some: { userId } } }
+        ]
       },
       select: {
-        projectCode: true,
-        projectName: true,
+        code: true,
+        name: true,
         category: true,
+        status: true,
       },
-      distinct: ['projectCode'],
-      orderBy: {
-        projectCode: 'asc',
-      },
+      orderBy: { code: 'asc' },
     })
 
-    // 手動去重（因為 Prisma 的 distinct 可能不完全可靠）
-    const projectsMap = new Map()
-    workLogs.forEach(log => {
-      if (!projectsMap.has(log.projectCode)) {
-        projectsMap.set(log.projectCode, log)
-      }
-    })
-    
-    const projects = Array.from(projectsMap.values())
+    // 轉換格式以兼容前端
+    const formattedProjects = projects.map(p => ({
+      projectCode: p.code,
+      projectName: p.name,
+      category: p.category,
+      status: p.status,
+    }))
 
-    return NextResponse.json(projects)
+    // 如果 Project 表沒有資料，回退到 workLog 表
+    if (formattedProjects.length === 0) {
+      const workLogs = await prisma.workLog.findMany({
+        where: { userId },
+        select: {
+          projectCode: true,
+          projectName: true,
+          category: true,
+        },
+        distinct: ['projectCode'],
+        orderBy: { projectCode: 'asc' },
+      })
+
+      const projectsMap = new Map()
+      workLogs.forEach(log => {
+        if (!projectsMap.has(log.projectCode)) {
+          projectsMap.set(log.projectCode, log)
+        }
+      })
+      
+      return NextResponse.json(Array.from(projectsMap.values()))
+    }
+
+    return NextResponse.json(formattedProjects)
   } catch (error) {
     console.error('[GET /api/projects]', error)
     return new NextResponse('伺服器內部錯誤', { status: 500 })
   }
 }
 
-// 創建新案件（當輸入新的案件編號時）
+// 創建新案件
 export async function POST(req: NextRequest) {
   try {
-    const { userId, projectCode, projectName, category } = await req.json()
+    const { userId, projectCode, projectName, category, description } = await req.json()
 
     if (!userId || !projectCode || !projectName) {
       return new NextResponse('缺少必要欄位', { status: 400 })
     }
 
     // 檢查案件是否已存在
-    const existingProject = await prisma.workLog.findFirst({
-      where: {
-        userId,
-        projectCode,
-      },
+    const existingProject = await prisma.project.findUnique({
+      where: { code: projectCode },
     })
 
     if (existingProject) {
       return NextResponse.json({
-        projectCode: existingProject.projectCode,
-        projectName: existingProject.projectName,
+        projectCode: existingProject.code,
+        projectName: existingProject.name,
         category: existingProject.category,
+        status: existingProject.status,
       })
     }
 
-    // 如果是新案件，暫時回傳案件資訊（實際創建會在工作記錄中發生）
+    // 創建新專案
+    const newProject = await prisma.project.create({
+      data: {
+        code: projectCode,
+        name: projectName,
+        category: category || '',
+        description: description || '',
+        managerId: userId,
+      },
+    })
+
     return NextResponse.json({
-      projectCode,
-      projectName,
-      category: category || '',
+      projectCode: newProject.code,
+      projectName: newProject.name,
+      category: newProject.category,
+      status: newProject.status,
       isNew: true,
     })
   } catch (error) {

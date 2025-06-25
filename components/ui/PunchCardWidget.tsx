@@ -56,6 +56,13 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
         const userId = (session.user as any).id
         const response = await fetch(`/api/clock?userId=${userId}`)
         
+        if (response.status === 401) {
+          // 401 未授權，跳轉回登入頁面
+          console.log('身份驗證失敗，跳轉至登入頁面')
+          router.push('/login')
+          return
+        }
+        
         if (response.ok) {
           const data = await response.json()
           setClockedIn(data.clockedIn)
@@ -71,6 +78,8 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
           if (data.lastClockOut) {
             setEndTime(format(new Date(data.lastClockOut), "HH:mm"))
           }
+        } else {
+          console.error('載入打卡狀態失敗，狀態碼:', response.status)
         }
       } catch (error) {
         console.error('載入打卡狀態失敗:', error)
@@ -112,6 +121,13 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
       const userId = (session.user as any).id
       const response = await fetch(`/api/clock?userId=${userId}`)
       
+      if (response.status === 401) {
+        // 401 未授權，跳轉回登入頁面
+        console.log('身份驗證失敗，跳轉至登入頁面')
+        router.push('/login')
+        return
+      }
+      
       if (response.ok) {
         const data = await response.json()
         setClockedIn(data.clockedIn)
@@ -127,6 +143,8 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
         if (data.lastClockOut) {
           setEndTime(format(new Date(data.lastClockOut), "HH:mm"))
         }
+      } else {
+        console.error('重新載入打卡狀態失敗，狀態碼:', response.status)
       }
     } catch (error) {
       console.error('重新載入打卡狀態失敗:', error)
@@ -154,11 +172,20 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
         })
       })
       
+      if (response.status === 401) {
+        // 401 未授權，跳轉回登入頁面
+        console.log('打卡時身份驗證失敗，跳轉至登入頁面')
+        router.push('/login')
+        return
+      }
+      
       if (response.ok) {
         // 在動畫進行中更新狀態
         setTimeout(async () => {
           await reloadClockStatus()
         }, 300)
+      } else {
+        console.error('上班打卡失敗，狀態碼:', response.status)
       }
     } catch (error) {
       console.error('上班打卡失敗:', error)
@@ -191,6 +218,13 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
         })
       })
       
+      if (response.status === 401) {
+        // 401 未授權，跳轉回登入頁面
+        console.log('打卡時身份驗證失敗，跳轉至登入頁面')
+        router.push('/login')
+        return
+      }
+      
       if (response.ok) {
         // 在動畫進行中更新狀態
         setTimeout(async () => {
@@ -198,6 +232,8 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
           // 下班打卡後也通知主頁刷新今日工作摘要（因為會結算進行中的工作）
           if (onWorkLogSaved) onWorkLogSaved()
         }, 300)
+      } else {
+        console.error('下班打卡失敗，狀態碼:', response.status)
       }
     } catch (error) {
       console.error('下班打卡失敗:', error)
