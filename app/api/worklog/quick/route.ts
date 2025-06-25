@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,6 +10,11 @@ export async function POST(req: NextRequest) {
 
     if (!userId || !projectCode || !projectName || !category || !content) {
       return new NextResponse('缺少必要欄位', { status: 400 })
+    }
+
+    const session = await getServerSession(authOptions)
+    if (!session?.user || !(session.user as any).id || (session.user as any).id !== userId) {
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
     const now = new Date()

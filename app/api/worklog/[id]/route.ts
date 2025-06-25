@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 // 更新工作記錄
 export async function PUT(
@@ -24,6 +26,11 @@ export async function PUT(
       !projectCode || !projectName || !category || !content
     ) {
       return new NextResponse('缺少必要欄位', { status: 400 })
+    }
+
+    const session = await getServerSession(authOptions)
+    if (!session?.user || !(session.user as any).id || (session.user as any).id !== userId) {
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
     // 檢查工作記錄是否存在且屬於該用戶
@@ -69,6 +76,11 @@ export async function DELETE(
 
     if (!userId) {
       return new NextResponse('缺少 userId', { status: 400 })
+    }
+
+    const session = await getServerSession(authOptions)
+    if (!session?.user || !(session.user as any).id || (session.user as any).id !== userId) {
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
     // 檢查工作記錄是否存在且屬於該用戶
