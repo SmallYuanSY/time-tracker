@@ -70,8 +70,8 @@ export default function OvertimeWidget({ onStatusChange }: OvertimeWidgetProps) 
 
   if (loading) {
     return (
-      <Card className="bg-gradient-to-br from-orange-500/20 to-orange-600/20 border-orange-400/30 backdrop-blur-lg shadow-xl h-full">
-        <CardContent className="flex items-center justify-center p-8 h-full min-h-[200px]">
+      <Card className="bg-gradient-to-br from-orange-500/20 to-orange-600/20 border-orange-400/30 backdrop-blur-lg shadow-xl h-full py-0">
+        <CardContent className="flex items-center justify-center p-6 h-full" style={{ minHeight: '310px' }}>
           <div className="text-white/60">載入加班狀態...</div>
         </CardContent>
       </Card>
@@ -79,8 +79,8 @@ export default function OvertimeWidget({ onStatusChange }: OvertimeWidgetProps) 
   }
 
   return (
-    <Card className="bg-gradient-to-br from-orange-500/20 to-orange-600/20 border-orange-400/30 backdrop-blur-lg shadow-xl h-full">
-      <CardContent className="flex flex-col justify-center items-center p-8 h-full min-h-[200px] gap-6">
+    <Card className="bg-gradient-to-br from-orange-500/20 to-orange-600/20 border-orange-400/30 backdrop-blur-lg shadow-xl h-full py-0">
+      <CardContent className="flex flex-col justify-center items-center p-6 h-full gap-6" style={{ minHeight: '310px' }}>
         <h3 className="text-white text-2xl font-bold text-center">⏱ 加班模式</h3>
         <div className="text-center p-4 bg-white/10 rounded-xl w-full">
           <div className="text-white text-lg font-medium">

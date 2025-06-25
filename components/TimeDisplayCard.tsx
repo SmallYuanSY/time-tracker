@@ -28,8 +28,8 @@ export default function TimeDisplayCard() {
 
   if (!isClient || !currentTime) {
     return (
-      <Card className="bg-gradient-to-br from-blue-500/20 to-purple-600/20 border-blue-400/30 backdrop-blur-lg shadow-xl h-full">
-        <CardContent className="flex flex-col justify-center items-center p-8 h-full min-h-[200px]">
+      <Card className="bg-gradient-to-br from-blue-500/20 to-purple-600/20 border-blue-400/30 backdrop-blur-lg shadow-xl h-full py-0">
+        <CardContent className="flex flex-col justify-center items-center p-6 h-full" style={{ minHeight: '310px' }}>
           <div className="text-white/60">載入中...</div>
         </CardContent>
       </Card>
@@ -37,8 +37,8 @@ export default function TimeDisplayCard() {
   }
 
   return (
-    <Card className="bg-gradient-to-br from-blue-500/20 to-purple-600/20 border-blue-400/30 backdrop-blur-lg shadow-xl h-full">
-      <CardContent className="flex flex-col justify-center items-center p-8 h-full min-h-[200px]">
+    <Card className="bg-gradient-to-br from-blue-500/20 to-purple-600/20 border-blue-400/30 backdrop-blur-lg shadow-xl h-full py-0">
+      <CardContent className="flex flex-col justify-center items-center p-6 h-full" style={{ minHeight: '310px' }}>
         {/* 大時鐘顯示 */}
         <div className="text-center mb-4">
           <h1 className="text-4xl md:text-5xl font-mono font-bold text-white mb-2 tracking-wider">

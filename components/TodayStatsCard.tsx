@@ -86,8 +86,8 @@ export default function TodayStatsCard() {
 
   if (loading) {
     return (
-      <Card className="bg-gradient-to-br from-green-500/20 to-emerald-600/20 border-green-400/30 backdrop-blur-lg shadow-xl h-full">
-        <CardContent className="flex items-center justify-center p-8 h-full min-h-[200px]">
+      <Card className="bg-gradient-to-br from-green-500/20 to-emerald-600/20 border-green-400/30 backdrop-blur-lg shadow-xl h-full py-0">
+        <CardContent className="flex items-center justify-center p-6 h-full" style={{ minHeight: '310px' }}>
           <div className="text-white/60">載入中...</div>
         </CardContent>
       </Card>
@@ -95,11 +95,10 @@ export default function TodayStatsCard() {
   }
 
   return (
-    <Card className="bg-gradient-to-br from-green-500/20 to-emerald-600/20 border-green-400/30 backdrop-blur-lg shadow-xl h-full">
-      <CardHeader className="pb-3">
-        <h3 className="text-white text-lg font-semibold text-center">📊 今日統計</h3>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Card className="bg-gradient-to-br from-green-500/20 to-emerald-600/20 border-green-400/30 backdrop-blur-lg shadow-xl h-full py-0">
+      <CardContent className="p-6 h-full flex flex-col" style={{ minHeight: '310px' }}>
+        <h3 className="text-white text-lg font-semibold text-center mb-4">📊 今日統計</h3>
+        <div className="space-y-4 flex-1 flex flex-col justify-center">
         {/* 總工作時數 */}
         <div className="text-center p-3 bg-white/10 rounded-xl">
           <div className="text-2xl font-bold text-white">{stats.totalHours}h</div>
@@ -130,6 +129,7 @@ export default function TodayStatsCard() {
               style={{ width: `${Math.min((stats.totalHours / 8) * 100, 100)}%` }}
             ></div>
           </div>
+        </div>
         </div>
       </CardContent>
     </Card>

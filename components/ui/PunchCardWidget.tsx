@@ -95,8 +95,8 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
 
   if (status === 'loading' || loading) {
     return (
-      <Card className="bg-gradient-to-br from-purple-500/20 to-pink-600/20 border-purple-400/30 backdrop-blur-lg shadow-xl h-full">
-        <CardContent className="flex items-center justify-center p-8 h-full min-h-[200px]">
+      <Card className="bg-gradient-to-br from-purple-500/20 to-pink-600/20 border-purple-400/30 backdrop-blur-lg shadow-xl h-full py-0">
+        <CardContent className="flex items-center justify-center p-6 h-full" style={{ minHeight: '280px' }}>
           <div className="text-white/60">載入打卡狀態...</div>
         </CardContent>
       </Card>
@@ -105,8 +105,8 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
 
   if (status === 'unauthenticated') {
     return (
-      <Card className="bg-gradient-to-br from-purple-500/20 to-pink-600/20 border-purple-400/30 backdrop-blur-lg shadow-xl h-full">
-        <CardContent className="flex items-center justify-center p-8 h-full min-h-[200px]">
+      <Card className="bg-gradient-to-br from-purple-500/20 to-pink-600/20 border-purple-400/30 backdrop-blur-lg shadow-xl h-full py-0">
+        <CardContent className="flex items-center justify-center p-6 h-full" style={{ minHeight: '280px' }}>
           <div className="text-white/60">重新導向至登入頁面...</div>
         </CardContent>
       </Card>
@@ -247,26 +247,29 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
 
   return (
     <>
-      <Card className={`bg-gradient-to-br from-purple-500/20 to-pink-600/20 border-purple-400/30 backdrop-blur-lg shadow-xl h-full ${isFlipping ? 'flip' : ''}`}>
-        <CardContent className="flex flex-col justify-center items-center p-8 h-full min-h-[200px] gap-6">
+      <Card className={`bg-gradient-to-br from-purple-500/20 to-pink-600/20 border-purple-400/30 backdrop-blur-lg shadow-xl h-full py-0 ${isFlipping ? 'flip' : ''}`}>
+        <CardContent className="flex flex-col justify-between items-center p-6 h-full" style={{ minHeight: '310px' }}>
           {/* 打卡系統標題 */}
           <h3 className="text-white text-2xl font-bold text-center">⏰ 打卡系統</h3>
           
-          {/* 打卡狀態 */}
-          <div className="text-center p-4 bg-white/10 rounded-xl w-full">
-            <div className="text-white text-lg font-medium">
-              {clockedIn ? (
-                startTime ? `✅ 已上班：${startTime}` : "✅ 已上班"
-              ) : (
-                endTime ? `🏁 已下班：${endTime}` : "⚪ 尚未打卡"
+          {/* 中間內容區域 */}
+          <div className="flex-1 flex flex-col justify-center w-full space-y-4">
+            {/* 打卡狀態 */}
+            <div className="text-center p-4 bg-white/10 rounded-xl w-full">
+              <div className="text-white text-lg font-medium">
+                {clockedIn ? (
+                  startTime ? `✅ 已上班：${startTime}` : "✅ 已上班"
+                ) : (
+                  endTime ? `🏁 已下班：${endTime}` : "⚪ 尚未打卡"
+                )}
+              </div>
+              {/* 顯示今日打卡歷史 */}
+              {startTime && endTime && !clockedIn && (
+                <div className="text-white/60 text-sm mt-2">
+                  今日：{startTime} - {endTime}
+                </div>
               )}
             </div>
-            {/* 顯示今日打卡歷史 */}
-            {startTime && endTime && !clockedIn && (
-              <div className="text-white/60 text-sm mt-2">
-                今日：{startTime} - {endTime}
-              </div>
-            )}
           </div>
           
           {/* 打卡按鈕 */}

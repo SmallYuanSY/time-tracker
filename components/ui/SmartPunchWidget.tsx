@@ -69,8 +69,17 @@ export default function SmartPunchWidget({ onWorkLogSaved }: SmartPunchWidgetPro
               }
             }
           } else {
-            // 在正常上班時段 (8:00-18:00)，如果已下班也顯示加班模組
-            newShouldShowOvertime = true
+            // 在正常上班時段 (8:00-18:00)
+            if (data.lastClockOut && data.lastClockIn) {
+              // 有完整的上下班記錄，表示今天已經下班，可以加班
+              newShouldShowOvertime = true
+            } else if (!data.lastClockIn && !data.lastClockOut) {
+              // 今天還沒有任何打卡記錄，顯示正常打卡
+              newShouldShowOvertime = false
+            } else {
+              // 其他情況（例如只有上班記錄沒有下班記錄），顯示正常打卡
+              newShouldShowOvertime = false
+            }
           }
         }
         
