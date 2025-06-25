@@ -18,39 +18,59 @@ export async function POST(req: NextRequest) {
 
     // 如果是下班打卡，需要先結算所有進行中的工作記錄
     if (type === 'OUT') {
-      // 獲取今日日期範圍
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const tomorrow = new Date(today)
-      tomorrow.setDate(tomorrow.getDate() + 1)
+      const now = new Date()
+      const startOfToday = new Date()
+      startOfToday.setHours(0, 0, 0, 0)
 
-      // 查找今日所有沒有結束時間的工作記錄
+      // 取得所有未結束且開始時間早於目前時間的工作記錄
       const ongoingWorkLogs = await prisma.workLog.findMany({
         where: {
           userId,
-          startTime: {
-            gte: today,
-            lt: tomorrow,
-          },
-          endTime: null, // 沒有結束時間的記錄
+          endTime: null,
+          startTime: { lte: now },
         },
       })
 
-      // 取得當前時間作為結束時間
-      const now = new Date()
-
-      // 批量更新所有進行中的工作記錄，設定結束時間
       if (ongoingWorkLogs.length > 0) {
-        await prisma.workLog.updateMany({
-          where: {
-            id: {
-              in: ongoingWorkLogs.map(log => log.id)
-            }
-          },
-          data: {
-            endTime: now
-          }
+        const { Novu } = await import('@novu/api')
+        const novu = new Novu({
+          secretKey: process.env.NOVU_SECRET_KEY || process.env.NOVU_API_KEY,
         })
+
+        let needNotify = false
+
+        for (const log of ongoingWorkLogs) {
+          const limit = new Date(log.startTime)
+          limit.setDate(limit.getDate() + 1)
+          limit.setHours(8, 0, 0, 0)
+
+          const endTime = now > limit ? limit : now
+
+          if (log.startTime < startOfToday && now > limit) {
+            needNotify = true
+          }
+
+          await prisma.workLog.update({
+            where: { id: log.id },
+            data: { endTime },
+          })
+        }
+
+        if (needNotify) {
+          try {
+            await novu.trigger({
+              workflowId: 'test-notification',
+              to: { subscriberId: `user_${userId}` },
+              payload: {
+                title: '未打下班卡提醒',
+                body: '您昨天忘記下班打卡，系統已自動將時間結算至早上 8 點。',
+                message: '您昨天忘記下班打卡，系統已自動將時間結算至早上 8 點。',
+              },
+            })
+          } catch (e) {
+            console.error('發送未打卡通知失敗:', e)
+          }
+        }
 
         console.log(`下班打卡：自動結算了 ${ongoingWorkLogs.length} 個進行中的工作記錄`)
       }
