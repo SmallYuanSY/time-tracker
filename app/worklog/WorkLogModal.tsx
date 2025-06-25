@@ -55,6 +55,18 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([])
   const [showProjectDropdown, setShowProjectDropdown] = useState(false)
   const [isNewProject, setIsNewProject] = useState(false)
+  const [selectedProjects, setSelectedProjects] = useState<Project[]>(
+    editData
+      ? [{ projectCode: editData.projectCode, projectName: editData.projectName, category: editData.category }]
+      : copyData
+        ? [{ projectCode: copyData.projectCode, projectName: copyData.projectName, category: copyData.category }]
+        : []
+  )
+
+  const extraTasks: Project[] = [
+    { projectCode: '01', projectName: '非特定工作', category: '' },
+    { projectCode: '09', projectName: '公司內務', category: '' },
+  ]
 
   // 載入用戶的案件列表
   useEffect(() => {
@@ -100,9 +112,9 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
       if (matchingProjects.length > 0) {
         setShowProjectDropdown(true)
         setIsNewProject(false)
-        
-        // 如果只有一個完全匹配的案件，自動選擇
-        const exactMatch = matchingProjects.find(p => 
+
+        // 如果只有一個完全匹配的案件，自動加入
+        const exactMatch = matchingProjects.find(p =>
           p.projectCode.toLowerCase() === code.toLowerCase()
         )
         if (exactMatch) {
@@ -115,8 +127,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
         setFormData({
           ...formData,
           projectCode: code,
-          projectName: '',
-          category: ''
+          projectName: ''
         })
       }
       
@@ -124,13 +135,12 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
       setShowProjectDropdown(false)
       setIsNewProject(false)
       
-      // 清空案件名稱和分類（如果不是編輯模式）
+      // 清空案件名稱（如果不是編輯模式）
       if (!editData) {
         setFormData({
           ...formData,
           projectCode: code,
-          projectName: '',
-          category: ''
+          projectName: ''
         })
       }
     }
@@ -138,14 +148,25 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
 
   // 選擇現有案件
   const selectProject = (project: Project) => {
-    setFormData({
-      ...formData,
-      projectCode: project.projectCode,
-      projectName: project.projectName,
-      category: project.category
+    setSelectedProjects(prev => {
+      if (prev.find(p => p.projectCode === project.projectCode)) return prev
+      return [...prev, project]
     })
+    setFormData({ ...formData, projectCode: '', projectName: '' })
     setShowProjectDropdown(false)
     setIsNewProject(false)
+  }
+
+  const removeProject = (code: string) => {
+    setSelectedProjects(prev => prev.filter(p => p.projectCode !== code))
+  }
+
+  const toggleExtraTask = (task: Project) => {
+    if (selectedProjects.find(p => p.projectCode === task.projectCode)) {
+      removeProject(task.projectCode)
+    } else {
+      setSelectedProjects(prev => [...prev, task])
+    }
   }
 
   // 點擊外部關閉下拉選單
@@ -166,8 +187,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
   const validateForm = () => {
     const newErrors: string[] = []
 
-    if (!formData.projectCode.trim()) newErrors.push('案件編號為必填欄位')
-    if (!formData.projectName.trim()) newErrors.push('案件名稱為必填欄位')
+    if (selectedProjects.length === 0) newErrors.push('請至少選擇一個案件')
     if (!formData.category.trim()) newErrors.push('分類為必填欄位')
     if (!formData.content.trim()) newErrors.push('工作內容為必填欄位')
     if (initialMode !== 'quick' && !formData.startTime) newErrors.push('開始時間為必填欄位')
@@ -199,60 +219,74 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
     setErrors([])
 
     try {
-      let url = '/api/worklog'
-      let method: 'POST' | 'PUT' = 'POST'
-      let payload: any
+      const baseUrl = initialMode === 'quick' ? '/api/worklog/quick' : '/api/worklog'
 
-      if (initialMode === 'quick') {
-        payload = {
-          userId: (session.user as any).id,
-          projectCode: formData.projectCode,
-          projectName: formData.projectName,
-          category: formData.category,
-          content: formData.content,
-        }
-        url = '/api/worklog/quick'
-      } else {
-        const today = new Date().toISOString().split('T')[0]
-        const startTime = formData.startTime || '09:00'
-        const fullStart = `${today}T${startTime}:00`
+      const requests = [] as Promise<Response>[]
 
-        let fullEnd = null
-        if (initialMode === 'full' || initialMode === 'end' || editData) {
-          const endTime = formData.endTime
-          if (endTime) {
-            fullEnd = `${today}T${endTime}:00`
+      for (const proj of editData ? selectedProjects.slice(0, 1) : selectedProjects) {
+        let url = baseUrl
+        let method: 'POST' | 'PUT' = editData ? 'PUT' : 'POST'
+        let payload: any
+
+        if (initialMode === 'quick') {
+          payload = {
+            userId: (session.user as any).id,
+            projectCode: proj.projectCode,
+            projectName: proj.projectName,
+            category: formData.category,
+            content: formData.content,
+          }
+        } else {
+          const today = new Date().toISOString().split('T')[0]
+          const startTime = formData.startTime || '09:00'
+          const fullStart = `${today}T${startTime}:00`
+
+          let fullEnd = null as string | null
+          if (initialMode === 'full' || initialMode === 'end' || editData) {
+            const endTime = formData.endTime
+            if (endTime) {
+              fullEnd = `${today}T${endTime}:00`
+            }
+          }
+
+          payload = {
+            userId: (session.user as any).id,
+            projectCode: proj.projectCode,
+            projectName: proj.projectName,
+            category: formData.category,
+            content: formData.content,
+            startTime: fullStart,
+            ...(fullEnd && { endTime: fullEnd }),
           }
         }
 
-        payload = {
-          ...formData,
-          userId: (session.user as any).id,
-          startTime: fullStart,
-          ...(fullEnd && { endTime: fullEnd }),
-        }
         if (editData) {
-          method = 'PUT'
           url = `/api/worklog/${editData.id}`
         }
-      }
 
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[提交工作紀錄]', payload)
-      }
-
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.text()
         if (process.env.NODE_ENV !== 'production') {
-          console.error('API 錯誤回應:', errorData)
+          console.log('[提交工作紀錄]', payload)
         }
-        throw new Error(errorData || `提交失敗 (${response.status})`)
+
+        requests.push(
+          fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+        )
+      }
+
+      const responses = await Promise.all(requests)
+
+      for (const response of responses) {
+        if (!response.ok) {
+          const errorData = await response.text()
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('API 錯誤回應:', errorData)
+          }
+          throw new Error(errorData || `提交失敗 (${response.status})`)
+        }
       }
 
       if (proceedNext && onNext) {
@@ -283,7 +317,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
   return (
     <Portal>
       <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40 backdrop-blur-sm">
-        <div className="relative bg-white/10 backdrop-blur-lg border border-white/20 ring-1 ring-white/10 rounded-3xl shadow-xl p-8 w-full max-w-md">
+        <div className="relative bg-white/10 backdrop-blur-lg border border-white/20 ring-1 ring-white/10 rounded-3xl shadow-xl p-8 w-full max-w-2xl">
           <h2 className="text-white text-xl font-bold mb-4">
             {editData ? '編輯工作紀錄' : copyData ? '複製並新增工作紀錄' : '新增工作紀錄'}
           </h2>
@@ -298,7 +332,8 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
             </div>
           )}
 
-          <div className="space-y-3">
+          <div className="md:grid md:grid-cols-3 gap-4">
+            <div className="space-y-3 md:col-span-2">
             {/* 智能案件選擇 */}
             <div className="relative project-dropdown-container">
               <input 
@@ -330,47 +365,38 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
                 </div>
               )}
             </div>
-            
-            {/* 案件名稱 - 根據是否為新案件決定是否可編輯 */}
+
+            {selectedProjects.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {selectedProjects.map(p => (
+                  <span key={p.projectCode} className="bg-blue-500/20 text-white text-sm px-2 py-1 rounded-full flex items-center gap-1">
+                    {p.projectCode} {p.projectName}
+                    <button type="button" onClick={() => removeProject(p.projectCode)} className="ml-1">✕</button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* 案件名稱 */}
             <div className="relative">
-              <input 
-                name="projectName" 
-                placeholder="案件名稱" 
-                value={formData.projectName} 
+              <input
+                name="projectName"
+                placeholder="案件名稱"
+                value={formData.projectName}
                 onChange={handleChange}
-                disabled={!isNewProject && formData.projectName !== ''}
-                className={`w-full rounded-xl border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none ${
-                  !isNewProject && formData.projectName !== '' 
-                    ? 'bg-white/10 cursor-not-allowed' 
-                    : 'bg-white/20'
-                }`}
+                className="w-full rounded-xl border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none bg-white/20"
               />
-              {!isNewProject && formData.projectName !== '' && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/60 text-sm">
-                  🔒
-                </div>
-              )}
             </div>
             
-            {/* 分類 - 根據是否為新案件決定是否可編輯 */}
+            {/* 工作分類 */}
             <div className="relative">
-              <input 
-                name="category" 
-                placeholder="分類" 
-                value={formData.category} 
+              <input
+                name="category"
+                placeholder="分類"
+                value={formData.category}
                 onChange={handleChange}
-                disabled={!isNewProject && formData.category !== ''}
-                className={`w-full rounded-xl border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none ${
-                  !isNewProject && formData.category !== '' 
-                    ? 'bg-white/10 cursor-not-allowed' 
-                    : 'bg-white/20'
-                }`}
+                className="w-full rounded-xl border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none bg-white/20"
               />
-              {!isNewProject && formData.category !== '' && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/60 text-sm">
-                  🔒
-                </div>
-              )}
             </div>
             
             {/* 新案件提示 */}
@@ -398,6 +424,20 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
                 )}
               </div>
             )}
+            </div>
+            <div className="space-y-2 mt-4 md:mt-0">
+              <div className="text-white font-bold text-sm">其他工作</div>
+              {extraTasks.map(task => (
+                <label key={task.projectCode} className="flex items-center gap-2 text-white/80">
+                  <input
+                    type="checkbox"
+                    checked={!!selectedProjects.find(p => p.projectCode === task.projectCode)}
+                    onChange={() => toggleExtraTask(task)}
+                  />
+                  <span>{task.projectCode} {task.projectName}</span>
+                </label>
+              ))}
+            </div>
           </div>
 
           <div className="mt-6 flex justify-between gap-2">
