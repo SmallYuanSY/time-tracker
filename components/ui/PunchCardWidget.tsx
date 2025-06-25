@@ -58,7 +58,9 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
         
         if (response.status === 401) {
           // 401 未授權，跳轉回登入頁面
-          console.log('身份驗證失敗，跳轉至登入頁面')
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('身份驗證失敗，跳轉至登入頁面')
+          }
           router.push('/login')
           return
         }
@@ -79,10 +81,14 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
             setEndTime(format(new Date(data.lastClockOut), "HH:mm"))
           }
         } else {
-          console.error('載入打卡狀態失敗，狀態碼:', response.status)
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('載入打卡狀態失敗，狀態碼:', response.status)
+          }
         }
       } catch (error) {
-        console.error('載入打卡狀態失敗:', error)
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('載入打卡狀態失敗:', error)
+        }
       } finally {
         setLoading(false)
       }
@@ -123,7 +129,9 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
       
       if (response.status === 401) {
         // 401 未授權，跳轉回登入頁面
-        console.log('身份驗證失敗，跳轉至登入頁面')
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('身份驗證失敗，跳轉至登入頁面')
+          }
         router.push('/login')
         return
       }
@@ -144,10 +152,14 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
           setEndTime(format(new Date(data.lastClockOut), "HH:mm"))
         }
       } else {
-        console.error('重新載入打卡狀態失敗，狀態碼:', response.status)
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('重新載入打卡狀態失敗，狀態碼:', response.status)
+          }
       }
     } catch (error) {
-      console.error('重新載入打卡狀態失敗:', error)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('重新載入打卡狀態失敗:', error)
+      }
     }
   }
 
@@ -174,7 +186,9 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
       
       if (response.status === 401) {
         // 401 未授權，跳轉回登入頁面
-        console.log('打卡時身份驗證失敗，跳轉至登入頁面')
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('打卡時身份驗證失敗，跳轉至登入頁面')
+          }
         router.push('/login')
         return
       }
@@ -185,10 +199,14 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
           await reloadClockStatus()
         }, 300)
       } else {
-        console.error('上班打卡失敗，狀態碼:', response.status)
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('上班打卡失敗，狀態碼:', response.status)
+        }
       }
     } catch (error) {
-      console.error('上班打卡失敗:', error)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('上班打卡失敗:', error)
+      }
     }
     
     // 600ms 後重置動畫狀態（與 CSS 動畫時長一致）
@@ -220,7 +238,9 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
       
       if (response.status === 401) {
         // 401 未授權，跳轉回登入頁面
-        console.log('打卡時身份驗證失敗，跳轉至登入頁面')
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('打卡時身份驗證失敗，跳轉至登入頁面')
+          }
         router.push('/login')
         return
       }
@@ -233,10 +253,14 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
           if (onWorkLogSaved) onWorkLogSaved()
         }, 300)
       } else {
-        console.error('下班打卡失敗，狀態碼:', response.status)
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('下班打卡失敗，狀態碼:', response.status)
+        }
       }
     } catch (error) {
-      console.error('下班打卡失敗:', error)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('下班打卡失敗:', error)
+      }
     }
     
     // 600ms 後重置動畫狀態（與 CSS 動畫時長一致）

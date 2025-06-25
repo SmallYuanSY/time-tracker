@@ -35,13 +35,19 @@ export function EndOfDayModal({
         
         if (response.ok) {
           const data = await response.json()
-          console.log('獲取的進行中工作記錄:', data)
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('獲取的進行中工作記錄:', data)
+          }
           setOngoingWorkLogs(data)
         } else {
-          console.error('API 請求失敗:', response.status, response.statusText)
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('API 請求失敗:', response.status, response.statusText)
+          }
         }
       } catch (error) {
-        console.error('獲取進行中工作記錄失敗:', error)
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('獲取進行中工作記錄失敗:', error)
+        }
       } finally {
         setLoading(false)
       }

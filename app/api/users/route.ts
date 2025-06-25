@@ -35,7 +35,9 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ user })
   } catch (error) {
-    console.error('[GET /api/users]', error)
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[GET /api/users]', error)
+    }
     return NextResponse.json({ error: "伺服器內部錯誤" }, { status: 500 })
   }
 }
@@ -81,10 +83,14 @@ export async function POST(req: Request) {
         }
       });
       
-      console.log(`✅ Novu subscriber created: ${subscriberId}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`✅ Novu subscriber created: ${subscriberId}`);
+      }
     } catch (novuError) {
       // Novu 錯誤不應該影響用戶註冊流程
-      console.error('❌ Failed to create Novu subscriber:', novuError);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('❌ Failed to create Novu subscriber:', novuError);
+      }
     }
 
     // 不回傳密碼
@@ -95,7 +101,9 @@ export async function POST(req: Request) {
       message: "用戶建立成功，通知服務已設定完成"
     })
   } catch (error) {
-    console.error('[POST /api/users]', error)
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[POST /api/users]', error)
+    }
     return NextResponse.json({ error: "伺服器內部錯誤" }, { status: 500 })
   }
 } 

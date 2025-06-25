@@ -45,7 +45,9 @@ export const authOptions: NextAuthOptions = {
             email: user.email,
           }
         } catch (error) {
-          console.error("Auth error:", error)
+          if (process.env.NODE_ENV !== 'production') {
+            console.error("Auth error:", error)
+          }
           return null
         }
       },
