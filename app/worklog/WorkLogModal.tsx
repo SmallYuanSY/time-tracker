@@ -69,7 +69,9 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
           setProjects(data)
         }
       } catch (error) {
-        console.error('載入案件列表失敗:', error)
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('載入案件列表失敗:', error)
+        }
       }
     }
 
@@ -235,7 +237,9 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
         }
       }
 
-      console.log('[提交工作紀錄]', payload)
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[提交工作紀錄]', payload)
+      }
 
       const response = await fetch(url, {
         method,
@@ -245,7 +249,9 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
 
       if (!response.ok) {
         const errorData = await response.text()
-        console.error('API 錯誤回應:', errorData)
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('API 錯誤回應:', errorData)
+        }
         throw new Error(errorData || `提交失敗 (${response.status})`)
       }
 
@@ -265,7 +271,9 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
         onClose()
       }
     } catch (error) {
-      console.error('提交工作紀錄失敗:', error)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('提交工作紀錄失敗:', error)
+      }
       setErrors([error instanceof Error ? error.message : '提交失敗，請稍後再試'])
     } finally {
       setIsSubmitting(false)

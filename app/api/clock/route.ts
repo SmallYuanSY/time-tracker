@@ -69,11 +69,15 @@ export async function POST(req: NextRequest) {
               },
             })
           } catch (e) {
-            console.error('發送未打卡通知失敗:', e)
+            if (process.env.NODE_ENV !== 'production') {
+              console.error('發送未打卡通知失敗:', e)
+            }
           }
         }
 
-        console.log(`下班打卡：自動結算了 ${ongoingWorkLogs.length} 個進行中的工作記錄`)
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`下班打卡：自動結算了 ${ongoingWorkLogs.length} 個進行中的工作記錄`)
+        }
       }
     }
 
@@ -87,7 +91,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error) {
-    console.error('[POST /api/clock]', error)
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[POST /api/clock]', error)
+    }
     return new NextResponse('Internal Server Error', { status: 500 })
   }
 }
@@ -214,7 +220,9 @@ export async function GET(req: NextRequest) {
       yesterdayClocks, // 提供昨日記錄供前端參考
     })
   } catch (error) {
-    console.error('[GET /api/clock]', error)
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[GET /api/clock]', error)
+    }
     return new NextResponse('Internal Server Error', { status: 500 })
   }
 }

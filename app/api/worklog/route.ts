@@ -44,12 +44,16 @@ export async function POST(req: NextRequest) {
     const endDate = endTime ? new Date(endTime) : null
     
     if (isNaN(startDate.getTime())) {
-      console.error('[POST /api/worklog] 無效的開始時間:', startTime)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[POST /api/worklog] 無效的開始時間:', startTime)
+      }
       return new NextResponse('無效的開始時間格式', { status: 400 })
     }
     
     if (endTime && isNaN(endDate!.getTime())) {
-      console.error('[POST /api/worklog] 無效的結束時間:', endTime)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[POST /api/worklog] 無效的結束時間:', endTime)
+      }
       return new NextResponse('無效的結束時間格式', { status: 400 })
     }
 
@@ -81,7 +85,9 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json(result)
   } catch (error) {
-    console.error('[POST /api/worklog] 錯誤詳情:', error)
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[POST /api/worklog] 錯誤詳情:', error)
+    }
     
     // 更具體的錯誤處理
     if (error instanceof Error) {
@@ -151,7 +157,9 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(results)
   } catch (error) {
-    console.error('[GET /api/worklog]', error)
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[GET /api/worklog]', error)
+    }
     return new NextResponse('伺服器內部錯誤', { status: 500 })
   }
 }

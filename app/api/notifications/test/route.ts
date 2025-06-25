@@ -35,11 +35,15 @@ export async function POST(req: NextRequest) {
               lastUpdated: new Date().toISOString(),
             }
           })
-          console.log(`✅ Subscriber ${subscriberId} 資料已更新`)
+          if (process.env.NODE_ENV !== 'production') {
+            console.log(`✅ Subscriber ${subscriberId} 資料已更新`)
+          }
         }
       } catch (updateError) {
         // 更新失敗不影響發送通知
-        console.log('⚠️ 更新 subscriber 資料失敗，但繼續發送通知:', updateError)
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('⚠️ 更新 subscriber 資料失敗，但繼續發送通知:', updateError)
+        }
       }
     }
 
@@ -64,7 +68,9 @@ export async function POST(req: NextRequest) {
       message: '通知發送成功'
     })
   } catch (error) {
-    console.error('發送通知失敗:', error)
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('發送通知失敗:', error)
+    }
     return NextResponse.json(
       { 
         error: '發送通知失敗',
