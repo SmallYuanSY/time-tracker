@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -10,7 +11,7 @@ export async function POST(req: NextRequest) {
       return new NextResponse('Missing userId', { status: 400 })
     }
 
-    const session = await getServerSession()
+  const session = await getServerSession(authOptions)
     if (!session?.user || !(session.user as any).id || (session.user as any).id !== userId) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
