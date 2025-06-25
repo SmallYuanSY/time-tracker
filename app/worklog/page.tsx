@@ -28,6 +28,7 @@ export default function WorkLogPage() {
   const refreshLogsRef = useRef<(() => Promise<void>) | null>(null)
   const [today, setToday] = useState<Date | null>(null)
   const [isClient, setIsClient] = useState(false)
+  const [stats, setStats] = useState({ totalHours: 0, completed: 0, overtimeHours: 0 })
 
   // 確保在客戶端才初始化日期
   useEffect(() => {
@@ -86,6 +87,26 @@ export default function WorkLogPage() {
     setEditingLog(null)
   }
 
+  const calculateStats = (logs: WorkLog[]) => {
+    let totalMinutes = 0
+    let overtimeMinutes = 0
+    logs.forEach((log) => {
+      if (!log.endTime) return
+      const start = new Date(log.startTime)
+      const end = new Date(log.endTime)
+      const minutes = (end.getTime() - start.getTime()) / 60000
+      totalMinutes += minutes
+      if (start.getHours() >= 18 || start.getHours() < 6) {
+        overtimeMinutes += minutes
+      }
+    })
+    setStats({
+      totalHours: +(totalMinutes / 60).toFixed(1),
+      completed: logs.length,
+      overtimeHours: +(overtimeMinutes / 60).toFixed(1),
+    })
+  }
+
   if (!isClient || !today) {
     return (
       <DashboardLayout>
@@ -134,21 +155,21 @@ export default function WorkLogPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 border-blue-400/30 backdrop-blur">
             <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-blue-300">8</div>
+              <div className="text-2xl font-bold text-blue-300">{stats.totalHours}</div>
               <div className="text-blue-100 text-sm">總工作時數</div>
             </CardContent>
           </Card>
           
           <Card className="bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-400/30 backdrop-blur">
             <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-green-300">5</div>
+              <div className="text-2xl font-bold text-green-300">{stats.completed}</div>
               <div className="text-green-100 text-sm">完成項目</div>
             </CardContent>
           </Card>
           
           <Card className="bg-gradient-to-br from-orange-500/20 to-orange-600/10 border-orange-400/30 backdrop-blur">
             <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-orange-300">2</div>
+              <div className="text-2xl font-bold text-orange-300">{stats.overtimeHours}</div>
               <div className="text-orange-100 text-sm">加班時數</div>
             </CardContent>
           </Card>
@@ -160,11 +181,12 @@ export default function WorkLogPage() {
             <h2 className="text-xl font-semibold text-white">今日工作記錄</h2>
           </CardHeader>
           <CardContent>
-            <WorkLogList 
+            <WorkLogList
               onRefresh={(refreshFn: () => Promise<void>) => {
                 refreshLogsRef.current = refreshFn
               }}
               onEdit={handleEditLog}
+              onLogsLoaded={calculateStats}
             />
           </CardContent>
         </Card>
