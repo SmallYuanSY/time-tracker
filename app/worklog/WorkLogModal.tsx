@@ -42,7 +42,9 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
       ? new Date(editData.startTime).toTimeString().slice(0, 5)
       : initialMode === 'quick'
         ? ''
-        : '09:00',
+        : initialMode === 'start'
+          ? new Date().toTimeString().slice(0, 5) // 使用當前時間
+          : '09:00',
     endTime: editData?.endTime ? new Date(editData.endTime).toTimeString().slice(0, 5) : '',
   })
   const [errors, setErrors] = useState<string[]>([])
