@@ -207,7 +207,6 @@
 
   /* 確保 Radix Select 內容完全脫離文檔流 */
   [data-radix-popper-content-wrapper] {
-    position: absolute !important;
     pointer-events: none !important;
   }
 
