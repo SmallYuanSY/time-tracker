@@ -13,9 +13,10 @@ interface DateTimePickerProps {
   label?: string
   value?: Date
   onChange?: (date: Date) => void
+  container?: Element | null
 }
 
-export function DateTimePicker({ label = "選擇日期", value, onChange }: DateTimePickerProps) {
+export function DateTimePicker({ label = "選擇日期", value, onChange, container }: DateTimePickerProps) {
   const [date, setDate] = useState<Date | undefined>(value)
 
   return (
@@ -31,7 +32,7 @@ export function DateTimePicker({ label = "選擇日期", value, onChange }: Date
             {date ? format(date, "yyyy/MM/dd") : "點擊選擇日期"}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        <PopoverContent className="w-auto p-0" align="start" {...(container ? { container } : {})}>
           <Calendar
             locale={zhTW}
             mode="single"

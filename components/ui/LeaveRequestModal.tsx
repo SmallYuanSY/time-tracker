@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { 
   Dialog,
@@ -29,6 +29,7 @@ interface LeaveRequestModalProps {
 
 export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveRequestModalProps) {
   const { data: session } = useSession()
+  const contentRef = useRef<HTMLDivElement | null>(null)
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -153,7 +154,7 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent ref={contentRef} className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="text-2xl">📝</span>
@@ -185,15 +186,15 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
                 代理人 <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <Select 
-                  value={formData.agentId} 
+                <Select
+                  value={formData.agentId}
                   onValueChange={(value) => setFormData(prev => ({ ...prev, agentId: value }))}
                   disabled={loading}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder={loading ? "載入中..." : "請選擇代理人"} />
                   </SelectTrigger>
-                  <SelectContent position="popper" side="bottom" align="start">
+                  <SelectContent position="popper" side="bottom" align="start" container={contentRef.current}>
                     {users.map((user) => (
                       <SelectItem key={user.id} value={user.id}>
                         <div className="flex items-center gap-2">
@@ -223,6 +224,7 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
                 <DateTimePicker
                   value={formData.startDate || undefined}
                   onChange={(date) => setFormData(prev => ({ ...prev, startDate: date }))}
+                  container={contentRef.current}
                 />
               </div>
               
@@ -234,6 +236,7 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
                 <DateTimePicker
                   value={formData.endDate || undefined}
                   onChange={(date) => setFormData(prev => ({ ...prev, endDate: date }))}
+                  container={contentRef.current}
                 />
               </div>
             </div>
