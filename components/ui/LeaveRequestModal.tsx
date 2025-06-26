@@ -6,7 +6,8 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
+  DialogDescription
 } from './dialog'
 import { Button } from './button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select'
@@ -160,6 +161,9 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
             <span className="text-2xl">📝</span>
             申請請假
           </DialogTitle>
+          <DialogDescription>
+            填寫請假申請表單，選擇代理人和請假時間範圍
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-6">
