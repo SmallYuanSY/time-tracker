@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 
@@ -32,7 +31,6 @@ export function SimpleTimePicker({ value = "09:00", onChange, label }: SimpleTim
   React.useEffect(() => {
     const scrollToSelected = () => {
       if (hourScrollRef.current) {
-        const hourIndex = parseInt(hour)
         const hourElement = hourScrollRef.current.querySelector(`[data-hour="${hour}"]`)
         if (hourElement) {
           hourElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -40,7 +38,6 @@ export function SimpleTimePicker({ value = "09:00", onChange, label }: SimpleTim
       }
       
       if (minuteScrollRef.current) {
-        const minuteIndex = parseInt(minute)
         const minuteElement = minuteScrollRef.current.querySelector(`[data-minute="${minute}"]`)
         if (minuteElement) {
           minuteElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
