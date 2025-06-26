@@ -192,6 +192,48 @@
     position: fixed !important;
   }
 
+  /* 修復 Radix Select 在 space-y-* 中的擠壓問題 */
+  /* 針對 Radix Popper 包裝層的間距修復 */
+  .space-y-1 > [data-radix-popper-content-wrapper],
+  .space-y-2 > [data-radix-popper-content-wrapper],
+  .space-y-3 > [data-radix-popper-content-wrapper],
+  .space-y-4 > [data-radix-popper-content-wrapper],
+  .space-y-5 > [data-radix-popper-content-wrapper],
+  .space-y-6 > [data-radix-popper-content-wrapper],
+  .space-y-8 > [data-radix-popper-content-wrapper] {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* 確保 Radix Select 內容完全脫離文檔流 */
+  [data-radix-popper-content-wrapper] {
+    position: absolute !important;
+    pointer-events: none !important;
+  }
+
+  /* 但內容本身需要可以互動 */
+  [data-radix-popper-content-wrapper] > * {
+    pointer-events: auto !important;
+  }
+
+  /* 確保 Select 內容在 Dialog 中有正確的層級 */
+  [data-radix-dialog-overlay] ~ [data-radix-popper-content-wrapper],
+  [data-radix-popper-content-wrapper] {
+    z-index: 99 !important; /* 高於 Dialog 的 z-index (50) */
+  }
+
+  /* 確保 Radix Select Content 本身也有足夠高的 z-index */
+  [data-radix-select-content] {
+    z-index: 99 !important;
+  }
+
+  /* 確保 Select Portal 渲染在最高層級，避免被任何 Dialog overlay 遮蓋 */
+  [data-radix-portal] [data-radix-select-content],
+  [data-radix-portal] [data-radix-popper-content-wrapper] {
+    z-index: 99 !important;
+    position: fixed !important;
+  }
+
   /* 強制修正 Novu 彈出視窗樣式 - 更具體的選擇器 */
   body [data-radix-popper-content-wrapper],
   body [data-state="open"],
