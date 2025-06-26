@@ -7,11 +7,26 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  ADMIN       // 管理員
+  WEB_ADMIN   // 網頁管理
+  EMPLOYEE    // 員工
+}
+
+enum LeaveStatus {
+  PENDING_AGENT   // 等待代理人審核
+  AGENT_REJECTED  // 代理人拒絕
+  PENDING_ADMIN   // 等待管理員審核
+  ADMIN_REJECTED  // 管理員拒絕
+  APPROVED        // 已批准
+}
+
 model User {
   id              String         @id @default(cuid())
   email           String         @unique
   password        String
   name            String?
+  role            UserRole       @default(EMPLOYEE)
   createdAt       DateTime       @default(now())
   agentLeaves     LeaveRequest[] @relation("Agent")
   requestedLeaves LeaveRequest[] @relation("Requester")
@@ -44,17 +59,18 @@ model workLog {
 }
 
 model LeaveRequest {
-  id          String   @id @default(cuid())
-  requesterId String
-  agentId     String
-  status      String   @default("PENDING_AGENT")
-  reason      String
-  startDate   DateTime
-  endDate     DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  agent       User     @relation("Agent", fields: [agentId], references: [id])
-  requester   User     @relation("Requester", fields: [requesterId], references: [id])
+  id            String   @id @default(cuid())
+  requesterId   String
+  agentId       String
+  status        LeaveStatus @default(PENDING_AGENT)
+  reason        String
+  startDate     DateTime
+  endDate       DateTime
+  agentApproved Boolean  @default(false) // 代理人是否已批准
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  agent         User     @relation("Agent", fields: [agentId], references: [id])
+  requester     User     @relation("Requester", fields: [requesterId], references: [id])
 }
 
 model Overtime {

@@ -27,10 +27,34 @@ const sidebarItems = [
   { name: "設定", icon: <Settings className="w-4 h-4 mr-2" />, href: "#" },
 ]
 
+const adminItems = [
+  { name: "用戶管理", icon: <Users className="w-4 h-4 mr-2" />, href: "/users", role: "WEB_ADMIN" },
+]
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession()
   const router = useRouter()
   const pathname = usePathname()
+  const [userRole, setUserRole] = React.useState<string | null>(null)
+
+  // 獲取用戶角色
+  React.useEffect(() => {
+    if (session?.user?.email) {
+      const fetchUserRole = async () => {
+        try {
+          const response = await fetch('/api/users')
+          if (response.ok) {
+            const users = await response.json()
+            const currentUser = users.find((user: any) => user.email === session.user?.email)
+            setUserRole(currentUser?.role || null)
+          }
+        } catch (error) {
+          console.error('獲取用戶角色失敗:', error)
+        }
+      }
+      fetchUserRole()
+    }
+  }, [session?.user?.email])
 
   const handleLogout = async () => {
     await signOut({ 
@@ -63,6 +87,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     variant={isActive ? "secondary" : "ghost"}
                     className={cn(
                       "w-full justify-start",
+                      isActive && "bg-accent text-accent-foreground"
+                    )}
+                    onClick={() => handleNavigation(item.href)}
+                  >
+                    {item.icon}
+                    {item.name}
+                  </Button>
+                )
+              })}
+              
+              {/* 管理功能 - 只對特定角色顯示 */}
+              {userRole === 'WEB_ADMIN' && adminItems.map((item) => {
+                const isActive = pathname === item.href
+                return (
+                  <Button 
+                    key={item.name} 
+                    variant={isActive ? "secondary" : "ghost"}
+                    className={cn(
+                      "w-full justify-start border-t border-white/10 mt-2 pt-2",
                       isActive && "bg-accent text-accent-foreground"
                     )}
                     onClick={() => handleNavigation(item.href)}

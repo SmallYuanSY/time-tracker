@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
         id: true,
         name: true,
         email: true,
+        role: true,
       },
       orderBy: {
         name: 'asc',
@@ -38,10 +39,31 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: Request) {
   try {
-    const { email, password, name } = await req.json()
+    // 檢查權限：只有 WEB_ADMIN 可以創建用戶
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return new NextResponse('Unauthorized', { status: 401 })
+    }
+
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { role: true }
+    })
+
+    if (!currentUser || currentUser.role !== 'WEB_ADMIN') {
+      return NextResponse.json({ error: "只有網頁管理員可以創建用戶" }, { status: 403 })
+    }
+
+    const { email, password, name, role } = await req.json()
 
     if (!email || !password) {
       return NextResponse.json({ error: "缺少必要欄位" }, { status: 400 })
+    }
+
+    // 驗證角色欄位
+    const validRoles = ['ADMIN', 'WEB_ADMIN', 'EMPLOYEE']
+    if (role && !validRoles.includes(role)) {
+      return NextResponse.json({ error: "無效的角色" }, { status: 400 })
     }
 
     // 檢查使用者是否已存在
@@ -60,6 +82,7 @@ export async function POST(req: Request) {
         email,
         password: hashedPassword,
         name,
+        role: role || 'EMPLOYEE',
       },
     })
 

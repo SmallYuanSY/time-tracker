@@ -8,13 +8,9 @@ const novu = new Novu({
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { action } = await req.json()
-    
-    const newStatus = action === 'approve' ? 'APPROVED' : 'ADMIN_REJECTED'
-    
     const leave = await prisma.leaveRequest.update({
       where: { id: params.id },
-      data: { status: newStatus }
+      data: { status: 'REJECTED' }
     })
 
     // 通知申請人
@@ -28,17 +24,13 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       })
       
       if (leaveWithDetails) {
-        const message = action === 'approve' 
-          ? `您的請假申請已獲得最終批准`
-          : `您的請假申請已被管理員拒絕`
-        
         await novu.trigger({
           workflowId: 'test-notification',
           to: { subscriberId: `user_${leaveWithDetails.requesterId}` },
           payload: { 
-            title: '請假申請結果',
-            body: message,
-            message: message
+            title: '請假申請已拒絕',
+            body: `您的請假申請已被拒絕`,
+            message: `您的請假申請已被拒絕`
           }
         })
       }
@@ -48,7 +40,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
     return NextResponse.json(leave)
   } catch (error) {
-    console.error('[PUT /api/leaves/[id]/admin]', error)
+    console.error('[PUT /api/leaves/[id]/reject]', error)
     return NextResponse.json({ error: '伺服器錯誤' }, { status: 500 })
   }
-}
+} 

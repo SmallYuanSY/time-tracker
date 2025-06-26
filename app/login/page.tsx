@@ -65,11 +65,7 @@ export default function LoginPage() {
           {loading ? "登入中..." : "登入"}
         </button>
         
-        <div className="mt-4 text-center">
-          <a href="/register" className="text-white/70 hover:text-white transition text-sm">
-            還沒有帳號？點此註冊
-          </a>
-        </div>
+
 
         <div className="absolute inset-0 rounded-3xl pointer-events-none ring-1 ring-white/10 border border-white/10" />
       </div>

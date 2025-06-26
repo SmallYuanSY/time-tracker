@@ -16,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Calendar, User, FileText } from 'lucide-react'
+import { SimpleTimePicker } from '@/components/ui/simple-time-picker'
+import { CalendarIcon, User, FileText } from 'lucide-react'
 
 interface User {
   id: string
@@ -36,8 +37,10 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
   const [formData, setFormData] = useState({
     agentId: '',
     reason: '',
-    startDate: '',
-    endDate: '',
+    startDate: undefined as Date | undefined,
+    startTime: '09:00',
+    endDate: undefined as Date | undefined,
+    endTime: '18:00',
   })
   const [errors, setErrors] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -50,8 +53,10 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
       setFormData({
         agentId: '',
         reason: '',
-        startDate: '',
-        endDate: '',
+        startDate: undefined,
+        startTime: '09:00',
+        endDate: undefined,
+        endTime: '18:00',
       })
       setErrors([])
     }
@@ -63,8 +68,10 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
       const response = await fetch('/api/users')
       if (response.ok) {
         const data = await response.json()
-        // 過濾掉當前用戶
-        const filteredUsers = data.filter((user: User) => user.email !== session?.user?.email)
+        // 過濾掉當前用戶和 WEB_ADMIN（WEB_ADMIN 不參與業務流程）
+        const filteredUsers = data.filter((user: any) => 
+          user.email !== session?.user?.email && user.role !== 'WEB_ADMIN'
+        )
         setUsers(filteredUsers)
       }
     } catch (error) {
@@ -74,7 +81,7 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
     }
   }
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (field: string, value: string | Date | undefined) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
@@ -87,13 +94,22 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
     if (!formData.endDate) newErrors.push('請選擇結束日期')
 
     if (formData.startDate && formData.endDate) {
-      const start = new Date(formData.startDate)
-      const end = new Date(formData.endDate)
-      if (start > end) {
-        newErrors.push('結束日期不能早於開始日期')
+      // 合併日期和時間
+      const [startHour, startMinute] = formData.startTime.split(':').map(Number)
+      const [endHour, endMinute] = formData.endTime.split(':').map(Number)
+      
+      const startDateTime = new Date(formData.startDate)
+      startDateTime.setHours(startHour, startMinute, 0, 0)
+      
+      const endDateTime = new Date(formData.endDate)
+      endDateTime.setHours(endHour, endMinute, 0, 0)
+      
+      if (startDateTime >= endDateTime) {
+        newErrors.push('結束時間必須晚於開始時間')
       }
-      if (start.getTime() < new Date().setHours(0, 0, 0, 0)) {
-        newErrors.push('開始日期不能早於今天')
+      
+      if (startDateTime.getTime() < new Date().getTime()) {
+        newErrors.push('開始時間不能早於現在')
       }
     }
 
@@ -106,12 +122,29 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
 
     setIsSubmitting(true)
     try {
+      // 合併日期和時間
+      const [startHour, startMinute] = formData.startTime.split(':').map(Number)
+      const [endHour, endMinute] = formData.endTime.split(':').map(Number)
+      
+      const startDateTime = new Date(formData.startDate!)
+      startDateTime.setHours(startHour, startMinute, 0, 0)
+      
+      const endDateTime = new Date(formData.endDate!)
+      endDateTime.setHours(endHour, endMinute, 0, 0)
+
+      const submitData = {
+        agentId: formData.agentId,
+        reason: formData.reason,
+        startDate: startDateTime.toISOString(),
+        endDate: endDateTime.toISOString(),
+      }
+
       const response = await fetch('/api/leaves', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(submitData),
       })
 
       if (response.ok) {
@@ -133,7 +166,7 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="w-full max-w-md">
+      <DialogContent className="w-full max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             📝 申請請假
@@ -208,50 +241,86 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
             </div>
           </div>
 
-          {/* 開始日期 */}
-          <div>
-            <label className="text-sm text-white/80 font-medium block mb-2">
-              開始日期 *
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/60" />
-              <input
-                type="date"
-                value={formData.startDate}
-                onChange={(e) => handleChange('startDate', e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-                className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/20"
+          {/* 開始日期和時間 */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm text-white/80 font-medium block mb-2">
+                開始日期 *
+              </label>
+              <div className="relative">
+                <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/60" />
+                <input
+                  type="date"
+                  value={formData.startDate ? formData.startDate.toISOString().split('T')[0] : ''}
+                  onChange={(e) => handleChange('startDate', e.target.value ? new Date(e.target.value) : undefined)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/20"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <SimpleTimePicker
+                label="開始時間 *"
+                value={formData.startTime}
+                onChange={(time) => handleChange('startTime', time)}
               />
             </div>
           </div>
 
-          {/* 結束日期 */}
-          <div>
-            <label className="text-sm text-white/80 font-medium block mb-2">
-              結束日期 *
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/60" />
-              <input
-                type="date"
-                value={formData.endDate}
-                onChange={(e) => handleChange('endDate', e.target.value)}
-                min={formData.startDate || new Date().toISOString().split('T')[0]}
-                className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/20"
+          {/* 結束日期和時間 */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm text-white/80 font-medium block mb-2">
+                結束日期 *
+              </label>
+              <div className="relative">
+                <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/60" />
+                <input
+                  type="date"
+                  value={formData.endDate ? formData.endDate.toISOString().split('T')[0] : ''}
+                  onChange={(e) => handleChange('endDate', e.target.value ? new Date(e.target.value) : undefined)}
+                  min={formData.startDate ? formData.startDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
+                  className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/20"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <SimpleTimePicker
+                label="結束時間 *"
+                value={formData.endTime}
+                onChange={(time) => handleChange('endTime', time)}
               />
             </div>
           </div>
 
-          {/* 請假天數計算 */}
+          {/* 請假時數計算 */}
           {formData.startDate && formData.endDate && (
             <div className="p-3 bg-green-500/10 border border-green-400/20 rounded-lg">
               <div className="text-sm text-green-200">
-                📅 請假天數：{
-                  Math.ceil(
-                    (new Date(formData.endDate).getTime() - new Date(formData.startDate).getTime()) 
-                    / (1000 * 60 * 60 * 24)
-                  ) + 1
-                } 天
+                {(() => {
+                  const [startHour, startMinute] = formData.startTime.split(':').map(Number)
+                  const [endHour, endMinute] = formData.endTime.split(':').map(Number)
+                  
+                  const startDateTime = new Date(formData.startDate)
+                  startDateTime.setHours(startHour, startMinute, 0, 0)
+                  
+                  const endDateTime = new Date(formData.endDate)
+                  endDateTime.setHours(endHour, endMinute, 0, 0)
+                  
+                  const diffMs = endDateTime.getTime() - startDateTime.getTime()
+                  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+                  const diffHours = Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10
+                  
+                  return (
+                    <>
+                      📅 請假天數：{diffDays} 天
+                      <br />
+                      ⏰ 請假時數：{diffHours} 小時
+                    </>
+                  )
+                })()}
               </div>
             </div>
           )}
