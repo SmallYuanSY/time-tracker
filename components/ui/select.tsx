@@ -69,7 +69,6 @@ SelectScrollDownButton.displayName =
 
 interface SelectContentProps
   extends React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> {
-  anchorRef?: React.RefObject<HTMLElement>
   container?: Element | null
 }
 
@@ -78,7 +77,7 @@ const SelectContent = React.forwardRef<
   SelectContentProps
 >(
   (
-    { className, children, position = "popper", side = "bottom", align = "start", anchorRef, container, ...props },
+    { className, children, position = "popper", side = "bottom", align = "start", container, ...props },
     ref
   ) => (
     <SelectPrimitive.Portal {...(container ? { container } : {})}>
@@ -96,7 +95,7 @@ const SelectContent = React.forwardRef<
         sideOffset={4}
         collisionPadding={10}
         avoidCollisions={true}
-        {...(anchorRef && { anchorRef })}
+
         {...props}
       >
         <SelectScrollUpButton />

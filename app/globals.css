@@ -169,7 +169,9 @@
   /* 針對 Novu Inbox 的彈出內容 */
   .novu-popover-content,
   .novu-inbox-popover,
-  [class*="popover"] {
+  [class*="novu-popover"],
+  [data-novu-popover],
+  [data-novu-dropdown] {
     transform-origin: top right !important;
     right: 0 !important;
     left: auto !important;
@@ -248,5 +250,63 @@
     backdrop-filter: blur(12px) !important;
     border: 1px solid rgba(255, 255, 255, 0.3) !important;
     border-radius: 12px !important;
+  }
+
+  /* 日期選擇器 Popover 的智能定位修復 */
+  [data-radix-popover-content] {
+    z-index: 10001 !important;
+    max-width: none !important;
+    width: auto !important;
+  }
+
+  /* 確保日期選擇器在 Dialog 中不會被裁剪 */
+  [data-radix-dialog-overlay] ~ [data-radix-popover-content] {
+    z-index: 10001 !important;
+  }
+
+  /* Calendar 組件在 Popover 中的樣式調整 */
+  [data-radix-popover-content] [data-slot="calendar"] {
+    width: auto !important;
+    min-width: max-content !important;
+  }
+
+  /* 確保 Popover 內容不受父容器寬度限制 */
+  [data-radix-popover-content] .max-w-none {
+    max-width: none !important;
+  }
+
+  /* 日期選擇器 Popover 的淺紫色霧化效果 - 更高優先級 */
+  [data-radix-popover-content]:not([class*="novu"]):not([data-novu-popover]) {
+    background: rgba(139, 92, 246, 0.15) !important; /* 淺紫色背景 */
+    backdrop-filter: blur(20px) !important; /* 增強霧化效果 */
+    -webkit-backdrop-filter: blur(20px) !important; /* Safari 支援 */
+    border: 1px solid rgba(139, 92, 246, 0.2) !important; /* 淺紫色邊框 */
+    border-radius: 16px !important; /* 圓角 */
+    box-shadow: 
+      0 20px 25px -5px rgba(139, 92, 246, 0.1),
+      0 10px 10px -5px rgba(139, 92, 246, 0.04),
+      0 0 0 1px rgba(139, 92, 246, 0.05) !important; /* 淺紫色陰影 */
+  }
+
+  /* 確保 Calendar 本身保持白色背景但有透明度 */
+  [data-radix-popover-content]:not([class*="novu"]) [data-slot="calendar"] {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    margin: 4px !important;
+  }
+
+  /* 深色模式下的日期選擇器樣式 */
+  .dark [data-radix-popover-content]:not([class*="novu"]):not([data-novu-popover]) {
+    background: rgba(139, 92, 246, 0.2) !important; /* 深色模式下稍微加深 */
+    border: 1px solid rgba(139, 92, 246, 0.3) !important;
+    box-shadow: 
+      0 20px 25px -5px rgba(139, 92, 246, 0.2),
+      0 10px 10px -5px rgba(139, 92, 246, 0.1),
+      0 0 0 1px rgba(139, 92, 246, 0.1) !important;
+  }
+
+  .dark [data-radix-popover-content]:not([class*="novu"]) [data-slot="calendar"] {
+    background: rgba(30, 30, 30, 0.95) !important; /* 深色模式下的 Calendar 背景 */
   }
 }
