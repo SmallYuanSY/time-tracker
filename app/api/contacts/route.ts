@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         createdAt: 'desc',
       },
       include: {
-        projects: {
+        Project: {
           select: {
             id: true,
             code: true,

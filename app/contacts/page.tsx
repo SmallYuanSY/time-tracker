@@ -13,7 +13,7 @@ interface Contact {
   phone: string
   contactName: string
   notes?: string
-  projects?: {
+  Project?: {
     id: string
     code: string
     name: string
@@ -236,11 +236,11 @@ export default function ContactsPage() {
                 )}
 
                 {/* 關聯專案 */}
-                {contact.projects && contact.projects.length > 0 && (
+                {contact.Project && contact.Project.length > 0 && (
                   <div className="border-t border-white/10 pt-3">
                     <div className="text-white/50 text-xs mb-2">關聯專案：</div>
                     <div className="flex flex-wrap gap-1">
-                      {contact.projects.map(project => (
+                      {contact.Project.map(project => (
                         <span key={project.id} className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded text-xs">
                           {project.code}
                         </span>

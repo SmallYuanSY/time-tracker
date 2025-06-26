@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Search, Plus } from 'lucide-react'
@@ -117,6 +118,9 @@ export default function ContactSelectionModal({
               </span>
             )}
           </DialogTitle>
+          <DialogDescription>
+            選擇要指派給專案的聯絡人，可以多選
+          </DialogDescription>
         </DialogHeader>
 
         {/* 搜尋列 */}

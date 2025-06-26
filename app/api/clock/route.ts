@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
         if (needNotify) {
           try {
             await novu.trigger({
-              workflowId: 'test-notification',
+              workflowId: 'projoin-notification',
               to: { subscriberId: `user_${userId}` },
               payload: {
                 title: '未打下班卡提醒',

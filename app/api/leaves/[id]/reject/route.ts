@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Novu } from '@novu/api'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 const novu = new Novu({
   secretKey: process.env.NOVU_SECRET_KEY || process.env.NOVU_API_KEY
@@ -8,32 +10,68 @@ const novu = new Novu({
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return new NextResponse('Unauthorized', { status: 401 })
+    }
+
+    // 獲取當前用戶
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email },
+    })
+
+    if (!currentUser) {
+      return new NextResponse('用戶不存在', { status: 404 })
+    }
+
+    // 獲取請假申請
+    const existingLeave = await prisma.leaveRequest.findUnique({
+      where: { id: params.id },
+      include: {
+        requester: true,
+        agent: true,
+      }
+    })
+
+    if (!existingLeave) {
+      return new NextResponse('請假申請不存在', { status: 404 })
+    }
+
+    // 根據當前狀態和用戶權限決定拒絕狀態
+    let rejectionStatus: 'AGENT_REJECTED' | 'ADMIN_REJECTED'
+    
+    if (existingLeave.status === 'PENDING_AGENT' && existingLeave.agentId === currentUser.id) {
+      rejectionStatus = 'AGENT_REJECTED'
+    } else if (existingLeave.status === 'PENDING_ADMIN' && currentUser.role === 'ADMIN') {
+      rejectionStatus = 'ADMIN_REJECTED'
+    } else {
+      return new NextResponse('無權限拒絕此請假申請', { status: 403 })
+    }
+
     const leave = await prisma.leaveRequest.update({
       where: { id: params.id },
-      data: { status: 'REJECTED' }
+      data: { status: rejectionStatus }
     })
 
     // 通知申請人
     try {
-      const leaveWithDetails = await prisma.leaveRequest.findUnique({
-        where: { id: params.id },
-        include: {
-          requester: true,
-          agent: true,
+      const messageTitle = rejectionStatus === 'AGENT_REJECTED' 
+        ? '請假申請已被代理人拒絕'
+        : '請假申請已被管理員拒絕'
+      
+      const messageBody = rejectionStatus === 'AGENT_REJECTED'
+        ? `代理人已拒絕您的請假申請`
+        : `管理員已拒絕您的請假申請`
+
+      await novu.trigger({
+        workflowId: 'test-notification',
+        to: { subscriberId: `user_${existingLeave.requesterId}` },
+        payload: { 
+          title: messageTitle,
+          body: messageBody,
+          message: messageBody
         }
       })
-      
-      if (leaveWithDetails) {
-        await novu.trigger({
-          workflowId: 'test-notification',
-          to: { subscriberId: `user_${leaveWithDetails.requesterId}` },
-          payload: { 
-            title: '請假申請已拒絕',
-            body: `您的請假申請已被拒絕`,
-            message: `您的請假申請已被拒絕`
-          }
-        })
-      }
     } catch (e) {
       console.error('Novu 發送失敗', e)
     }

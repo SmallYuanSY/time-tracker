@@ -33,7 +33,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
           : `您的請假申請已被管理員拒絕`
         
         await novu.trigger({
-          workflowId: 'test-notification',
+          workflowId: 'projoin-notification',
           to: { subscriberId: `user_${leaveWithDetails.requesterId}` },
           payload: { 
             title: '請假申請結果',

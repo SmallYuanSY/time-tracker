@@ -27,10 +27,10 @@ export async function GET(req: NextRequest) {
 
     // 獲取相關的請假記錄
     let whereCondition: any = {
-      OR: [
-        { requesterId: currentUser.id }, // 我的申請
-        { agentId: currentUser.id },     // 我需要審核的
-      ],
+        OR: [
+          { requesterId: currentUser.id }, // 我的申請
+          { agentId: currentUser.id },     // 我需要審核的
+        ],
     }
 
     // 如果是管理員（僅 ADMIN，不包括 WEB_ADMIN），也顯示等待管理員審核的申請
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
     // 通知代理人
     try {
       await novu.trigger({
-        workflowId: 'test-notification',
+        workflowId: 'projoin-notification',
         to: { subscriberId: `user_${agent.id}` },
         payload: {
           title: '請假代理請求',

@@ -37,7 +37,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
           : `代理人已拒絕您的請假申請`
         
         await novu.trigger({
-          workflowId: 'test-notification',
+          workflowId: 'projoin-notification',
           to: { subscriberId: `user_${leaveWithDetails.requesterId}` },
           payload: { 
             title: '請假申請進度',
@@ -56,7 +56,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
           for (const admin of admins) {
             await novu.trigger({
-              workflowId: 'test-notification',
+              workflowId: 'projoin-notification',
               to: { subscriberId: `user_${admin.id}` },
               payload: { 
                 title: '請假申請待審核',

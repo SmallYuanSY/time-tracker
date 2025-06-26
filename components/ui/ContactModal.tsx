@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
 
@@ -106,6 +107,9 @@ export default function ContactModal({ open, onClose, onSave, editData }: Contac
           <DialogTitle className="flex items-center gap-2 text-white">
             📝 {editData ? '編輯聯絡人' : '新增聯絡人'}
           </DialogTitle>
+          <DialogDescription>
+            {editData ? '修改聯絡人的基本資訊' : '填寫新聯絡人的基本資訊'}
+          </DialogDescription>
         </DialogHeader>
 
         {errors.length > 0 && (

@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
     // 使用 Novu SDK 發送通知
     const result = await novu.trigger({
-      workflowId: 'test-notification',
+      workflowId: 'projoin-notification',
       to: {
         subscriberId: subscriberId,
       },
