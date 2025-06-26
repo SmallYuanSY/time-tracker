@@ -6,8 +6,8 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
-  DialogDescription
+import { DateTimeRangePicker } from './date-time-range-picker'
+import { User, FileText, Clock } from 'lucide-react'
 } from './dialog'
 import { Button } from './button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select'
@@ -190,31 +190,13 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
                 代理人 <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <Select
-                  value={formData.agentId}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, agentId: value }))}
-                  disabled={loading}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={loading ? "載入中..." : "請選擇代理人"} />
-                  </SelectTrigger>
-                  <SelectContent position="popper" side="bottom" align="start" container={contentRef.current}>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                          <span>{user.name}</span>
-                          <span className="text-sm text-gray-500">({user.email})</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {selectedAgent && (
-                <div className="text-xs text-gray-600 bg-blue-50 p-2 rounded">
-                  已選擇：{selectedAgent.name} ({selectedAgent.email})
-                </div>
+            <DateTimeRangePicker
+              value={[formData.startDate, formData.endDate]}
+              onChange={([start, end]) =>
+                setFormData(prev => ({ ...prev, startDate: start, endDate: end }))
+              }
+              container={contentRef.current}
+            />
               )}
             </div>
 
