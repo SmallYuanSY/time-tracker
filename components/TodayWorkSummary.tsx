@@ -108,8 +108,7 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
 
   if (loading) {
     return (
-      <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
-        <h2 className="text-xl font-semibold text-white mb-4">📋 今日工作</h2>
+      <div>
         <div className="text-center text-white/60">載入中...</div>
       </div>
     )
@@ -117,7 +116,7 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
 
   return (
     <>
-      <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
+      <div>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-white">📋 今日工作</h2>
           <div className="flex items-center gap-3">

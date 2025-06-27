@@ -34,6 +34,7 @@ model User {
   projects        Project[]
   clocks          clock[]
   workLogs        workLog[]
+  scheduledWorks  ScheduledWork[]
 }
 
 model clock {
@@ -56,6 +57,48 @@ model workLog {
   content     String
   project     Project?  @relation(fields: [projectId], references: [id])
   user        User      @relation(fields: [userId], references: [id])
+}
+
+enum WorkType {
+  SCHEDULED  // 預定工作（下週工作）
+  URGENT     // 臨時工作（本週工作）
+}
+
+model WorkCategory {
+  id          String   @id @default(cuid())
+  categoryId  String   @unique // 分類唯一識別碼
+  title       String   // 分類標題
+  content     String   // 分類內容
+  icon        String?  // 圖示
+  description String?  // 描述
+  colorBg     String   // 背景顏色
+  colorText   String   // 文字顏色
+  colorBorder String   // 邊框顏色
+  colorAccent String   // 強調色
+  isActive    Boolean  @default(true)
+  isSystem    Boolean  @default(false) // 是否為系統預設分類
+  sortOrder   Int      @default(0) // 排序順序
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ScheduledWork {
+  id          String   @id @default(cuid())
+  userId      String
+  projectId   String?
+  projectCode String
+  projectName String
+  category    String
+  content     String
+  priority    Int      @default(0) // 排序優先級
+  isCompleted Boolean  @default(false)
+  workType    WorkType @default(SCHEDULED) // 工作類型（預定/臨時）
+  scheduledStartDate DateTime // 預定開始日期
+  scheduledEndDate   DateTime // 預定結束日期
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project? @relation(fields: [projectId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
 }
 
 model LeaveRequest {
@@ -99,6 +142,7 @@ model Project {
   Contact     Contact?  @relation(fields: [contactId], references: [id])
   manager     User      @relation(fields: [managerId], references: [id])
   workLogs    workLog[]
+  scheduledWorks ScheduledWork[]
 }
 
 model Contact {

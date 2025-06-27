@@ -9,7 +9,10 @@ import { format } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import WorkLogModal from './WorkLogModal'
 import WorkLogList from '@/components/worklog/WorkLogList'
+import ScheduledWorkList from '@/components/worklog/ScheduledWorkList'
+import ScheduledWorkModal from '@/components/ui/ScheduledWorkModal'
 import DashboardLayout from '@/components/layouts/DashboardLayout'
+import { ListTodo, Clock } from 'lucide-react'
 
 interface WorkLog {
   id: string
@@ -21,14 +24,32 @@ interface WorkLog {
   endTime: string | null
 }
 
+interface ScheduledWork {
+  id: string
+  projectCode: string
+  projectName: string
+  category: string
+  content: string
+  priority: number
+  isCompleted: boolean
+  scheduledStartDate: string
+  scheduledEndDate: string
+  createdAt: string
+  updatedAt: string
+}
+
 export default function WorkLogPage() {
   const { data: session, status } = useSession()
   const [showModal, setShowModal] = useState(false)
+  const [showScheduledModal, setShowScheduledModal] = useState(false)
   const [editingLog, setEditingLog] = useState<WorkLog | null>(null)
+  const [editingScheduledWork, setEditingScheduledWork] = useState<ScheduledWork | null>(null)
   const refreshLogsRef = useRef<(() => Promise<void>) | null>(null)
+  const refreshScheduledWorksRef = useRef<(() => Promise<void>) | null>(null)
   const [today, setToday] = useState<Date | null>(null)
   const [isClient, setIsClient] = useState(false)
   const [stats, setStats] = useState({ totalHours: 0, completed: 0, overtimeHours: 0 })
+  const [currentView, setCurrentView] = useState<'worklog' | 'scheduled'>('worklog') // 當前檢視模式
 
   // 確保在客戶端才初始化日期
   useEffect(() => {
@@ -60,7 +81,11 @@ export default function WorkLogPage() {
   }, [status, session])
 
   const handleAddWork = () => {
-    setShowModal(true)
+    if (currentView === 'worklog') {
+      setShowModal(true)
+    } else {
+      setShowScheduledModal(true)
+    }
   }
 
   const handleModalSave = async () => {
@@ -71,9 +96,19 @@ export default function WorkLogPage() {
     }
   }
 
+  const handleScheduledModalSave = async () => {
+    setShowScheduledModal(false)
+    // 新增預定工作後刷新列表
+    if (refreshScheduledWorksRef.current) {
+      await refreshScheduledWorksRef.current()
+    }
+  }
+
   const handleRefresh = async () => {
-    if (refreshLogsRef.current) {
+    if (currentView === 'worklog' && refreshLogsRef.current) {
       await refreshLogsRef.current()
+    } else if (currentView === 'scheduled' && refreshScheduledWorksRef.current) {
+      await refreshScheduledWorksRef.current()
     }
   }
 
@@ -82,9 +117,34 @@ export default function WorkLogPage() {
     setShowModal(true)
   }
 
+  const handleEditScheduledWork = (work: ScheduledWork) => {
+    setEditingScheduledWork(work)
+    setShowScheduledModal(true)
+  }
+
   const handleCloseModal = () => {
     setShowModal(false)
     setEditingLog(null)
+  }
+
+  const handleCloseScheduledModal = () => {
+    setShowScheduledModal(false)
+    setEditingScheduledWork(null)
+  }
+
+  // 從預定工作開始實際工作
+  const handleStartWork = (scheduledWork: ScheduledWork) => {
+    // 預填工作記錄表單
+    setEditingLog({
+      id: '', // 新建記錄
+      projectCode: scheduledWork.projectCode,
+      projectName: scheduledWork.projectName,
+      category: scheduledWork.category,
+      content: scheduledWork.content,
+      startTime: new Date().toISOString(),
+      endTime: null,
+    })
+    setShowModal(true)
   }
 
   const calculateStats = (logs: WorkLog[]) => {
@@ -126,13 +186,39 @@ export default function WorkLogPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                  📋 工作日誌
+                  {currentView === 'worklog' ? '📋 工作日誌' : '📅 預定工作'}
                 </h1>
                 <p className="text-white/70 mt-1">
                   {format(today, 'yyyy年MM月dd日 EEEE', { locale: zhTW })}
                 </p>
               </div>
               <div className="flex gap-3">
+                {/* 檢視模式切換 */}
+                <div className="flex bg-white/10 rounded-lg p-1">
+                  <button
+                    onClick={() => setCurrentView('worklog')}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      currentView === 'worklog'
+                        ? 'bg-blue-500 text-white'
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <Clock className="w-4 h-4" />
+                    工作記錄
+                  </button>
+                  <button
+                    onClick={() => setCurrentView('scheduled')}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      currentView === 'scheduled'
+                        ? 'bg-purple-500 text-white'
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <ListTodo className="w-4 h-4" />
+                    預定工作
+                  </button>
+                </div>
+                
                 <Button
                   onClick={handleRefresh}
                   variant="outline"
@@ -144,7 +230,7 @@ export default function WorkLogPage() {
                   onClick={handleAddWork}
                   className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold shadow-lg"
                 >
-                  ➕ 新增工作紀錄
+                  ➕ {currentView === 'worklog' ? '新增工作紀錄' : '新增預定工作'}
                 </Button>
               </div>
             </div>
@@ -175,19 +261,35 @@ export default function WorkLogPage() {
           </Card>
         </div>
 
-        {/* 工作紀錄列表 */}
+        {/* 動態列表區域 */}
         <Card className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-xl">
           <CardHeader>
-            <h2 className="text-xl font-semibold text-white">今日工作記錄</h2>
+            <h2 className="text-xl font-semibold text-white">
+              {currentView === 'worklog' ? '今日工作記錄' : '今日預定工作'}
+            </h2>
           </CardHeader>
           <CardContent>
-            <WorkLogList
-              onRefresh={(refreshFn: () => Promise<void>) => {
-                refreshLogsRef.current = refreshFn
-              }}
-              onEdit={handleEditLog}
-              onLogsLoaded={calculateStats}
-            />
+            {currentView === 'worklog' ? (
+              <WorkLogList
+                onRefresh={(refreshFn: () => Promise<void>) => {
+                  refreshLogsRef.current = refreshFn
+                }}
+                onEdit={handleEditLog}
+                onLogsLoaded={calculateStats}
+              />
+            ) : (
+              <ScheduledWorkList
+                onRefresh={(refreshFn: () => Promise<void>) => {
+                  refreshScheduledWorksRef.current = refreshFn
+                }}
+                onEdit={handleEditScheduledWork}
+                onWorksLoaded={(works) => {
+                  // 可以根據需要計算預定工作的統計
+                  console.log('預定工作已載入:', works)
+                }}
+                onStartWork={handleStartWork}
+              />
+            )}
           </CardContent>
         </Card>
 
@@ -205,6 +307,16 @@ export default function WorkLogPage() {
               }
             }}
             editData={editingLog} // 傳遞編輯資料
+          />
+        )}
+
+        {/* 新增/編輯預定工作彈窗 */}
+        {showScheduledModal && (
+          <ScheduledWorkModal
+            open={showScheduledModal}
+            onClose={handleCloseScheduledModal}
+            onSave={handleScheduledModalSave}
+            editData={editingScheduledWork} // 傳遞編輯資料
           />
         )}
       </div>

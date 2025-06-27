@@ -5,6 +5,8 @@ import { useSession } from 'next-auth/react'
 import { SimpleTimePicker } from '@/components/ui/simple-time-picker'
 import { Portal } from '@/components/ui/portal'
 import ConflictConfirmModal from '@/components/ui/ConflictConfirmModal'
+import CategorySelector from '@/components/ui/CategorySelector'
+import { WorkCategory } from '@/lib/data/workCategories'
 
 interface WorkLog {
   id: string
@@ -571,15 +573,13 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
             )}
             
             {/* 工作分類 */}
-            <div className="relative">
-              <input
-                name="category"
-                placeholder="工作分類"
-                value={formData.category}
-                onChange={handleChange}
-                className="w-full rounded-xl border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none bg-white/20"
-              />
-            </div>
+            <CategorySelector
+              value={formData.category}
+              onChange={(category: WorkCategory) => {
+                setFormData({ ...formData, category: category.content })
+              }}
+              required={true}
+            />
             
            
             <textarea name="content" placeholder="工作內容" rows={3} value={formData.content} onChange={handleChange}

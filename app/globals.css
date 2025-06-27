@@ -309,4 +309,11 @@
   .dark [data-radix-popover-content]:not([class*="novu"]) [data-slot="calendar"] {
     background: rgba(30, 30, 30, 0.95) !important; /* 深色模式下的 Calendar 背景 */
   }
+
+  /* 確保自定義 CategorySelector 下拉選單不受 Radix 樣式影響 */
+  .category-selector-dropdown {
+    pointer-events: auto !important;
+    position: absolute !important;
+    z-index: 100 !important;
+  }
 }

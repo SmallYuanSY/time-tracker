@@ -7,15 +7,18 @@ import DashboardLayout from "@/components/layouts/DashboardLayout";
 import SmartPunchWidget from "@/components/ui/SmartPunchWidget";
 import NovuInbox from "@/app/components/ui/inbox/NovuInbox";
 import TodayWorkSummary from "@/components/TodayWorkSummary";
+import ScheduledWorkList from "@/components/worklog/ScheduledWorkList";
 import TimeDisplayCard from "@/components/TimeDisplayCard";
 import TodayStatsCard from "@/components/TodayStatsCard";
 import { Portal } from "@/components/ui/portal";
+import { Clock, Calendar } from "lucide-react";
 
 
 export default function HomePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [summaryKey, setSummaryKey] = useState(0);
+  const [activeTab, setActiveTab] = useState<'today' | 'scheduled'>('today');
 
   // 身份驗證檢查
   useEffect(() => {
@@ -76,7 +79,7 @@ export default function HomePage() {
         </div>
       </Portal>
 
-      <div className="min-h-full bg-gradient-to-br from-slate-900 via-indigo-900 to-purple-900 space-y-6 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-purple-900 space-y-6 p-6">
         {/* 頂部功能區域 - 分成多個卡片 */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 時間和日期卡片 */}
@@ -95,52 +98,81 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* 今日工作摘要 */}
-        <TodayWorkSummary 
-          key={summaryKey} 
-          onRefresh={() => setSummaryKey(k => k + 1)}
-          refreshTrigger={summaryKey}
-        />
-
-        {/* 快速操作區域 */}
-        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
-          <h2 className="text-xl font-semibold text-white mb-4">快速操作</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <a
-              href="/worklog"
-              className="bg-blue-600/20 hover:bg-blue-600/30 border border-blue-400/30 rounded-xl p-4 text-center transition-colors"
-            >
-              <div className="text-blue-300 text-2xl mb-2">📝</div>
-              <div className="text-white font-medium">工作記錄</div>
-              <div className="text-white/60 text-sm">查看和管理工作日誌</div>
-            </a>
+        {/* 工作內容切換區域 */}
+        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl overflow-hidden">
+          {/* 切換標籤 */}
+          <div className="relative flex bg-white/5 p-1 rounded-t-2xl">
+            {/* 滑動背景 */}
+            <div
+              className={`absolute top-1 bottom-1 w-1/2 bg-gradient-to-r from-purple-600/30 to-blue-600/30 backdrop-blur border border-white/20 rounded-xl transition-all duration-300 ease-out ${
+                activeTab === 'today' ? 'left-1' : 'left-1/2'
+              }`}
+            />
             
-            <a
-              href="/notifications"
-              className="bg-purple-600/20 hover:bg-purple-600/30 border border-purple-400/30 rounded-xl p-4 text-center transition-colors"
+            {/* 今日工作標籤 */}
+            <button
+              onClick={() => setActiveTab('today')}
+              className={`relative z-10 flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-medium transition-all duration-300 ${
+                activeTab === 'today'
+                  ? 'text-white scale-105'
+                  : 'text-white/60 hover:text-white/80 scale-100'
+              }`}
             >
-              <div className="text-purple-300 text-2xl mb-2">🔔</div>
-              <div className="text-white font-medium">完整通知</div>
-              <div className="text-white/60 text-sm">查看所有通知和測試</div>
-            </a>
+              <Clock className="h-4 w-4" />
+              今日工作
+              {activeTab === 'today' && (
+                <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
+              )}
+            </button>
             
-            <a
-              href="/test-notification"
-              className="bg-green-600/20 hover:bg-green-600/30 border border-green-400/30 rounded-xl p-4 text-center transition-colors"
+            {/* 預定工作標籤 */}
+            <button
+              onClick={() => setActiveTab('scheduled')}
+              className={`relative z-10 flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-medium transition-all duration-300 ${
+                activeTab === 'scheduled'
+                  ? 'text-white scale-105'
+                  : 'text-white/60 hover:text-white/80 scale-100'
+              }`}
             >
-              <div className="text-green-300 text-2xl mb-2">🧪</div>
-              <div className="text-white font-medium">測試通知</div>
-              <div className="text-white/60 text-sm">發送測試通知</div>
-            </a>
-
-            <a
-              href="/overtime"
-              className="bg-orange-600/20 hover:bg-orange-600/30 border border-orange-400/30 rounded-xl p-4 text-center transition-colors"
+              <Calendar className="h-4 w-4" />
+              預定工作
+              {activeTab === 'scheduled' && (
+                <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+              )}
+            </button>
+          </div>
+          
+          {/* 內容區域 */}
+          <div className="relative overflow-hidden">
+            {/* 今日工作內容 */}
+            <div
+              className={`transition-all duration-500 ease-in-out ${
+                activeTab === 'today'
+                  ? 'opacity-100 transform translate-x-0'
+                  : 'opacity-0 transform -translate-x-full absolute inset-0'
+              }`}
             >
-              <div className="text-orange-300 text-2xl mb-2">⏱</div>
-              <div className="text-white font-medium">加班模式</div>
-              <div className="text-white/60 text-sm">紀錄加班開始與結束</div>
-            </a>
+              <div className="p-6">
+                <TodayWorkSummary 
+                  key={summaryKey} 
+                  onRefresh={() => setSummaryKey(k => k + 1)}
+                  refreshTrigger={summaryKey}
+                />
+              </div>
+            </div>
+            
+            {/* 預定工作內容 */}
+            <div
+              className={`transition-all duration-500 ease-in-out ${
+                activeTab === 'scheduled'
+                  ? 'opacity-100 transform translate-x-0'
+                  : 'opacity-0 transform translate-x-full absolute inset-0'
+              }`}
+            >
+              <div className="p-6">
+                <ScheduledWorkList />
+              </div>
+            </div>
           </div>
         </div>
       </div>

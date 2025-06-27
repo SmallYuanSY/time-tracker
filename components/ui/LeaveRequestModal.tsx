@@ -350,6 +350,7 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
                       >
                         <Calendar
                           mode="single"
+                          locale={zhTW}
                           selected={formData.startDate || undefined}
                           onSelect={(date) => {
                             if (date) {
@@ -434,6 +435,7 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
                       >
                         <Calendar
                           mode="single"
+                          locale={zhTW}
                           selected={formData.endDate || undefined}
                           onSelect={(date) => {
                             if (date) {
