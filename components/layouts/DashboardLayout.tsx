@@ -22,7 +22,6 @@ import {
 
 const sidebarItems = [
   { name: "總覽", icon: <LayoutDashboard className="w-4 h-4 mr-2" />, href: "/" },
-  { name: "工作記錄", icon: <FileClock className="w-4 h-4 mr-2" />, href: "/worklog" },
   { name: "工作日誌", icon: <BookOpen className="w-4 h-4 mr-2" />, href: "/journal" },
   { name: "案件管理", icon: <Briefcase className="w-4 h-4 mr-2" />, href: "/projects" },
   { name: "聯絡人", icon: <Users className="w-4 h-4 mr-2" />, href: "/contacts" },

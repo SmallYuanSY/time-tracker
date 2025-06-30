@@ -57,6 +57,8 @@ interface ScheduledWorkListProps {
   onEdit?: (work: ScheduledWork) => void
   onWorksLoaded?: (works: ScheduledWork[]) => void
   onStartWork?: (work: ScheduledWork) => void
+  mode?: 'week' | 'all'
+  currentWeek?: Date
 }
 
 // 可排序的工作項目組件
@@ -193,14 +195,15 @@ export default function ScheduledWorkList({
   onRefresh, 
   onEdit, 
   onWorksLoaded,
-  onStartWork 
+  onStartWork,
+  mode = 'all',
+  currentWeek
 }: ScheduledWorkListProps) {
   const { data: session } = useSession()
   const [works, setWorks] = useState<ScheduledWork[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
-  const [today, setToday] = useState<string>("")
   const [isClient, setIsClient] = useState(false)
   const [filter, setFilter] = useState<'ALL' | 'SCHEDULED' | 'URGENT'>('ALL')
 
@@ -212,20 +215,19 @@ export default function ScheduledWorkList({
     })
   )
 
-  // 確保在客戶端才初始化日期
+  // 確保在客戶端才初始化
   useEffect(() => {
     setIsClient(true)
-    setToday(new Date().toISOString().split("T")[0])
   }, [])
 
   const loadScheduledWorks = useCallback(async () => {
-    if (!session?.user || !today) return
+    if (!session?.user) return
 
     try {
       setLoading(true)
       setError(null)
 
-      // 獲取所有預定工作，然後在本地篩選前後一週
+      // 獲取所有預定工作
       const response = await fetch('/api/scheduled-work')
 
       if (!response.ok) {
@@ -234,22 +236,28 @@ export default function ScheduledWorkList({
 
       const allWorks = await response.json()
       
-      // 計算前後一週的日期範圍
-      const todayDate = new Date(today)
-      const oneWeekBefore = subDays(todayDate, 7)
-      const oneWeekAfter = addDays(todayDate, 7)
+      let filteredWorks = allWorks
       
-      // 篩選前後一週的工作
-      const filteredWorks = allWorks.filter((work: ScheduledWork) => {
-        const workStartDate = new Date(work.scheduledStartDate)
-        const workEndDate = new Date(work.scheduledEndDate)
+      // 根據模式篩選數據
+      if (mode === 'week' && currentWeek) {
+        // 計算週範圍
+        const weekStart = new Date(currentWeek)
+        weekStart.setDate(currentWeek.getDate() - currentWeek.getDay() + 1) // 週一
+        const weekEnd = new Date(weekStart)
+        weekEnd.setDate(weekStart.getDate() + 6) // 週日
         
-        // 檢查工作的時間範圍是否與前後一週有重疊
-        return isWithinInterval(workStartDate, { start: oneWeekBefore, end: oneWeekAfter }) ||
-               isWithinInterval(workEndDate, { start: oneWeekBefore, end: oneWeekAfter }) ||
-               (workStartDate <= oneWeekBefore && workEndDate >= oneWeekAfter)
-      })
-      
+        // 篩選本週相關的工作
+        filteredWorks = allWorks.filter((work: ScheduledWork) => {
+          const workStartDate = new Date(work.scheduledStartDate)
+          const workEndDate = new Date(work.scheduledEndDate)
+          
+          // 檢查工作的時間範圍是否與本週有重疊
+          return isWithinInterval(workStartDate, { start: weekStart, end: weekEnd }) ||
+                 isWithinInterval(workEndDate, { start: weekStart, end: weekEnd }) ||
+                 (workStartDate <= weekStart && workEndDate >= weekEnd)
+              })
+      }
+        
       setWorks(filteredWorks)
       if (onWorksLoaded) {
         onWorksLoaded(filteredWorks)
@@ -261,16 +269,16 @@ export default function ScheduledWorkList({
     } finally {
       setLoading(false)
     }
-  }, [session, today, onWorksLoaded])
+  }, [session, mode, currentWeek, onWorksLoaded])
 
   useEffect(() => {
-    if (!session?.user || !isClient || !today) {
+    if (!session?.user || !isClient) {
       setLoading(false)
       return
     }
 
     loadScheduledWorks()
-  }, [session, today, isClient])
+  }, [session, isClient, loadScheduledWorks])
 
   // 將 loadScheduledWorks 函數傳遞給父元件
   useEffect(() => {
@@ -410,11 +418,14 @@ export default function ScheduledWorkList({
 
   // 計算並格式化日期範圍（為空狀態使用）
   const getDateRangeTextForEmpty = () => {
-    if (!today) return ''
-    const todayDate = new Date(today)
-    const oneWeekBefore = subDays(todayDate, 7)
-    const oneWeekAfter = addDays(todayDate, 7)
-    return `${format(oneWeekBefore, 'MM/dd')} - ${format(oneWeekAfter, 'MM/dd')}`
+    if (mode === 'week' && currentWeek) {
+      const weekStart = new Date(currentWeek)
+      weekStart.setDate(currentWeek.getDate() - currentWeek.getDay() + 1) // 週一
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekStart.getDate() + 6) // 週日
+      return `${format(weekStart, 'MM/dd')} - ${format(weekEnd, 'MM/dd')}`
+    }
+    return '所有時間'
   }
 
   if (works.length === 0) {
@@ -453,11 +464,14 @@ export default function ScheduledWorkList({
 
   // 計算並格式化日期範圍
   const getDateRangeText = () => {
-    if (!today) return ''
-    const todayDate = new Date(today)
-    const oneWeekBefore = subDays(todayDate, 7)
-    const oneWeekAfter = addDays(todayDate, 7)
-    return `${format(oneWeekBefore, 'MM/dd')} - ${format(oneWeekAfter, 'MM/dd')}`
+    if (mode === 'week' && currentWeek) {
+      const weekStart = new Date(currentWeek)
+      weekStart.setDate(currentWeek.getDate() - currentWeek.getDay() + 1) // 週一
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekStart.getDate() + 6) // 週日
+      return `${format(weekStart, 'MM/dd')} - ${format(weekEnd, 'MM/dd')}`
+    }
+    return '所有時間'
   }
 
   return (

@@ -3,6 +3,10 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SessionProvider from "@/components/providers/SessionProvider";
 import { PortalProvider } from "@/components/providers/PortalProvider";
+import { initializeTaiwanTimezone } from "@/lib/timezone";
+
+// 初始化台灣時區
+initializeTaiwanTimezone();
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

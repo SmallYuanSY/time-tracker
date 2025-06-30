@@ -43,6 +43,7 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             name: user.name,
             email: user.email,
+            role: user.role,
           }
         } catch (error) {
           if (process.env.NODE_ENV !== 'production') {
@@ -63,12 +64,14 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
+        token.role = (user as any).role
       }
       return token
     },
     async session({ session, token }) {
       if (token && session.user) {
         (session.user as any).id = token.id as string
+        (session.user as any).role = token.role as string
       }
       return session
     },

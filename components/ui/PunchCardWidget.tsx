@@ -9,6 +9,7 @@ import WorkLogModal from "@/app/worklog/WorkLogModal"
 import { EndOfDayModal } from "@/components/ui/EndOfDayModal"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import { getDeviceInfo, type DeviceInfo } from "@/lib/utils"
 
 interface PunchCardWidgetProps {
   onWorkLogSaved?: () => void
@@ -175,12 +176,16 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
     setIsFlipping(true)
     
     try {
+      // 收集設備資訊
+      const deviceInfo = await getDeviceInfo()
+      
       const response = await fetch('/api/clock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: (session?.user as any)?.id,
-          type: 'IN'
+          type: 'IN',
+          deviceInfo
         })
       })
       
@@ -227,12 +232,16 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
     setIsFlipping(true)
     
     try {
+      // 收集設備資訊
+      const deviceInfo = await getDeviceInfo()
+      
       const response = await fetch('/api/clock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: (session?.user as any)?.id,
-          type: 'OUT'
+          type: 'OUT',
+          deviceInfo
         })
       })
       

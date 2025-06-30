@@ -172,13 +172,63 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
   const calculateDuration = () => {
     if (!formData.startDate || !formData.endDate) return null
     
-    const start = formData.startDate
-    const end = formData.endDate
-    const diffMs = end.getTime() - start.getTime()
-    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
-    const diffHours = Math.round(diffMs / (1000 * 60 * 60) * 10) / 10
+    const start = new Date(formData.startDate)
+    const end = new Date(formData.endDate)
     
-    return { days: diffDays, hours: diffHours }
+    // 計算跨越的天數
+    const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+    const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+    const diffDays = Math.ceil((endDay.getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    
+    let totalWorkMinutes = 0
+    
+    // 逐日計算工作時間
+    for (let d = 0; d < diffDays; d++) {
+      const currentDay = new Date(startDay)
+      currentDay.setDate(startDay.getDate() + d)
+      
+      // 當日的開始和結束時間
+      let dayStart = new Date(currentDay)
+      let dayEnd = new Date(currentDay)
+      dayEnd.setHours(23, 59, 59, 999)
+      
+      // 如果是第一天，使用請假開始時間
+      if (d === 0) {
+        dayStart = new Date(start)
+      }
+      
+      // 如果是最後一天，使用請假結束時間
+      if (d === diffDays - 1) {
+        dayEnd = new Date(end)
+      }
+      
+      // 當日午休時間 12:30-13:30
+      const lunchStart = new Date(currentDay)
+      lunchStart.setHours(12, 30, 0, 0)
+      const lunchEnd = new Date(currentDay)
+      lunchEnd.setHours(13, 30, 0, 0)
+      
+      // 計算當日工作時間（分鐘）
+      let dayWorkMinutes = (dayEnd.getTime() - dayStart.getTime()) / (1000 * 60)
+      
+      // 檢查是否需要扣除午休時間
+      if (dayStart <= lunchStart && dayEnd >= lunchEnd) {
+        // 完全包含午休時間，扣除整個1小時
+        dayWorkMinutes -= 60
+      } else if (dayStart < lunchEnd && dayEnd > lunchStart) {
+        // 部分重疊午休時間
+        const overlapStart = Math.max(dayStart.getTime(), lunchStart.getTime())
+        const overlapEnd = Math.min(dayEnd.getTime(), lunchEnd.getTime())
+        const overlapMinutes = Math.max(0, (overlapEnd - overlapStart) / (1000 * 60))
+        dayWorkMinutes -= overlapMinutes
+      }
+      
+      totalWorkMinutes += Math.max(0, dayWorkMinutes)
+    }
+    
+    const totalWorkHours = Math.round(totalWorkMinutes / 60 * 10) / 10
+    
+    return { days: diffDays, hours: totalWorkHours }
   }
 
   const duration = calculateDuration()
@@ -385,10 +435,16 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
                     type="time"
                     value={formData.startDate ? format(formData.startDate, "HH:mm") : "09:00"}
                     onChange={(e) => {
-                      const [hours, minutes] = e.target.value.split(':').map(Number)
-                      const newDate = formData.startDate ? new Date(formData.startDate) : new Date()
-                      newDate.setHours(hours, minutes)
-                      setFormData(prev => ({ ...prev, startDate: newDate }))
+                      const timeParts = e.target.value.split(':')
+                      if (timeParts.length >= 2) {
+                        const hours = parseInt(timeParts[0], 10)
+                        const minutes = parseInt(timeParts[1], 10)
+                        if (!isNaN(hours) && !isNaN(minutes)) {
+                          const newDate = formData.startDate ? new Date(formData.startDate) : new Date()
+                          newDate.setHours(hours, minutes)
+                          setFormData(prev => ({ ...prev, startDate: newDate }))
+                        }
+                      }
                     }}
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   />
@@ -470,10 +526,16 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
                     type="time"
                     value={formData.endDate ? format(formData.endDate, "HH:mm") : "18:00"}
                     onChange={(e) => {
-                      const [hours, minutes] = e.target.value.split(':').map(Number)
-                      const newDate = formData.endDate ? new Date(formData.endDate) : new Date()
-                      newDate.setHours(hours, minutes)
-                      setFormData(prev => ({ ...prev, endDate: newDate }))
+                      const timeParts = e.target.value.split(':')
+                      if (timeParts.length >= 2) {
+                        const hours = parseInt(timeParts[0], 10)
+                        const minutes = parseInt(timeParts[1], 10)
+                        if (!isNaN(hours) && !isNaN(minutes)) {
+                          const newDate = formData.endDate ? new Date(formData.endDate) : new Date()
+                          newDate.setHours(hours, minutes)
+                          setFormData(prev => ({ ...prev, endDate: newDate }))
+                        }
+                      }
                     }}
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   />
@@ -483,12 +545,12 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
 
             {/* 時長顯示 */}
             {duration && (
-              <Card className="border-blue-200 bg-blue-50">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 text-blue-800">
+              <Card className="border-blue-500/30 bg-blue-500/10 dark:border-blue-400/30 dark:bg-blue-400/10">
+                <CardContent className="px-4" style={{ paddingTop: '5px', paddingBottom: '5px' }}>
+                  <div className="flex items-center gap-2 text-gray-200">
                     <Clock className="h-4 w-4" />
                     <span className="font-medium">請假時長：</span>
-                    <span>{duration.days} 天 ({duration.hours} 小時)</span>
+                    <span className="font-semibold">{duration.days} 天 ({duration.hours} 小時)</span>
                   </div>
                 </CardContent>
               </Card>

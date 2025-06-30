@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
           const projectRecord = await prisma.project.findUnique({
             where: { code: project.projectCode },
             include: {
-              contact: true,
+              Contact: true,
             },
           })
 
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
             projectCode: project.projectCode,
             projectName: project.projectName,
             category: project.category,
-            contact: projectRecord?.contact || null,
+            contact: projectRecord?.Contact || null,
           }
         })
       )

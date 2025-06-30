@@ -3,10 +3,12 @@ import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getClientIP } from '@/lib/ip-utils'
+import { nowInTaiwan, getTaiwanDayRange } from '@/lib/timezone'
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, type } = await req.json()
+    const { userId, type, deviceInfo } = await req.json()
 
     if (!userId || !type) {
       return new NextResponse('Missing userId or type', { status: 400 })
@@ -17,11 +19,13 @@ export async function POST(req: NextRequest) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
+    const ipAddress = getClientIP(req)
+    const userAgent = req.headers.get('user-agent') || ''
+
     // 如果是下班打卡，需要先結算所有進行中的工作記錄
     if (type === 'OUT') {
-      const now = new Date()
-      const startOfToday = new Date()
-      startOfToday.setHours(0, 0, 0, 0)
+      const now = nowInTaiwan()
+      const { start: startOfToday } = getTaiwanDayRange(now)
 
       // 取得所有未結束且開始時間早於目前時間的工作記錄
       const ongoingWorkLogs = await prisma.workLog.findMany({
@@ -86,6 +90,10 @@ export async function POST(req: NextRequest) {
       data: {
         userId,
         type, // 必須為 "IN" 或 "OUT"
+        ipAddress,
+        macAddress: deviceInfo?.macAddress || null,
+        userAgent,
+        deviceInfo: deviceInfo ? JSON.stringify(deviceInfo) : null,
       },
     })
 
@@ -112,15 +120,16 @@ export async function GET(req: NextRequest) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
-    // 獲取今日日期範圍
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    // 獲取今日日期範圍（台灣時間）
+    const currentTime = nowInTaiwan()
+    const { start: today, end: todayEnd } = getTaiwanDayRange(currentTime)
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
 
     // 獲取昨日日期範圍（用於跨日判斷）
     const yesterday = new Date(today)
     yesterday.setDate(yesterday.getDate() - 1)
+    const { start: yesterdayStart } = getTaiwanDayRange(yesterday)
 
     // 獲取今日的打卡記錄，按時間排序
     const todayClocks = await prisma.clock.findMany({
@@ -166,7 +175,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 判斷當前時間
-    const now = new Date()
+    const now = currentTime
     const hour = now.getHours()
 
     // 判斷當前是否為上班狀態

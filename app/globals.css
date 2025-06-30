@@ -139,6 +139,22 @@
   transform-style: preserve-3d;
 }
 
+/* 新增淡入下滑動畫 */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeInDown {
+  animation: fadeInDown 0.3s ease-out;
+}
+
 /* Novu 彈出視窗的 z-index 修正 */
 @layer components {
   /* Novu Inbox 彈出視窗樣式 */

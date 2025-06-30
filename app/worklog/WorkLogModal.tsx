@@ -50,6 +50,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
           ? new Date().toTimeString().slice(0, 5) // 使用當前時間
           : '09:00',
     endTime: editData?.endTime ? new Date(editData.endTime).toTimeString().slice(0, 5) : '',
+    editReason: '', // 新增：編輯原因
   })
   const [errors, setErrors] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -221,7 +222,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
             content: formData.content,
             startTime: fullStart,
             ...(fullEnd && { endTime: fullEnd }),
-            confirmConflicts: true, // 確認處理衝突
+            ...(editData && { editReason: formData.editReason }),
           }
         }
 
@@ -255,6 +256,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
           content: '',
           startTime: useQuickApi ? '' : formData.endTime || '17:00',
           endTime: '',
+          editReason: '',
         })
         onNext()
       } else if (onSave) {
@@ -327,6 +329,9 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
     if (selectedProjects.length === 0) newErrors.push('請至少選擇一個案件')
     if (!formData.category.trim()) newErrors.push('工作分類為必填欄位')
     if (!formData.content.trim()) newErrors.push('工作內容為必填欄位')
+    
+    // 編輯模式下，編輯原因為必填
+    if (editData && !formData.editReason.trim()) newErrors.push('編輯原因為必填欄位')
     
     // 根據時間模式決定是否需要時間驗證
     const needTimeValidation = !(initialMode === 'quick' || copyData) || useFullTimeMode
@@ -401,6 +406,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
             content: formData.content,
             startTime: fullStart,
             ...(fullEnd && { endTime: fullEnd }),
+            ...(editData && { editReason: formData.editReason }),
           }
         }
 
@@ -454,6 +460,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
           content: '',
           startTime: useQuickApi ? '' : formData.endTime || '17:00',
           endTime: '',
+          editReason: '',
         })
         onNext()
       } else if (onSave) {
@@ -585,6 +592,26 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
             <textarea name="content" placeholder="工作內容" rows={3} value={formData.content} onChange={handleChange}
               className="w-full rounded-xl bg-white/20 border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none" />
             
+            {/* 編輯原因（僅在編輯模式下顯示） */}
+            {editData && (
+              <div className="space-y-2">
+                <label className="text-sm text-white font-medium block">
+                  編輯原因 <span className="text-red-400">*</span>
+                </label>
+                <textarea 
+                  name="editReason" 
+                  placeholder="請說明編輯此工作記錄的原因..." 
+                  rows={2} 
+                  value={formData.editReason} 
+                  onChange={handleChange}
+                  className="w-full rounded-xl bg-orange-500/20 border border-orange-400/50 px-4 py-2 text-white placeholder:text-orange-200/60 focus:outline-none focus:border-orange-400" 
+                />
+                <p className="text-xs text-orange-200/80">
+                  ⚠️ 編輯原因將記錄您的IP地址，供管理員審核使用
+                </p>
+              </div>
+            )}
+            
             {/* 快速記錄模式的時間切換撥桿 */}
             {(initialMode === 'quick' || copyData) && (
               <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
@@ -606,15 +633,8 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
             ) : (
               <div className="grid grid-cols-2 gap-4">
                 <SimpleTimePicker label="開始時間" value={formData.startTime} onChange={(time: string) => setFormData({ ...formData, startTime: time })} />
-                {(initialMode === 'full' || initialMode === 'end' || ((initialMode === 'quick' || copyData) && useFullTimeMode)) ? (
+                {(initialMode === 'full' || initialMode === 'end' || editData || ((initialMode === 'quick' || copyData) && useFullTimeMode)) && (
                   <SimpleTimePicker label="結束時間" value={formData.endTime} onChange={(time: string) => setFormData({ ...formData, endTime: time })} />
-                ) : (
-                  <div className="space-y-2">
-                    <div className="text-sm text-white font-medium block">結束時間</div>
-                    <div className="w-full rounded-xl bg-white/10 border border-white/20 px-4 py-3 text-white/60 text-center">
-                      {initialMode === 'start' ? '下班時填寫' : '請選擇結束時間'}
-                    </div>
-                  </div>
                 )}
               </div>
             )}

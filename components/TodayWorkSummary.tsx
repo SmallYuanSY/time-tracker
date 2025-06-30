@@ -4,7 +4,10 @@ import { useEffect, useState, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { format, parseISO } from "date-fns"
+import { format, parseISO, addDays, subDays } from "date-fns"
+import { zhTW } from "date-fns/locale"
+import { nowInTaiwan } from "@/lib/timezone"
+import { ChevronLeft, ChevronRight, Calendar } from "lucide-react"
 import WorkLogModal from "@/app/worklog/WorkLogModal"
 
 interface WorkLog {
@@ -29,17 +32,16 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
   const [showModal, setShowModal] = useState(false)
   const [editingLog, setEditingLog] = useState<WorkLog | null>(null)
   const [copyingLog, setCopyingLog] = useState<WorkLog | null>(null)
-  const [today, setToday] = useState<string>("")
+  const [selectedDate, setSelectedDate] = useState<Date>(nowInTaiwan())
   const [isClient, setIsClient] = useState(false)
 
-  // 確保在客戶端才初始化日期
+  // 確保在客戶端才初始化
   useEffect(() => {
     setIsClient(true)
-    setToday(new Date().toISOString().split("T")[0])
   }, [])
 
   const fetchWorkLogs = useCallback(async () => {
-    if (!session?.user || !isClient || !today) {
+    if (!session?.user || !isClient) {
       setLoading(false)
       return
     }
@@ -47,7 +49,8 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
     try {
       setLoading(true)
       const userId = (session.user as any).id
-      const response = await fetch(`/api/worklog?userId=${userId}&date=${today}`)
+      const dateString = format(selectedDate, 'yyyy-MM-dd')
+      const response = await fetch(`/api/worklog?userId=${userId}&date=${dateString}`)
       
       if (response.ok) {
         const data = await response.json()
@@ -58,13 +61,13 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
     } finally {
       setLoading(false)
     }
-  }, [session?.user, isClient, today])
+  }, [session?.user, isClient, selectedDate])
 
   useEffect(() => {
-    if (isClient && today && session?.user) {
+    if (isClient && session?.user) {
       fetchWorkLogs()
     }
-  }, [session, today, isClient, fetchWorkLogs])
+  }, [session, selectedDate, isClient, fetchWorkLogs])
 
   // 監聽外部刷新觸發
   useEffect(() => {
@@ -101,6 +104,22 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
     setShowModal(true)
   }
 
+  const goToPreviousDay = () => {
+    setSelectedDate(prev => subDays(prev, 1))
+  }
+
+  const goToNextDay = () => {
+    setSelectedDate(prev => addDays(prev, 1))
+  }
+
+  const goToToday = () => {
+    setSelectedDate(nowInTaiwan())
+  }
+
+  const today = nowInTaiwan()
+  const isToday = format(selectedDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
+  const isFutureDate = selectedDate > today
+
   const isOvertime = (startTime: string) => {
     const t = parseISO(startTime)
     return t.getHours() >= 18 || t.getHours() < 6
@@ -117,22 +136,81 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
   return (
     <>
       <div>
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-white">📋 今日工作</h2>
-          <div className="flex items-center gap-3">
-            <span className="text-white/60 text-sm">{logs.length} 項工作</span>
-            <Button
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm"
-              onClick={handleQuickAdd}
-            >
-              ➕ 快速紀錄
-            </Button>
+        {/* 日期導航和標題 */}
+        <div className="mb-4">
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-xl font-semibold text-white">📋 工作記錄</h2>
+            <div className="flex items-center gap-3">
+              <span className="text-white/60 text-sm">{logs.length} 項工作</span>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                onClick={handleQuickAdd}
+              >
+                ➕ 快速紀錄
+              </Button>
+            </div>
+          </div>
+          
+          {/* 日期選擇器 */}
+          <div className="relative bg-white/10 backdrop-blur rounded-xl p-3">
+            {/* 左側導航按鈕 */}
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goToPreviousDay}
+                className="text-white/80 hover:text-white hover:bg-white/20 p-2"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {/* 中間日期顯示 - 絕對居中 */}
+            <div className="flex items-center justify-center gap-2">
+              <Calendar className="h-4 w-4 text-white/60" />
+              <span className="text-white font-medium text-lg">
+                {format(selectedDate, 'yyyy/MM/dd (E)', { locale: zhTW })}
+              </span>
+              {isToday && (
+                <span className="text-xs bg-green-500/20 text-green-300 px-2 py-1 rounded-full border border-green-400/30">
+                  今天
+                </span>
+              )}
+              {isFutureDate && (
+                <span className="text-xs bg-orange-500/20 text-orange-300 px-2 py-1 rounded-full border border-orange-400/30">
+                  未來
+                </span>
+              )}
+            </div>
+            
+            {/* 右側導航按鈕 */}
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goToNextDay}
+                className="text-white/80 hover:text-white hover:bg-white/20 p-2"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              
+              {!isToday && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={goToToday}
+                  className="text-white/80 hover:text-white hover:bg-white/20 text-xs"
+                >
+                  回到今天
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
         {logs.length === 0 ? (
           <div className="text-center text-white/60 py-8">
-            今日尚無工作記錄
+            {isToday ? '今日尚無工作記錄' : `${format(selectedDate, 'MM/dd', { locale: zhTW })} 尚無工作記錄`}
           </div>
         ) : (
           <div className="space-y-3">
@@ -191,7 +269,7 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
         {logs.length > 6 && (
           <div className="text-center mt-4">
             <a 
-              href="/worklog" 
+              href="/journal" 
               className="text-blue-300 hover:text-blue-200 text-sm underline"
             >
               查看全部 {logs.length} 項工作 →

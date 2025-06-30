@@ -123,4 +123,90 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ error: "伺服器內部錯誤" }, { status: 500 })
   }
+}
+
+export async function PUT(req: Request) {
+  try {
+    // 檢查權限：只有 WEB_ADMIN 可以更新用戶
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return new NextResponse('Unauthorized', { status: 401 })
+    }
+
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { role: true }
+    })
+
+    if (!currentUser || currentUser.role !== 'WEB_ADMIN') {
+      return NextResponse.json({ error: "只有網頁管理員可以更新用戶" }, { status: 403 })
+    }
+
+    const { id, email, password, name, role } = await req.json()
+
+    if (!id) {
+      return NextResponse.json({ error: "缺少用戶ID" }, { status: 400 })
+    }
+
+    // 驗證角色欄位
+    const validRoles = ['ADMIN', 'WEB_ADMIN', 'EMPLOYEE']
+    if (role && !validRoles.includes(role)) {
+      return NextResponse.json({ error: "無效的角色" }, { status: 400 })
+    }
+
+    // 檢查用戶是否存在
+    const existingUser = await prisma.user.findUnique({
+      where: { id }
+    })
+
+    if (!existingUser) {
+      return NextResponse.json({ error: "用戶不存在" }, { status: 404 })
+    }
+
+    // 如果要更新電子郵件，檢查是否與其他用戶重複
+    if (email && email !== existingUser.email) {
+      const emailExists = await prisma.user.findUnique({
+        where: { email }
+      })
+
+      if (emailExists) {
+        return NextResponse.json({ error: "電子郵件已被使用" }, { status: 409 })
+      }
+    }
+
+    // 準備更新資料
+    const updateData: any = {}
+    
+    if (email) updateData.email = email
+    if (name !== undefined) updateData.name = name
+    if (role) updateData.role = role
+    
+    // 如果提供了新密碼，則加密並更新
+    if (password) {
+      updateData.password = await bcrypt.hash(password, 10)
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: updateData,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+      }
+    })
+
+    // 注意：Novu subscriber 會在下次觸發事件時自動更新
+
+    return NextResponse.json({ 
+      user: updatedUser,
+      message: "用戶資料更新成功"
+    })
+  } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[PUT /api/users]', error)
+    }
+    return NextResponse.json({ error: "伺服器內部錯誤" }, { status: 500 })
+  }
 } 

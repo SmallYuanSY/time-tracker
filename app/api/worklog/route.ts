@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { nowInTaiwan, getTaiwanDayRange, parseTaiwanTime } from '@/lib/timezone'
 
 export async function POST(req: NextRequest) {
   try {
@@ -39,9 +40,9 @@ export async function POST(req: NextRequest) {
       return new NextResponse(`缺少必要欄位: ${missingFields.join(', ')}`, { status: 400 })
     }
 
-    // 驗證日期格式
-    const startDate = new Date(startTime)
-    const endDate = endTime ? new Date(endTime) : null
+    // 驗證日期格式（使用台灣時間）
+    const startDate = parseTaiwanTime(startTime)
+    const endDate = endTime ? parseTaiwanTime(endTime) : null
     
     if (isNaN(startDate.getTime())) {
       if (process.env.NODE_ENV !== 'production') {
@@ -143,17 +144,58 @@ export async function POST(req: NextRequest) {
       console.log('[POST /api/worklog] startDate:', startDate)
       console.log('[POST /api/worklog] endDate:', endDate)
     }
-    
-    const result = await prisma.workLog.create({
-      data: {
-        userId,
-        startTime: startDate,
-        endTime: endDate as any,
-        projectCode,
-        projectName,
-        category,
-        content,
-      },
+
+    // 使用資料庫事務來確保工作記錄和案件記錄都能成功創建
+    const result = await prisma.$transaction(async (tx) => {
+      // 首先檢查案件是否已存在於 Project 表中
+      let project = await tx.project.findUnique({
+        where: { code: projectCode },
+      })
+
+      // 如果案件不存在，創建新案件記錄
+      if (!project) {
+        try {
+          project = await tx.project.create({
+            data: {
+              code: projectCode,
+              name: projectName,
+              category: category || '',
+              description: `從工作記錄自動創建 - ${content}`,
+              managerId: userId,
+              status: 'ACTIVE',
+            },
+          })
+          
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[POST /api/worklog] 自動創建案件記錄:', project.code)
+          }
+        } catch (error) {
+          // 如果創建案件失敗（可能是並發創建），重新查詢
+          project = await tx.project.findUnique({
+            where: { code: projectCode },
+          })
+          
+          if (!project) {
+            throw error // 如果仍然找不到，拋出原始錯誤
+          }
+        }
+      }
+
+      // 創建工作記錄，並關聯到 Project
+      const workLogResult = await tx.workLog.create({
+        data: {
+          userId,
+          startTime: startDate,
+          endTime: endDate as any,
+          projectCode,
+          projectName,
+          category,
+          content,
+          projectId: project.id, // 關聯到 Project 記錄
+        },
+      })
+
+      return workLogResult
     })
 
     if (process.env.NODE_ENV !== 'production') {
@@ -196,16 +238,17 @@ export async function GET(req: NextRequest) {
     let startDate: Date
     let endDate: Date
 
-    // 支援兩種查詢模式：按日期 或 按時間範圍
+    // 支援兩種查詢模式：按日期 或 按時間範圍（使用台灣時間）
     if (fromStr && toStr) {
       // 使用 from/to 範圍查詢
-      startDate = new Date(fromStr)
-      endDate = new Date(toStr)
+      startDate = parseTaiwanTime(fromStr)
+      endDate = parseTaiwanTime(toStr)
     } else if (dateStr) {
       // 使用日期查詢（向後兼容）
-      startDate = new Date(dateStr)
-      endDate = new Date(startDate)
-      endDate.setDate(startDate.getDate() + 1)
+      const targetDate = parseTaiwanTime(dateStr)
+      const { start, end } = getTaiwanDayRange(targetDate)
+      startDate = start
+      endDate = end
     } else {
       return new NextResponse('缺少 date 或 from/to 參數', { status: 400 })
     }

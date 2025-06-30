@@ -34,6 +34,7 @@ export default function ProjectsPage() {
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
+  const [migrating, setMigrating] = useState(false)
 
   useEffect(() => {
     if (session?.user) {
@@ -110,6 +111,34 @@ export default function ProjectsPage() {
     setShowContactSelectionModal(true)
   }
 
+  const handleMigration = async () => {
+    if (!confirm('確定要執行資料遷移嗎？這會將現有的工作記錄轉換為案件管理記錄。')) {
+      return
+    }
+
+    try {
+      setMigrating(true)
+      const response = await fetch('/api/projects/migrate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        alert(result.message)
+        await loadProjects() // 重新載入案件列表
+      } else {
+        throw new Error(result.error || '遷移失敗')
+      }
+    } catch (error) {
+      console.error('遷移失敗:', error)
+      alert(`遷移失敗: ${error instanceof Error ? error.message : '未知錯誤'}`)
+    } finally {
+      setMigrating(false)
+    }
+  }
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -131,15 +160,24 @@ export default function ProjectsPage() {
               管理所有案件的聯絡人資訊，共 {projects.length} 個案件
             </p>
           </div>
-          <button
-            onClick={() => {
-              setEditingContact(null)
-              setShowContactModal(true)
-            }}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition flex items-center gap-2"
-          >
-            ➕ 新增聯絡人
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleMigration}
+              disabled={migrating}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition flex items-center gap-2"
+            >
+              {migrating ? '⏳ 遷移中...' : '🔄 遷移工作記錄'}
+            </button>
+            <button
+              onClick={() => {
+                setEditingContact(null)
+                setShowContactModal(true)
+              }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition flex items-center gap-2"
+            >
+              ➕ 新增聯絡人
+            </button>
+          </div>
         </div>
 
         {/* 案件列表 */}

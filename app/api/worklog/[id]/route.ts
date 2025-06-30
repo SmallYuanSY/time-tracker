@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getClientIP } from '@/lib/ip-utils'
 
 // 更新工作記錄
 export async function PUT(
@@ -17,6 +18,7 @@ export async function PUT(
       projectName,
       category,
       content,
+      editReason,
     } = await req.json()
 
     const { id } = params
@@ -26,6 +28,10 @@ export async function PUT(
       !projectCode || !projectName || !category || !content
     ) {
       return new NextResponse('缺少必要欄位', { status: 400 })
+    }
+
+    if (!editReason || editReason.trim() === '') {
+      return new NextResponse('編輯原因為必填欄位', { status: 400 })
     }
 
     const session = await getServerSession(authOptions)
@@ -131,6 +137,15 @@ export async function PUT(
         projectName,
         category,
         content,
+        // 編輯追蹤資訊
+        isEdited: true,
+        editReason: editReason.trim(),
+        editedBy: userId,
+        editedAt: new Date(),
+        editIpAddress: getClientIP(req),
+        // 如果是第一次編輯，保存原始時間
+        originalStartTime: existingLog.isEdited ? existingLog.originalStartTime : existingLog.startTime,
+        originalEndTime: existingLog.isEdited ? existingLog.originalEndTime : existingLog.endTime,
       },
     })
 

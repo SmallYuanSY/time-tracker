@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useSession } from 'next-auth/react'
 import { format } from 'date-fns'
+import { getDeviceInfo } from '@/lib/utils'
 
 interface OvertimeWidgetProps {
   onStatusChange?: () => void
@@ -43,10 +44,14 @@ export default function OvertimeWidget({ onStatusChange }: OvertimeWidgetProps) 
   const start = async () => {
     if (!session?.user) return
     const userId = (session.user as any).id
+    
+    // 收集設備資訊
+    const deviceInfo = await getDeviceInfo()
+    
     const res = await fetch('/api/overtime/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, deviceInfo }),
     })
     if (res.ok) {
       await loadStatus()
@@ -57,10 +62,14 @@ export default function OvertimeWidget({ onStatusChange }: OvertimeWidgetProps) 
   const end = async () => {
     if (!session?.user) return
     const userId = (session.user as any).id
+    
+    // 收集設備資訊
+    const deviceInfo = await getDeviceInfo()
+    
     const res = await fetch('/api/overtime/end', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, deviceInfo }),
     })
     if (res.ok) {
       await loadStatus()
