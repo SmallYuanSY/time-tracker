@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Shield, Monitor, Smartphone, Globe, Clock } from 'lucide-react'
+import { Shield, Monitor, Smartphone, Globe } from 'lucide-react'
 
 interface DeviceInfoDisplayProps {
   record: {

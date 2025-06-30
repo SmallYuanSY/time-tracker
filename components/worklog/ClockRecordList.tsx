@@ -9,6 +9,7 @@ import { Clock, LogIn, LogOut, Calendar, Edit3, Plane } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import DeviceInfoDisplay from '@/components/ui/DeviceInfoDisplay'
 import { Portal } from '@/components/ui/portal'
+import WorkTimeStatsCard from '@/components/ui/WorkTimeStatsCard'
 
 interface ClockRecord {
   id: string
@@ -474,16 +475,25 @@ export default function ClockRecordList({ userId, currentWeek, timeRange = 'week
         const analysis = analyzeDayRecords(dayRecords)
         const leaveInfo = checkLeaveOnDate(day)
         
+        // 決定卡片顏色：有打卡記錄時使用淡綠色，無打卡記錄時使用預設色
+        const hasRecords = dayRecords.length > 0
+        const cardBgClass = hasRecords 
+          ? "bg-green-500/8 border-green-500/15 backdrop-blur-sm" 
+          : "bg-white/5 border-white/10 backdrop-blur-sm"
+        
         return (
-          <Card key={dateKey} className="bg-white/5 border-white/10 backdrop-blur-sm">
+          <Card key={dateKey} className={cardBgClass}>
             <CardContent className="p-4">
               {/* 日期標題 */}
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-blue-400" />
+                  <Calendar className={`w-4 h-4 ${hasRecords ? 'text-green-400' : 'text-blue-400'}`} />
                   <span className="text-white font-medium">
                     {format(day, 'MM/dd')} ({dayName})
                   </span>
+                  {hasRecords && (
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                  )}
                   {leaveInfo && (
                     <div className="flex items-center gap-1 px-2 py-1 bg-purple-500/20 text-purple-300 rounded-full text-xs">
                       <Plane className="w-3 h-3" />
@@ -706,9 +716,12 @@ export default function ClockRecordList({ userId, currentWeek, timeRange = 'week
 
                     {/* 詳細打卡記錄（可收合） */}
                     <details className="group">
-                      <summary className="cursor-pointer text-white/70 text-sm hover:text-white transition-colors">
-                        <span className="group-open:hidden">▶ 查看詳細打卡記錄 ({dayRecords.length} 筆)</span>
-                        <span className="hidden group-open:inline">▼ 隱藏詳細打卡記錄</span>
+                      <summary className="cursor-pointer text-white/70 text-sm hover:text-white transition-colors list-none">
+                        <div className="flex items-center gap-2">
+                          <span className="group-open:rotate-90 transition-transform duration-200">▶</span>
+                          <span className="group-open:hidden">查看詳細打卡記錄 ({dayRecords.length} 筆)</span>
+                          <span className="hidden group-open:inline">隱藏詳細打卡記錄</span>
+                        </div>
                       </summary>
                       <div className="mt-3 space-y-2">
                         {dayRecords.sort((a, b) => 
@@ -779,6 +792,13 @@ export default function ClockRecordList({ userId, currentWeek, timeRange = 'week
           </Card>
         )
       })}
+
+      {/* 工作時間統計 */}
+      <WorkTimeStatsCard
+        userId={userId}
+        timeRange={timeRange}
+        currentDate={currentWeek}
+      />
 
       {/* 編輯彈窗 */}
       {editingRecord && (

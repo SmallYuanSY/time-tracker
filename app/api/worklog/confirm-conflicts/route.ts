@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getClientIP } from '@/lib/ip-utils'
+import { getTaiwanDayRange } from '@/lib/timezone'
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,7 +16,9 @@ export async function POST(req: NextRequest) {
       projectName,
       category,
       content,
-      confirmConflicts
+      confirmConflicts,
+      isClockMode,
+      clockEditReason,
     } = body
 
     if (!confirmConflicts) {
@@ -113,17 +117,64 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 建立新的工作記錄
-    const result = await prisma.workLog.create({
-      data: {
-        userId,
-        startTime: startDate,
-        endTime: endDate,
-        projectCode,
-        projectName,
-        category,
-        content,
-      },
+    // 使用事務來確保工作記錄和打卡記錄的同步更新
+    const result = await prisma.$transaction(async (tx) => {
+      // 建立新的工作記錄
+      const workLogResult = await tx.workLog.create({
+        data: {
+          userId,
+          startTime: startDate,
+          endTime: endDate,
+          projectCode,
+          projectName,
+          category,
+          content,
+        },
+      })
+
+      // 如果是打卡模式且有修改原因，同時更新對應的打卡記錄
+      if (isClockMode && clockEditReason) {
+        // 獲取今日的打卡記錄範圍
+        const { start: todayStart, end: todayEnd } = getTaiwanDayRange(startDate)
+        
+        // 查找今日最近的上班打卡記錄
+        const recentClockIn = await tx.clock.findFirst({
+          where: {
+            userId,
+            type: 'IN',
+            timestamp: {
+              gte: todayStart,
+              lt: todayEnd,
+            },
+          },
+          orderBy: {
+            timestamp: 'desc',
+          },
+        })
+
+        if (recentClockIn) {
+          // 更新打卡記錄的時間為工作記錄的開始時間
+          await tx.clock.update({
+            where: { id: recentClockIn.id },
+            data: {
+              timestamp: startDate,
+              isEdited: true,
+              editReason: clockEditReason.trim(),
+              editedBy: userId,
+              editedAt: new Date(),
+              editIpAddress: getClientIP(req),
+              // 如果還沒有原始時間戳，保存原始時間
+              originalTimestamp: recentClockIn.isEdited ? recentClockIn.originalTimestamp : recentClockIn.timestamp,
+            },
+          })
+
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[POST /api/worklog/confirm-conflicts] 同步更新打卡記錄:', recentClockIn.id)
+          }
+        }
+      }
+
+      return workLogResult
     })
 
     if (process.env.NODE_ENV !== 'production') {

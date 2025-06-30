@@ -8,7 +8,7 @@ import { nowInTaiwan, getTaiwanDayRange } from '@/lib/timezone'
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, type, deviceInfo } = await req.json()
+    const { userId, type, deviceInfo, editReason } = await req.json()
 
     if (!userId || !type) {
       return new NextResponse('Missing userId or type', { status: 400 })
@@ -94,6 +94,15 @@ export async function POST(req: NextRequest) {
         macAddress: deviceInfo?.macAddress || null,
         userAgent,
         deviceInfo: deviceInfo ? JSON.stringify(deviceInfo) : null,
+        // 如果有修改原因，表示這是修改過時間的打卡
+        ...(editReason && {
+          isEdited: true,
+          editReason: editReason.trim(),
+          editedBy: userId,
+          editedAt: new Date(),
+          editIpAddress: ipAddress,
+          originalTimestamp: new Date(), // 原始時間就是當前時間，因為是在打卡時修改的
+        }),
       },
     })
 

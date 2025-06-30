@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth'
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { code: string } }
+  { params }: { params: Promise<{ code: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -19,7 +19,7 @@ export async function PUT(
       return new NextResponse('contactIds must be an array', { status: 400 })
     }
 
-    const { code } = params
+    const { code } = await params
 
     // 暫時使用第一個聯絡人ID，直到資料庫結構更新
     const contactId = contactIds.length > 0 ? contactIds[0] : null
@@ -66,7 +66,7 @@ export async function PUT(
           contactId,
         },
         include: {
-          contact: true,
+          Contact: true,
         },
       })
     } else {
@@ -75,7 +75,7 @@ export async function PUT(
         where: { code },
         data: { contactId },
         include: {
-          contact: true,
+          Contact: true,
         },
       })
     }

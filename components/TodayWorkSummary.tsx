@@ -7,7 +7,8 @@ import { Card } from "@/components/ui/card"
 import { format, parseISO, addDays, subDays } from "date-fns"
 import { zhTW } from "date-fns/locale"
 import { nowInTaiwan } from "@/lib/timezone"
-import { ChevronLeft, ChevronRight, Calendar } from "lucide-react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
+
 import WorkLogModal from "@/app/worklog/WorkLogModal"
 
 interface WorkLog {
@@ -34,6 +35,10 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
   const [copyingLog, setCopyingLog] = useState<WorkLog | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date>(nowInTaiwan())
   const [isClient, setIsClient] = useState(false)
+  const [dateAnimation, setDateAnimation] = useState<'none' | 'slide-left' | 'slide-right'>('none')
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [isDateChanging, setIsDateChanging] = useState(false)
+
 
   // 確保在客戶端才初始化
   useEffect(() => {
@@ -43,11 +48,16 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
   const fetchWorkLogs = useCallback(async () => {
     if (!session?.user || !isClient) {
       setLoading(false)
+      setIsInitialLoad(false)
       return
     }
 
     try {
-      setLoading(true)
+      // 只在初始載入時顯示載入狀態，日期切換時不顯示
+      if (isInitialLoad) {
+        setLoading(true)
+      }
+      
       const userId = (session.user as any).id
       const dateString = format(selectedDate, 'yyyy-MM-dd')
       const response = await fetch(`/api/worklog?userId=${userId}&date=${dateString}`)
@@ -60,8 +70,10 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
       console.error('獲取工作記錄失敗:', error)
     } finally {
       setLoading(false)
+      setIsInitialLoad(false)
+      setIsDateChanging(false)
     }
-  }, [session?.user, isClient, selectedDate])
+  }, [session?.user, isClient, selectedDate, isInitialLoad])
 
   useEffect(() => {
     if (isClient && session?.user) {
@@ -105,16 +117,33 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
   }
 
   const goToPreviousDay = () => {
-    setSelectedDate(prev => subDays(prev, 1))
+    setIsDateChanging(true)
+    setDateAnimation('slide-right')
+    setTimeout(() => {
+      setSelectedDate(prev => subDays(prev, 1))
+      setDateAnimation('none')
+    }, 150)
   }
 
   const goToNextDay = () => {
-    setSelectedDate(prev => addDays(prev, 1))
+    setIsDateChanging(true)
+    setDateAnimation('slide-left')
+    setTimeout(() => {
+      setSelectedDate(prev => addDays(prev, 1))
+      setDateAnimation('none')
+    }, 150)
   }
 
   const goToToday = () => {
-    setSelectedDate(nowInTaiwan())
+    setIsDateChanging(true)
+    setDateAnimation('slide-left')
+    setTimeout(() => {
+      setSelectedDate(nowInTaiwan())
+      setDateAnimation('none')
+    }, 150)
   }
+
+
 
   const today = nowInTaiwan()
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
@@ -125,7 +154,8 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
     return t.getHours() >= 18 || t.getHours() < 6
   }
 
-  if (loading) {
+  // 只在初始載入且沒有日期切換動畫時顯示載入畫面
+  if (loading && isInitialLoad && !isDateChanging) {
     return (
       <div>
         <div className="text-center text-white/60">載入中...</div>
@@ -152,7 +182,7 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
           </div>
           
           {/* 日期選擇器 */}
-          <div className="relative bg-white/10 backdrop-blur rounded-xl p-3">
+          <div className="relative bg-white/10 backdrop-blur rounded-xl p-3 overflow-visible">
             {/* 左側導航按鈕 */}
             <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
               <Button
@@ -167,17 +197,28 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
             
             {/* 中間日期顯示 - 絕對居中 */}
             <div className="flex items-center justify-center gap-2">
-              <Calendar className="h-4 w-4 text-white/60" />
-              <span className="text-white font-medium text-lg">
-                {format(selectedDate, 'yyyy/MM/dd (E)', { locale: zhTW })}
-              </span>
+              <div className="relative">
+                <span 
+                  className={`block text-white font-medium text-lg transition-all duration-300 ease-out ${
+                    dateAnimation === 'slide-left' ? 'transform -translate-x-full opacity-0' :
+                    dateAnimation === 'slide-right' ? 'transform translate-x-full opacity-0' :
+                    'transform translate-x-0 opacity-100'
+                  }`}
+                >
+                  {format(selectedDate, 'yyyy/MM/dd (E)', { locale: zhTW })}
+                </span>
+              </div>
               {isToday && (
-                <span className="text-xs bg-green-500/20 text-green-300 px-2 py-1 rounded-full border border-green-400/30">
+                <span className={`text-xs bg-green-500/20 text-green-300 px-2 py-1 rounded-full border border-green-400/30 transition-all duration-300 ${
+                  dateAnimation !== 'none' ? 'opacity-0 scale-90' : 'opacity-100 scale-100'
+                }`}>
                   今天
                 </span>
               )}
               {isFutureDate && (
-                <span className="text-xs bg-orange-500/20 text-orange-300 px-2 py-1 rounded-full border border-orange-400/30">
+                <span className={`text-xs bg-orange-500/20 text-orange-300 px-2 py-1 rounded-full border border-orange-400/30 transition-all duration-300 ${
+                  dateAnimation !== 'none' ? 'opacity-0 scale-90' : 'opacity-100 scale-100'
+                }`}>
                   未來
                 </span>
               )}
@@ -208,18 +249,44 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
           </div>
         </div>
 
-        {logs.length === 0 ? (
-          <div className="text-center text-white/60 py-8">
+        {/* 內容載入指示器 */}
+        {isDateChanging && !isInitialLoad && (
+          <div className="flex justify-center items-center py-4">
+            <div className="flex items-center gap-2 text-white/40">
+              <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+              <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              <span className="text-sm ml-2">載入中...</span>
+            </div>
+          </div>
+        )}
+
+        {!isDateChanging && logs.length === 0 ? (
+          <div className={`text-center text-white/60 py-8 transition-all duration-300 ${
+            dateAnimation !== 'none' ? 'opacity-0 transform scale-95' : 'opacity-100 transform scale-100'
+          }`}>
             {isToday ? '今日尚無工作記錄' : `${format(selectedDate, 'MM/dd', { locale: zhTW })} 尚無工作記錄`}
           </div>
-        ) : (
-          <div className="space-y-3">
+        ) : !isDateChanging && logs.length > 0 ? (
+          <div className={`space-y-3 transition-all duration-300 ${
+            dateAnimation !== 'none' ? 'opacity-0 transform scale-95' : 'opacity-100 transform scale-100'
+          }`}>
             {logs.slice(-6).map((log) => {
               const start = format(parseISO(log.startTime), "HH:mm")
               const end = log.endTime ? format(parseISO(log.endTime), "HH:mm") : "進行中"
-              const bgColor = isOvertime(log.startTime) 
-                ? "bg-orange-500/20 border-orange-400/30" 
-                : "bg-blue-500/20 border-blue-400/30"
+              
+              // 根據工作狀態決定卡片顏色
+              let bgColor = ""
+              if (!log.endTime) {
+                // 進行中的工作 - 綠色
+                bgColor = "bg-green-500/20 border-green-400/30"
+              } else if (isOvertime(log.startTime)) {
+                // 加班且已完成 - 橘色
+                bgColor = "bg-orange-500/20 border-orange-400/30"
+              } else {
+                // 一般已完成工作 - 藍色
+                bgColor = "bg-blue-500/20 border-blue-400/30"
+              }
 
               return (
                 <Card key={log.id} className={`${bgColor} backdrop-blur p-4 transition-all hover:bg-opacity-80`}>
@@ -264,9 +331,9 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
               )
             })}
           </div>
-        )}
+        ) : null}
 
-        {logs.length > 6 && (
+        {!isDateChanging && logs.length > 6 && (
           <div className="text-center mt-4">
             <a 
               href="/journal" 

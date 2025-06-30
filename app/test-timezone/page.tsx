@@ -10,8 +10,7 @@ export default function TestTimezonePage() {
   const { data: session } = useSession()
   const [currentTime, setCurrentTime] = useState<Date | null>(null)
   const [browserTime, setBrowserTime] = useState<Date | null>(null)
-  const [migrationStatus, setMigrationStatus] = useState<string>('')
-  const [isMigrating, setIsMigrating] = useState(false)
+
   const [dataCheck, setDataCheck] = useState<any>(null)
   const [isChecking, setIsChecking] = useState(false)
 
@@ -61,34 +60,7 @@ export default function TestTimezonePage() {
     }
   }
 
-  const runMigration = async () => {
-    if (!session?.user || (session.user as any).role !== 'ADMIN') {
-      setMigrationStatus('❌ 需要管理員權限才能執行遷移')
-      return
-    }
 
-    setIsMigrating(true)
-    setMigrationStatus('🚀 正在執行時區遷移...')
-
-    try {
-      const response = await fetch('/api/migrate-timezone', {
-        method: 'POST',
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        const totalRecords = Object.values(result.stats).reduce((sum: number, count) => sum + (count as number), 0)
-        setMigrationStatus(`✅ 遷移完成！共處理了 ${totalRecords} 筆記錄`)
-      } else {
-        setMigrationStatus(`❌ 遷移失敗: ${result.message}`)
-      }
-    } catch (error) {
-      setMigrationStatus(`❌ 遷移失敗: ${error}`)
-    } finally {
-      setIsMigrating(false)
-    }
-  }
 
   const checkData = async () => {
     setIsChecking(true)

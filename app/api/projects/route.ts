@@ -10,6 +10,8 @@ export async function GET(req: NextRequest) {
     const userId = searchParams.get('userId')
     const projectCode = searchParams.get('projectCode')
     const includeContacts = searchParams.get('includeContacts') === 'true'
+    const sortBy = searchParams.get('sortBy') || 'code' // code, lastUsed
+    const search = searchParams.get('search') || ''
 
     const session = await getServerSession(authOptions)
     if (!session?.user) {
@@ -18,15 +20,26 @@ export async function GET(req: NextRequest) {
 
     // 如果是案件管理頁面（不需要 userId）
     if (!userId && includeContacts) {
-      // 取得所有已使用的案件及其聯絡人資訊
+      // 取得所有已使用的案件及其聯絡人資訊和最後使用時間
       const distinctProjects = await prisma.workLog.groupBy({
-        by: ['projectCode', 'projectName', 'category'],
-        orderBy: {
-          projectCode: 'asc',
+        by: ['projectCode'],
+        _max: {
+          endTime: true,
+          startTime: true,
         },
+        _count: {
+          id: true,
+        },
+        where: search ? {
+          OR: [
+            { projectCode: { contains: search } },
+            { projectName: { contains: search } },
+            { category: { contains: search } },
+          ]
+        } : undefined,
       })
 
-      // 對每個案件查找關聯的 Project 記錄和聯絡人
+      // 對每個案件查找關聯的 Project 記錄和聯絡人，以及更準確的最後使用時間
       const projectsWithContacts = await Promise.all(
         distinctProjects.map(async (project) => {
           const projectRecord = await prisma.project.findUnique({
@@ -36,16 +49,65 @@ export async function GET(req: NextRequest) {
             },
           })
 
+          // 獲取該案件的最後一筆工作記錄的時間和基本資訊（更準確的方法）
+          const lastWorkLog = await prisma.workLog.findFirst({
+            where: {
+              projectCode: project.projectCode,
+            },
+            orderBy: [
+              { endTime: 'desc' },
+              { startTime: 'desc' },
+            ],
+            select: {
+              endTime: true,
+              startTime: true,
+              projectName: true,
+              category: true,
+              user: {
+                select: {
+                  name: true,
+                  email: true,
+                }
+              }
+            },
+          })
+
+          // 計算最後使用時間（endTime 優先，如果沒有則用 startTime）
+          const lastUsedTime = lastWorkLog ? (lastWorkLog.endTime || lastWorkLog.startTime) : null
+          const lastUsedBy = lastWorkLog ? lastWorkLog.user : null
+
+          // 使用最後一筆工作記錄的項目名稱和分類，如果沒有則從 Project 記錄取得
+          const projectName = projectRecord?.name || lastWorkLog?.projectName || project.projectCode
+          const category = projectRecord?.category || lastWorkLog?.category || ''
+
           return {
             projectCode: project.projectCode,
-            projectName: project.projectName,
-            category: project.category,
+            projectName,
+            category,
             contact: projectRecord?.Contact || null,
+            lastUsedTime,
+            lastUsedBy,
+            totalWorkLogs: project._count.id,
           }
         })
       )
 
-      return NextResponse.json(projectsWithContacts)
+      // 根據排序方式排序
+      let sortedProjects = projectsWithContacts
+      if (sortBy === 'code') {
+        sortedProjects = projectsWithContacts.sort((a, b) => 
+          a.projectCode.localeCompare(b.projectCode)
+        )
+      } else if (sortBy === 'lastUsed') {
+        sortedProjects = projectsWithContacts.sort((a, b) => {
+          if (!a.lastUsedTime && !b.lastUsedTime) return 0
+          if (!a.lastUsedTime) return 1
+          if (!b.lastUsedTime) return -1
+          return new Date(b.lastUsedTime).getTime() - new Date(a.lastUsedTime).getTime()
+        })
+      }
+
+      return NextResponse.json(sortedProjects)
     }
 
     if (!userId) {

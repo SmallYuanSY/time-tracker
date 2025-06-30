@@ -30,6 +30,7 @@ const sidebarItems = [
 ]
 
 const adminItems = [
+  { name: "管理員控制台", icon: <LayoutDashboard className="w-4 h-4 mr-2" />, href: "/admin", role: "ADMIN" },
   { name: "用戶管理", icon: <Users className="w-4 h-4 mr-2" />, href: "/users", role: "WEB_ADMIN" },
   { name: "分類管理", icon: <Layers className="w-4 h-4 mr-2" />, href: "/categories", role: "ADMIN" },
 ]

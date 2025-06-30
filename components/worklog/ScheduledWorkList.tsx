@@ -24,7 +24,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Clock, CheckCircle, Circle, Edit, Trash2, Play } from "lucide-react"
+import { GripVertical, Clock, CheckCircle, Circle, Edit, Trash2, Play, Copy } from "lucide-react"
 import { getWorkCategoryByContent } from '@/lib/data/workCategories'
 
 interface ScheduledWork {
@@ -57,6 +57,7 @@ interface ScheduledWorkListProps {
   onEdit?: (work: ScheduledWork) => void
   onWorksLoaded?: (works: ScheduledWork[]) => void
   onStartWork?: (work: ScheduledWork) => void
+  onCopy?: (work: ScheduledWork) => void
   mode?: 'week' | 'all'
   currentWeek?: Date
 }
@@ -67,13 +68,15 @@ function SortableWorkItem({
   onEdit, 
   onDelete, 
   onToggleComplete,
-  onStartWork 
+  onStartWork,
+  onCopy 
 }: { 
   work: ScheduledWork
   onEdit: (work: ScheduledWork) => void
   onDelete: (id: string) => void
   onToggleComplete: (id: string, isCompleted: boolean) => void
   onStartWork: (work: ScheduledWork) => void
+  onCopy?: (work: ScheduledWork) => void
 }) {
   const {
     attributes,
@@ -100,92 +103,151 @@ function SortableWorkItem({
     <Card 
       ref={setNodeRef} 
       style={style} 
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${priorityColor} ${completedStyle}`}
+      className={`group hover:shadow-lg transition-all duration-200 bg-gradient-to-r from-white/5 to-white/10 backdrop-blur border border-white/20 rounded-2xl overflow-hidden ${completedStyle}`}
     >
-      {/* 拖拽手柄 */}
-      <div
-        {...attributes}
-        {...listeners}
-        className="cursor-grab hover:cursor-grabbing text-white/50 hover:text-white/80 transition-colors"
-      >
-        <GripVertical className="w-4 h-4" />
-      </div>
+      <div className="flex items-center p-4">
+        {/* 左側：拖拽手柄和狀態 */}
+        <div className="flex items-center gap-3 mr-4">
+          {/* 拖拽手柄 */}
+          <div
+            {...attributes}
+            {...listeners}
+            className="cursor-grab hover:cursor-grabbing text-white/40 hover:text-white/70 transition-colors p-1 rounded hover:bg-white/10"
+          >
+            <GripVertical className="w-4 h-4" />
+          </div>
 
-      {/* 完成狀態切換 */}
-      <button
-        onClick={() => onToggleComplete(work.id, !work.isCompleted)}
-        className="text-white/70 hover:text-white transition-colors"
-      >
-        {work.isCompleted ? (
-          <CheckCircle className="w-4 h-4 text-green-400" />
-        ) : (
-          <Circle className="w-4 h-4" />
-        )}
-      </button>
+          {/* 完成狀態切換 */}
+          <button
+            onClick={() => onToggleComplete(work.id, !work.isCompleted)}
+            className="text-white/60 hover:text-white transition-colors p-1 rounded hover:bg-white/10"
+          >
+            {work.isCompleted ? (
+              <CheckCircle className="w-5 h-5 text-green-400" />
+            ) : (
+              <Circle className="w-5 h-5" />
+            )}
+          </button>
 
-      {/* 工作類型指示器 */}
-      <div className={`w-3 h-3 rounded-full ${work.workType === 'URGENT' ? 'bg-orange-400' : 'bg-blue-400'}`}></div>
+          {/* 優先級和工作類型指示器 */}
+          <div className="flex flex-col items-center gap-1">
+            <div className={`w-3 h-3 rounded-full ${
+              work.workType === 'URGENT' ? 'bg-orange-400' : 'bg-blue-400'
+            }`}></div>
+            <div className={`w-2 h-2 rounded-full ${
+              work.priority <= 2 ? 'bg-red-400' :
+              work.priority <= 5 ? 'bg-yellow-400' : 'bg-green-400'
+            }`}></div>
+          </div>
+        </div>
 
-      {/* 工作內容 */}
-      <div className="flex-1 grid grid-cols-5 gap-2">
-        <div className={`px-2 py-1 rounded bg-white/20 text-white text-center text-sm ${work.isCompleted ? 'line-through' : ''}`}>
-          {work.projectCode}
-        </div>
-        <div className={`px-2 py-1 rounded bg-white/20 text-white text-center text-sm ${work.isCompleted ? 'line-through' : ''}`}>
-          {work.projectName}
-        </div>
-        <div className={`px-2 py-1 rounded text-center text-sm flex items-center justify-center gap-1 ${work.isCompleted ? 'line-through' : ''}`}>
-          {(() => {
-            const category = getWorkCategoryByContent(work.category)
-            if (category) {
-              return (
-                <>
-                  <div className={`w-2 h-2 rounded-full ${category.color.accent}`}></div>
-                  <span className={category.color.text}>{category.icon || ''} {category.title}</span>
-                </>
-              )
-            }
-            return <span className="text-white">{work.category}</span>
-          })()}
-        </div>
-        <div className="px-2 py-1 rounded bg-white/20 text-white text-center text-sm flex items-center justify-center gap-1">
-          <Clock className="w-3 h-3" />
-          {format(parseISO(work.scheduledStartDate), "MM/dd")} - {format(parseISO(work.scheduledEndDate), "MM/dd")}
-        </div>
-        <div className={`px-2 py-1 rounded text-center text-xs ${work.workType === 'URGENT' ? 'bg-orange-500/30 text-orange-200' : 'bg-blue-500/30 text-blue-200'}`}>
-          {work.workType === 'URGENT' ? '🔥 臨時' : '📅 預定'}
-        </div>
-      </div>
+        {/* 中間：主要內容 */}
+        <div className="flex-1 min-w-0">
+          {/* 第一行：專案資訊和類型 */}
+          <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-2">
+              <span className={`px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r ${
+                work.workType === 'URGENT' 
+                  ? 'from-orange-500/20 to-red-500/20 text-orange-200 border border-orange-500/30' 
+                  : 'from-blue-500/20 to-purple-500/20 text-blue-200 border border-blue-500/30'
+              } ${work.isCompleted ? 'line-through opacity-60' : ''}`}>
+                {work.projectCode}
+              </span>
+              <span className={`text-white font-semibold truncate ${work.isCompleted ? 'line-through opacity-60' : ''}`}>
+                {work.projectName}
+              </span>
+            </div>
+            
+            <div className={`text-xs px-2 py-1 rounded-full ${
+              work.workType === 'URGENT' 
+                ? 'bg-orange-500/30 text-orange-200' 
+                : 'bg-blue-500/30 text-blue-200'
+            }`}>
+              {work.workType === 'URGENT' ? '🔥 臨時' : '📅 預定'}
+            </div>
+          </div>
 
-      {/* 操作按鈕 */}
-      <div className="flex gap-2">
-        {!work.isCompleted && (
+          {/* 第二行：工作內容 */}
+          <div className={`text-white/80 text-sm mb-2 ${work.isCompleted ? 'line-through opacity-60' : ''}`} 
+               style={{ 
+                 display: '-webkit-box',
+                 WebkitLineClamp: 2,
+                 WebkitBoxOrient: 'vertical',
+                 overflow: 'hidden'
+               }}>
+            {work.content}
+          </div>
+
+          {/* 第三行：分類和時間 */}
+          <div className="flex items-center gap-4 text-xs text-white/60">
+            <div className="flex items-center gap-2">
+              {(() => {
+                const category = getWorkCategoryByContent(work.category)
+                if (category) {
+                  return (
+                    <>
+                      <div className={`w-2 h-2 rounded-full ${category.color.accent}`}></div>
+                      <span className={category.color.text}>{category.icon || ''} {category.title}</span>
+                    </>
+                  )
+                }
+                return (
+                  <>
+                    <div className="w-2 h-2 rounded-full bg-white/40"></div>
+                    <span className="text-white/60">{work.category}</span>
+                  </>
+                )
+              })()}
+            </div>
+            
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              <span>{format(parseISO(work.scheduledStartDate), "MM/dd")} - {format(parseISO(work.scheduledEndDate), "MM/dd")}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 右側：操作按鈕 */}
+        <div className="flex items-center gap-2 ml-4">
+          {!work.isCompleted && (
+            <Button 
+              variant="secondary" 
+              size="sm"
+              className="bg-gradient-to-r from-green-500/20 to-blue-500/20 text-green-200 border border-green-500/30 hover:from-green-500/30 hover:to-blue-500/30 px-3 py-2 text-xs rounded-lg transition-all"
+              onClick={() => onStartWork(work)}
+            >
+              <Play className="w-3 h-3 mr-1" />
+              開始
+            </Button>
+          )}
+          {work.isCompleted && onCopy && (
+            <Button 
+              variant="secondary" 
+              size="sm"
+              className="bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-200 border border-purple-500/30 hover:from-purple-500/30 hover:to-blue-500/30 px-3 py-2 text-xs rounded-lg transition-all"
+              onClick={() => onCopy(work)}
+            >
+              <Copy className="w-3 h-3 mr-1" />
+              複製
+            </Button>
+          )}
           <Button 
             variant="secondary" 
             size="sm"
-            className="bg-blue-100 text-black px-3 py-1 text-xs rounded hover:bg-blue-200"
-            onClick={() => onStartWork(work)}
+            className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-200 border border-yellow-500/30 hover:from-yellow-500/30 hover:to-orange-500/30 px-3 py-2 text-xs rounded-lg transition-all"
+            onClick={() => onEdit(work)}
           >
-            <Play className="w-3 h-3 mr-1" />
-            開始
+            <Edit className="w-3 h-3" />
           </Button>
-        )}
-        <Button 
-          variant="secondary" 
-          size="sm"
-          className="bg-yellow-100 text-black px-3 py-1 text-xs rounded hover:bg-yellow-200"
-          onClick={() => onEdit(work)}
-        >
-          <Edit className="w-3 h-3" />
-        </Button>
-        <Button 
-          variant="destructive" 
-          size="sm"
-          className="px-3 py-1 text-xs rounded bg-red-500 hover:bg-red-600 text-white"
-          onClick={() => onDelete(work.id)}
-        >
-          <Trash2 className="w-3 h-3" />
-        </Button>
+          <Button 
+            variant="destructive" 
+            size="sm"
+            className="bg-gradient-to-r from-red-500/20 to-pink-500/20 text-red-200 border border-red-500/30 hover:from-red-500/30 hover:to-pink-500/30 px-3 py-2 text-xs rounded-lg transition-all"
+            onClick={() => onDelete(work.id)}
+          >
+            <Trash2 className="w-3 h-3" />
+          </Button>
+        </div>
       </div>
     </Card>
   )
@@ -196,6 +258,7 @@ export default function ScheduledWorkList({
   onEdit, 
   onWorksLoaded,
   onStartWork,
+  onCopy,
   mode = 'all',
   currentWeek
 }: ScheduledWorkListProps) {
@@ -549,6 +612,7 @@ export default function ScheduledWorkList({
                   onDelete={handleDelete}
                   onToggleComplete={handleToggleComplete}
                   onStartWork={handleStartWork}
+                  onCopy={onCopy}
                 />
               ))
             )}

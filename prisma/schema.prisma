@@ -35,6 +35,8 @@ model User {
   clocks          clock[]
   workLogs        workLog[]
   scheduledWorks  ScheduledWork[]
+  signedAttendance AttendanceSignature[] @relation("SignedAttendance")
+  signedByMe      AttendanceSignature[] @relation("AttendanceSigner")
 }
 
 model clock {
@@ -180,4 +182,22 @@ model Contact {
   updatedAt   DateTime  @updatedAt
   notes       String?
   Project     Project[]
+}
+
+model AttendanceSignature {
+  id        String   @id @default(cuid())
+  userId    String   // 被簽名的員工ID
+  date      String   // 簽名的日期 (YYYY-MM-DD)
+  signedBy  String   // 簽名者ID (管理員)
+  signedAt  DateTime @default(now()) // 簽名時間
+  note      String?  // 簽名備註
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // 關聯
+  user      User     @relation("SignedAttendance", fields: [userId], references: [id])
+  signer    User     @relation("AttendanceSigner", fields: [signedBy], references: [id])
+  
+  // 確保同一管理員對同一用戶同一天只能簽名一次
+  @@unique([userId, date, signedBy])
 }

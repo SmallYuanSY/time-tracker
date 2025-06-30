@@ -8,17 +8,104 @@ import SmartPunchWidget from "@/components/ui/SmartPunchWidget";
 import NovuInbox from "@/app/components/ui/inbox/NovuInbox";
 import TodayWorkSummary from "@/components/TodayWorkSummary";
 import ScheduledWorkList from "@/components/worklog/ScheduledWorkList";
+import ScheduledWorkModal from "@/components/ui/ScheduledWorkModal";
+import WorkLogModal from "@/app/worklog/WorkLogModal";
 import TimeDisplayCard from "@/components/TimeDisplayCard";
 import TodayStatsCard from "@/components/TodayStatsCard";
 import { Portal } from "@/components/ui/portal";
-import { Clock, Calendar } from "lucide-react";
+import { Clock, Calendar, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { format, addDays, subDays } from "date-fns";
 
+interface ScheduledWork {
+  id: string
+  projectCode: string
+  projectName: string
+  category: string
+  content: string
+  priority: number
+  isCompleted: boolean
+  workType: 'SCHEDULED' | 'URGENT'
+  scheduledStartDate: string
+  scheduledEndDate: string
+  createdAt: string
+  updatedAt: string
+}
 
 export default function HomePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [summaryKey, setSummaryKey] = useState(0);
   const [activeTab, setActiveTab] = useState<'today' | 'scheduled'>('today');
+  
+  // 預定工作相關狀態
+  const [showScheduledWorkModal, setShowScheduledWorkModal] = useState(false);
+  const [editingScheduledWork, setEditingScheduledWork] = useState<ScheduledWork | null>(null);
+  const [showWorkLogModal, setShowWorkLogModal] = useState(false);
+  const [workLogFromScheduled, setWorkLogFromScheduled] = useState<ScheduledWork | null>(null);
+  const [scheduledWorkRefreshKey, setScheduledWorkRefreshKey] = useState(0);
+
+  // 週導航相關狀態
+  const [scheduledWorkMode, setScheduledWorkMode] = useState<'week' | 'all'>('all');
+  const [currentWeek, setCurrentWeek] = useState(new Date());
+
+  // 計算週的開始和結束日期
+  const weekStart = new Date(currentWeek);
+  weekStart.setDate(currentWeek.getDate() - currentWeek.getDay() + 1); // 週一
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6); // 週日
+
+  // 週導航函數
+  const navigateWeek = (direction: 'prev' | 'next') => {
+    if (direction === 'prev') {
+      setCurrentWeek(prev => subDays(prev, 7));
+    } else {
+      setCurrentWeek(prev => addDays(prev, 7));
+    }
+  };
+
+  // 處理預定工作編輯
+  const handleEditScheduledWork = (work: ScheduledWork) => {
+    setEditingScheduledWork(work);
+    setShowScheduledWorkModal(true);
+  };
+
+  // 處理開始工作（從預定工作轉為工作記錄）
+  const handleStartWork = (work: ScheduledWork) => {
+    setWorkLogFromScheduled(work);
+    setShowWorkLogModal(true);
+  };
+
+  // 處理預定工作複製
+  const handleCopyScheduledWork = (work: ScheduledWork) => {
+    setWorkLogFromScheduled(work);
+    setShowWorkLogModal(true);
+  };
+
+  // 處理預定工作模態框關閉
+  const handleScheduledWorkModalClose = () => {
+    setShowScheduledWorkModal(false);
+    setEditingScheduledWork(null);
+  };
+
+  // 處理預定工作保存
+  const handleScheduledWorkSave = () => {
+    setScheduledWorkRefreshKey(k => k + 1);
+    handleScheduledWorkModalClose();
+  };
+
+  // 處理工作記錄模態框關閉
+  const handleWorkLogModalClose = () => {
+    setShowWorkLogModal(false);
+    setWorkLogFromScheduled(null);
+  };
+
+  // 處理工作記錄保存
+  const handleWorkLogSave = () => {
+    setSummaryKey(k => k + 1);
+    setScheduledWorkRefreshKey(k => k + 1);
+    handleWorkLogModalClose();
+  };
 
   // 身份驗證檢查
   useEffect(() => {
@@ -170,12 +257,120 @@ export default function HomePage() {
               }`}
             >
               <div className="p-6">
-                <ScheduledWorkList />
+                {/* 預定工作標題、模式切換和導航 */}
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+                  {/* 左側：標題和模式切換 */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div>
+                      <h2 className="text-xl font-semibold text-white">📅 預定工作管理</h2>
+                      <p className="text-white/60 text-sm mt-1">安排和管理您的工作計劃</p>
+                    </div>
+                    
+                    {/* 顯示模式切換 */}
+                    <div className="flex bg-white/10 rounded-lg p-1">
+                      <button
+                        onClick={() => setScheduledWorkMode('week')}
+                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                          scheduledWorkMode === 'week'
+                            ? 'bg-purple-500 text-white'
+                            : 'text-white/70 hover:text-white hover:bg-white/10'
+                        }`}
+                      >
+                        本週範圍
+                      </button>
+                      <button
+                        onClick={() => setScheduledWorkMode('all')}
+                        className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                          scheduledWorkMode === 'all'
+                            ? 'bg-purple-500 text-white'
+                            : 'text-white/70 hover:text-white hover:bg-white/10'
+                        }`}
+                      >
+                        所有時間
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* 右側：週導航和新增按鈕 */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    {/* 週導航 - 只在本週範圍模式下顯示 */}
+                    {scheduledWorkMode === 'week' && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => navigateWeek('prev')}
+                          variant="outline"
+                          size="sm"
+                          className="border-white/20 text-white hover:bg-white/10"
+                        >
+                          ← 上週
+                        </Button>
+                        <span className="text-white/80 text-sm px-3 whitespace-nowrap">
+                          {format(weekStart, 'yyyy/MM/dd')} - {format(weekEnd, 'yyyy/MM/dd')}
+                        </span>
+                        <Button
+                          onClick={() => navigateWeek('next')}
+                          variant="outline"
+                          size="sm"
+                          className="border-white/20 text-white hover:bg-white/10"
+                        >
+                          下週 →
+                        </Button>
+                      </div>
+                    )}
+                    
+                    {/* 新增按鈕 */}
+                    <Button
+                      onClick={() => setShowScheduledWorkModal(true)}
+                      className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold whitespace-nowrap"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      新增預定工作
+                    </Button>
+                  </div>
+                </div>
+                
+                <ScheduledWorkList
+                  key={scheduledWorkRefreshKey}
+                  mode={scheduledWorkMode}
+                  currentWeek={currentWeek}
+                  onEdit={handleEditScheduledWork}
+                  onStartWork={handleStartWork}
+                  onCopy={handleCopyScheduledWork}
+                  onRefresh={(refreshFn) => {
+                    // 可以在這裡保存 refreshFn 以供後續使用
+                  }}
+                />
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* 預定工作編輯/新增模態框 */}
+      <ScheduledWorkModal
+        open={showScheduledWorkModal}
+        onClose={handleScheduledWorkModalClose}
+        onSave={handleScheduledWorkSave}
+        editData={editingScheduledWork}
+      />
+
+      {/* 工作記錄模態框 (從預定工作開始) */}
+      {showWorkLogModal && workLogFromScheduled && (
+        <WorkLogModal
+          onClose={handleWorkLogModalClose}
+          onSave={handleWorkLogSave}
+          initialMode="start"
+          copyData={{
+            id: '',
+            projectCode: workLogFromScheduled.projectCode,
+            projectName: workLogFromScheduled.projectName,
+            category: workLogFromScheduled.category,
+            content: workLogFromScheduled.content,
+            startTime: new Date().toISOString(),
+            endTime: null,
+          }}
+        />
+      )}
     </DashboardLayout>
   )
 }

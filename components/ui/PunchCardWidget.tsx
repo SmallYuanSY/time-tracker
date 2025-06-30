@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { format } from "date-fns"
-import { zhTW } from "date-fns/locale"
 import WorkLogModal from "@/app/worklog/WorkLogModal"
 import { EndOfDayModal } from "@/components/ui/EndOfDayModal"
 import { useSession } from "next-auth/react"
@@ -169,48 +168,26 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
     setShowWorkLogModal(true)
   }
 
-  const confirmClockIn = async () => {
+  const confirmClockIn = async (clockEditReason?: string) => {
     setShowWorkLogModal(false)
     
     // 觸發翻轉動畫
     setIsFlipping(true)
     
     try {
-      // 收集設備資訊
-      const deviceInfo = await getDeviceInfo()
-      
-      const response = await fetch('/api/clock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: (session?.user as any)?.id,
-          type: 'IN',
-          deviceInfo
-        })
-      })
-      
-      if (response.status === 401) {
-        // 401 未授權，跳轉回登入頁面
-          if (process.env.NODE_ENV !== 'production') {
-            console.log('打卡時身份驗證失敗，跳轉至登入頁面')
-          }
-        router.push('/login')
-        return
+      // 在打卡模式下，工作記錄 API 已經處理了打卡記錄的創建
+      // 不需要再調用打卡 API，只需要刷新狀態
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('工作記錄已處理打卡記錄創建，跳過打卡 API 調用')
       }
       
-      if (response.ok) {
-        // 在動畫進行中更新狀態
-        setTimeout(async () => {
-          await reloadClockStatus()
-        }, 300)
-      } else {
-        if (process.env.NODE_ENV !== 'production') {
-          console.error('上班打卡失敗，狀態碼:', response.status)
-        }
-      }
+      // 直接刷新打卡狀態
+      setTimeout(async () => {
+        await reloadClockStatus()
+      }, 300)
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
-        console.error('上班打卡失敗:', error)
+        console.error('刷新打卡狀態失敗:', error)
       }
     }
     
@@ -334,8 +311,8 @@ export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps
             setShowWorkLogModal(false)
             // 取消時不執行打卡
           }}
-          onSave={() => {
-            confirmClockIn() // 只有儲存時才執行打卡
+          onSave={(clockEditReason) => {
+            confirmClockIn(clockEditReason) // 傳遞修改原因給打卡函數
             // 通知主頁刷新今日工作摘要
             if (onWorkLogSaved) onWorkLogSaved()
           }}

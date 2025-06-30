@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getClientIP } from '@/lib/ip-utils'
 import { nowInTaiwan, getTaiwanDayRange, parseTaiwanTime } from '@/lib/timezone'
 
 export async function POST(req: NextRequest) {
@@ -20,6 +21,8 @@ export async function POST(req: NextRequest) {
       projectName,
       category,
       content,
+      isClockMode,
+      clockEditReason,
     } = body
 
     if (
@@ -194,6 +197,36 @@ export async function POST(req: NextRequest) {
           projectId: project.id, // 關聯到 Project 記錄
         },
       })
+
+      // 如果是打卡模式，創建打卡記錄
+      if (isClockMode) {
+        // 創建打卡記錄，使用工作記錄的開始時間
+        const clockData: any = {
+          userId,
+          type: 'IN',
+          timestamp: startDate, // 直接使用用戶指定的時間
+          ipAddress: getClientIP(req),
+          userAgent: req.headers.get('user-agent') || '',
+        }
+
+        // 如果有修改原因，標記為已編輯並記錄原始時間
+        if (clockEditReason) {
+          clockData.isEdited = true
+          clockData.editReason = clockEditReason.trim()
+          clockData.editedBy = userId
+          clockData.editedAt = new Date()
+          clockData.editIpAddress = getClientIP(req)
+          clockData.originalTimestamp = new Date() // 原始時間設為當前真實時間
+        }
+
+        const clockRecord = await tx.clock.create({
+          data: clockData,
+        })
+
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[POST /api/worklog] 創建打卡記錄，時間:', startDate.toISOString())
+        }
+      }
 
       return workLogResult
     })

@@ -56,6 +56,13 @@ export async function GET(req: NextRequest) {
       id: true,
       type: true,
       timestamp: true,
+      // 編輯相關欄位
+      isEdited: true,
+      editReason: true,
+      editedAt: true,
+      editedBy: true,
+      editIpAddress: true,
+      originalTimestamp: true,
     }
 
     if (includeDeviceInfo) {
