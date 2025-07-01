@@ -64,6 +64,17 @@ interface OvertimeSpreadsheetProps {
   onSelectDates?: (dates: string[]) => void
 }
 
+// 加入常數定義
+const DAILY_OVERTIME_LIMIT = 4 * 60;  // 4小時 = 240分鐘
+const MONTHLY_OVERTIME_LIMIT = 46 * 60;  // 46小時 = 2760分鐘
+
+interface OvertimeStats {
+  dailyMinutes: number;
+  monthlyMinutes: number;
+  isExceedDaily: boolean;
+  isExceedMonthly: boolean;
+}
+
 export default function OvertimeSpreadsheet({
   workLogs,
   signatures,
@@ -104,6 +115,8 @@ export default function OvertimeSpreadsheet({
       { value: '專案名稱', className: 'font-bold bg-gray-100 text-gray-900' },
       { value: '工作內容', className: 'font-bold bg-gray-100 text-gray-900' },
       { value: '加班時長', className: 'font-bold bg-gray-100 text-gray-900' },
+      { value: '是否超時', className: 'font-bold bg-gray-100 text-gray-900' },
+      { value: '當月累計', className: 'font-bold bg-gray-100 text-gray-900' },
       { value: '是否編輯', className: 'font-bold bg-gray-100 text-gray-900' },
       { value: '簽名狀態', className: 'font-bold bg-gray-100 text-gray-900' },
       { value: '簽名者', className: 'font-bold bg-gray-100 text-gray-900' },
@@ -117,6 +130,9 @@ export default function OvertimeSpreadsheet({
     const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd })
     const groupedLogs = groupWorkLogsByDate()
 
+    // 計算當月總加班時數
+    let monthlyOvertimeMinutes = 0
+
     // 只處理有加班記錄的日期
     monthDays.forEach(day => {
       const dateKey = format(day, 'yyyy-MM-dd')
@@ -125,32 +141,50 @@ export default function OvertimeSpreadsheet({
       const daySignatures = getDateSignatures(dateKey)
 
       if (dayLogs.length > 0) {
-        // 有加班記錄的日期
+        // 計算單日加班時數
+        let dailyOvertimeMinutes = 0
+        
+        dayLogs.forEach(log => {
+          if (log.endTime) {
+            const start = new Date(log.startTime)
+            const end = new Date(log.endTime)
+            const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
+            
+            if (durationMinutes >= 30) {
+              const roundedMinutes = Math.floor(durationMinutes / 30) * 30
+              dailyOvertimeMinutes += roundedMinutes
+            }
+          }
+        })
+
+        // 檢查單日上限
+        const isExceedDaily = dailyOvertimeMinutes > DAILY_OVERTIME_LIMIT
+        const effectiveDailyMinutes = Math.min(dailyOvertimeMinutes, DAILY_OVERTIME_LIMIT)
+        
+        // 更新月累計時數（使用有效的單日時數）
+        monthlyOvertimeMinutes += effectiveDailyMinutes
+        const isExceedMonthly = monthlyOvertimeMinutes > MONTHLY_OVERTIME_LIMIT
+
+        // 格式化時間顯示
+        const formatMinutes = (minutes: number) => {
+          const hours = Math.floor(minutes / 60)
+          const mins = minutes % 60
+          return `${hours}小時${mins > 0 ? `${mins}分鐘` : ''}`
+        }
+
         dayLogs.forEach(log => {
           const startTime = format(parseISO(log.startTime), 'HH:mm')
           const endTime = log.endTime ? format(parseISO(log.endTime), 'HH:mm') : '-'
           
-          // 計算加班時長（以30分鐘為單位）
           let overtimeDuration = '-'
           if (log.endTime) {
             const start = new Date(log.startTime)
             const end = new Date(log.endTime)
             const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
             
-            // 如果不滿30分鐘，不顯示
             if (durationMinutes >= 30) {
-              // 將分鐘數向下取整到最近的30分鐘
               const roundedMinutes = Math.floor(durationMinutes / 30) * 30
-              const hours = Math.floor(roundedMinutes / 60)
-              const minutes = roundedMinutes % 60
-              
-              if (hours === 0) {
-                overtimeDuration = `${minutes}分鐘`
-              } else if (minutes === 0) {
-                overtimeDuration = `${hours}小時`
-              } else {
-                overtimeDuration = `${hours}小時${minutes}分鐘`
-              }
+              overtimeDuration = formatMinutes(roundedMinutes)
             }
           }
 
@@ -159,6 +193,19 @@ export default function OvertimeSpreadsheet({
           const signers = daySignatures.map(sig => sig.signerName).join('、')
           const signTimes = daySignatures.map(sig => format(parseISO(sig.signedAt), 'yyyy-MM-dd HH:mm')).join('、')
           const signNotes = daySignatures.map(sig => sig.note || '').filter(note => note).join('、')
+
+          // 超時警告訊息
+          let overtimeWarning = '正常'
+          let overtimeWarningClass = 'text-green-600'
+          
+          if (isExceedDaily) {
+            overtimeWarning = `超出單日上限 (${formatMinutes(dailyOvertimeMinutes)})`
+            overtimeWarningClass = 'text-red-600 font-bold'
+          }
+
+          // 月累計顯示
+          const monthlyDisplay = formatMinutes(monthlyOvertimeMinutes)
+          const monthlyDisplayClass = isExceedMonthly ? 'text-red-600 font-bold' : 'text-gray-900'
 
           data.push([
             { value: format(day, 'yyyy/MM/dd'), className: 'text-gray-900 w-32' },
@@ -169,6 +216,8 @@ export default function OvertimeSpreadsheet({
             { value: log.projectName, className: 'text-gray-900' },
             { value: log.content, className: 'text-gray-900' },
             { value: overtimeDuration, className: 'text-gray-900' },
+            { value: overtimeWarning, className: overtimeWarningClass },
+            { value: monthlyDisplay, className: monthlyDisplayClass },
             { value: log.isEdited ? '是' : '否', className: log.isEdited ? 'text-orange-600' : 'text-gray-900' },
             { value: signatureStatus, className: daySignatures.length > 0 ? 'text-green-600' : 'text-gray-500' },
             { value: signers || '-', className: 'text-gray-900' },
@@ -182,6 +231,23 @@ export default function OvertimeSpreadsheet({
     // 如果沒有任何加班記錄，添加一行提示
     if (data.length === 1) {
       data.push(Array(headers.length).fill({ value: '本月無加班記錄', className: 'text-gray-500 text-center' }))
+    }
+
+    // 如果有加班記錄，在最後添加月累計總結
+    if (data.length > 1) {
+      const summaryRow = Array(headers.length).fill({ value: '', className: 'text-gray-900' })
+      summaryRow[0] = { value: '本月總計', className: 'font-bold text-gray-900' }
+      summaryRow[7] = { 
+        value: `${Math.floor(monthlyOvertimeMinutes / 60)}小時${monthlyOvertimeMinutes % 60}分鐘`,
+        className: monthlyOvertimeMinutes > MONTHLY_OVERTIME_LIMIT ? 'font-bold text-red-600' : 'font-bold text-gray-900'
+      }
+      if (monthlyOvertimeMinutes > MONTHLY_OVERTIME_LIMIT) {
+        summaryRow[8] = { 
+          value: `⚠️ 超出月上限${Math.floor((monthlyOvertimeMinutes - MONTHLY_OVERTIME_LIMIT) / 60)}小時${(monthlyOvertimeMinutes - MONTHLY_OVERTIME_LIMIT) % 60}分鐘`,
+          className: 'font-bold text-red-600'
+        }
+      }
+      data.push(summaryRow)
     }
 
     return data
@@ -204,6 +270,8 @@ export default function OvertimeSpreadsheet({
     { label: '專案名稱', key: 'projectName' },
     { label: '工作內容', key: 'content' },
     { label: '加班時長', key: 'duration' },
+    { label: '是否超時', key: 'isOvertime' },
+    { label: '當月累計', key: 'monthlyTotal' },
     { label: '是否編輯', key: 'isEdited' },
     { label: '簽名狀態', key: 'signStatus' },
     { label: '簽名者', key: 'signers' },
@@ -246,7 +314,7 @@ export default function OvertimeSpreadsheet({
 
   // 準備 CSV 資料
   const csvData = spreadsheetData.slice(1).map(row => ({
-    name: selectedUser.name || selectedUser.email,
+    name: selectedUser?.name || selectedUser?.email,
     date: row[0].value,
     day: row[1].value,
     startTime: row[2].value,
@@ -255,11 +323,13 @@ export default function OvertimeSpreadsheet({
     projectName: row[5].value,
     content: row[6].value,
     duration: row[7].value,
-    isEdited: row[8].value,
-    signStatus: row[9].value,
-    signers: row[10].value,
-    signTime: row[11].value,
-    signNote: row[12].value
+    isOvertime: row[8].value,
+    monthlyTotal: row[9].value,
+    isEdited: row[10].value,
+    signStatus: row[11].value,
+    signers: row[12].value,
+    signTime: row[13].value,
+    signNote: row[14].value
   }))
 
   return (

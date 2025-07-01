@@ -46,8 +46,8 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
       const today = format(new Date(), 'yyyy-MM-dd')
       const response = await fetch(`/api/admin/holidays/${today}`)
       if (response.ok) {
-        const holiday = await response.json()
-        setHolidayInfo(holiday)
+        const data = await response.json()
+        setHolidayInfo(data.holiday)
       }
     } catch (error) {
       console.error('載入假日資訊失敗:', error)
