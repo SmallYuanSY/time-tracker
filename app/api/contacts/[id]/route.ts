@@ -8,7 +8,7 @@ type ContactType = 'CONTACT' | 'SUPPLIER' | 'CUSTOMER' | 'BUILDER'
 // 更新聯絡人
 export async function PUT(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { companyName, address, phone, contactName, type, notes } = await req.json()
@@ -50,7 +50,7 @@ export async function PUT(
 // 刪除聯絡人
 export async function DELETE(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await context.params

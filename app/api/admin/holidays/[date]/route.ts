@@ -4,9 +4,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     date: string
-  }
+  }>
 }
 
 export async function GET(

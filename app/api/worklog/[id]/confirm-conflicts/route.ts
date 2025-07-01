@@ -5,10 +5,8 @@ import { authOptions } from '@/lib/auth'
 import { getClientIP } from '@/lib/ip-utils'
 import { getTaiwanDayRange } from '@/lib/timezone'
 
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const {
       userId,

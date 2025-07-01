@@ -4,9 +4,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     code: string
-  }
+  }>
 }
 
 export async function GET(
@@ -20,13 +20,13 @@ export async function GET(
     }
 
     const { params } = context
-    if (!params?.code) {
+    if (!(await params)?.code) {
       return new NextResponse('Project code is required', { status: 400 })
     }
 
     const project = await prisma.project.findUnique({
       where: {
-        code: params.code,
+        code: (await params).code,
       },
       include: {
         Contact: true,

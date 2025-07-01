@@ -5,10 +5,8 @@ import { authOptions } from '@/lib/auth'
 import { getClientIP } from '@/lib/ip-utils'
 
 // 更新打卡記錄
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const {
       userId,
@@ -82,10 +80,8 @@ export async function PUT(
 }
 
 // 刪除打卡記錄
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { searchParams } = new URL(req.url)
     const userId = searchParams.get('userId')

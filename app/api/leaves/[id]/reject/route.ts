@@ -8,7 +8,8 @@ const novu = new Novu({
   secretKey: process.env.NOVU_SECRET_KEY || process.env.NOVU_API_KEY
 })
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {

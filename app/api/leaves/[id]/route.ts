@@ -4,7 +4,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 // 獲取單個請假申請詳情
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
