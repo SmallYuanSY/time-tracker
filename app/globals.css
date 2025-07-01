@@ -113,7 +113,7 @@
 }
 
 @layer base {
-  * {
+  *:not([data-signature-pad]) {
     @apply border-border outline-ring/50;
   }
   body {
@@ -332,4 +332,21 @@
     position: absolute !important;
     z-index: 100 !important;
   }
+}
+
+/* 表格樣式 */
+.value-viewer {
+  background-color: white !important;
+  color: #374151 !important;
+  border-color: #E5E7EB !important;
+}
+
+.value-viewer.active {
+  background-color: #EFF6FF !important;
+  border-color: #3B82F6 !important;
+}
+
+.value-viewer.read-only {
+  background-color: #F9FAFB !important;
+  color: #6B7280 !important;
 }

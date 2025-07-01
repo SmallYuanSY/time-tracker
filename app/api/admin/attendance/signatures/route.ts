@@ -45,6 +45,13 @@ export async function GET(request: NextRequest) {
             email: true,
           },
         },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
       orderBy: {
         signedAt: 'desc',

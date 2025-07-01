@@ -21,22 +21,58 @@ enum LeaveStatus {
   APPROVED        // 已批准
 }
 
+enum HolidayType {
+  NATIONAL_HOLIDAY    // 國定假日
+  WEEKEND            // 例假日（週六日）
+  SPECIAL_HOLIDAY    // 特殊節日
+  MAKEUP_WORKDAY     // 補班日
+  TRANSFER_HOLIDAY   // 調整放假
+  OTHER              // 其他
+}
+
+enum ContactType {
+  CONTACT
+  SUPPLIER
+  CUSTOMER
+  BUILDER
+}
+
 model User {
-  id              String         @id @default(cuid())
-  email           String         @unique
-  password        String
-  name            String?
-  role            UserRole       @default(EMPLOYEE)
-  createdAt       DateTime       @default(now())
-  agentLeaves     LeaveRequest[] @relation("Agent")
-  requestedLeaves LeaveRequest[] @relation("Requester")
-  overtimes       Overtime[]
-  projects        Project[]
-  clocks          clock[]
-  workLogs        workLog[]
-  scheduledWorks  ScheduledWork[]
-  signedAttendance AttendanceSignature[] @relation("SignedAttendance")
-  signedByMe      AttendanceSignature[] @relation("AttendanceSigner")
+  id                 String    @id @default(cuid())
+  name               String?
+  email              String    @unique
+  emailVerified     DateTime?
+  image             String?
+  password           String
+  role               UserRole  @default(EMPLOYEE)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // 工作記錄關聯
+  workLogs           workLog[]
+  projects           Project[]
+  managedProjects    Project[] @relation("ProjectManager")
+
+  // 打卡記錄關聯
+  clocks             clock[]
+
+  // 請假關聯
+  agentLeaves        LeaveRequest[] @relation("Agent")
+  requestedLeaves    LeaveRequest[] @relation("Requester")
+
+  // 加班記錄關聯
+  overtimes          Overtime[]
+
+  // 排程工作關聯
+  scheduledWorks     ScheduledWork[]
+
+  // 考勤簽名關聯
+  signedAttendance   AttendanceSignature[] @relation("SignedAttendance")
+  attendanceSignatures AttendanceSignature[] @relation("AttendanceSigner")
+
+  // 加班簽名關聯
+  signedOvertime     OvertimeSignature[] @relation("SignedOvertime")
+  overtimeSignatures OvertimeSignature[] @relation("OvertimeSigner")
 }
 
 model clock {
@@ -67,6 +103,7 @@ model workLog {
   projectName String
   category    String
   content     String
+  isOvertime       Boolean   @default(false) // 是否為加班記錄
   isEdited         Boolean   @default(false) // 是否被編輯過
   editReason       String?   // 編輯原因
   editedBy         String?   // 編輯者ID
@@ -167,7 +204,8 @@ model Project {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   Contact     Contact?  @relation(fields: [contactId], references: [id])
-  manager     User      @relation(fields: [managerId], references: [id])
+  manager     User      @relation("ProjectManager", fields: [managerId], references: [id])
+  users       User[]
   workLogs    workLog[]
   scheduledWorks ScheduledWork[]
 }
@@ -179,6 +217,7 @@ model Contact {
   phone       String
   contactName String
   createdAt   DateTime  @default(now())
+  type        ContactType @default(CONTACT)
   updatedAt   DateTime  @updatedAt
   notes       String?
   Project     Project[]
@@ -200,4 +239,35 @@ model AttendanceSignature {
   
   // 確保同一管理員對同一用戶同一天只能簽名一次
   @@unique([userId, date, signedBy])
+}
+
+model OvertimeSignature {
+  id        String   @id @default(cuid())
+  userId    String   // 被簽名的員工ID
+  date      String   // 簽名的日期 (YYYY-MM-DD)
+  signedBy  String   // 簽名者ID (管理員)
+  signedAt  DateTime @default(now()) // 簽名時間
+  note      String?  // 簽名備註
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // 關聯
+  user      User     @relation("SignedOvertime", fields: [userId], references: [id])
+  signer    User     @relation("OvertimeSigner", fields: [signedBy], references: [id])
+  
+  // 確保同一管理員對同一用戶同一天只能簽名一次
+  @@unique([userId, date, signedBy])
+}
+
+model Holiday {
+  id          String      @id @default(cuid())
+  date        String      // 日期 (YYYY-MM-DD)
+  name        String      // 假日名稱
+  type        HolidayType // 假日類型
+  isHoliday   Boolean     @default(true) // true = 放假日, false = 補班日
+  description String?     // 額外描述
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([date])
 }

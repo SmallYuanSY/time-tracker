@@ -12,13 +12,20 @@ import { zhTW } from 'date-fns/locale'
 import { 
   Users, Calendar, Clock, TrendingUp, BarChart3, 
   Download, Filter, Search, Eye, ChevronLeft, ChevronRight,
-  User, Briefcase, Activity, FileText, Edit3, Check, CheckSquare, Square, Shield
+  User, Briefcase, Activity, FileText, Edit3, Check, CheckSquare, Square, Shield, FileSpreadsheet
 } from 'lucide-react'
+import AttendanceSpreadsheet from '@/components/ui/AttendanceSpreadsheet'
+import dynamic from 'next/dynamic'
+import Link from 'next/link'
+
+const WorkLogsPage = dynamic(() => import('./worklogs/page'), { ssr: false })
+const AttendancePage = dynamic(() => import('./attendance/page'), { ssr: false })
+const OvertimePage = dynamic(() => import('./overtime/page'), { ssr: false })
 
 interface User {
   id: string
   email: string
-  name: string
+  name: string | null
   role: 'ADMIN' | 'WEB_ADMIN' | 'EMPLOYEE'
   createdAt: string
 }
@@ -36,6 +43,7 @@ interface WorkLog {
   editedAt?: string
   editedBy?: string
   editIpAddress?: string
+  isOvertime?: boolean
   user: {
     id: string
     name: string
@@ -71,6 +79,7 @@ interface AttendanceSignature {
 }
 
 type ViewMode = 'worklogs' | 'attendance'
+type AttendanceViewMode = 'list' | 'spreadsheet'
 
 export default function AdminPage() {
   const { data: session, status } = useSession()
@@ -80,8 +89,10 @@ export default function AdminPage() {
   const [selectedUser, setSelectedUser] = useState<string>('')
   const [selectedUserIndex, setSelectedUserIndex] = useState(0)
   const [viewMode, setViewMode] = useState<ViewMode>('worklogs')
+  const [attendanceViewMode, setAttendanceViewMode] = useState<AttendanceViewMode>('list')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [searchTerm, setSearchTerm] = useState('')
+  const [currentModule, setCurrentModule] = useState<'worklogs' | 'attendance' | 'overtime'>('worklogs')
   
   // 數據狀態
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([])
@@ -281,13 +292,17 @@ export default function AdminPage() {
   // 按日期分組工作記錄
   const groupWorkLogsByDate = () => {
     const grouped: { [key: string]: WorkLog[] } = {}
-    
     workLogs.forEach(log => {
       const date = format(parseISO(log.startTime), 'yyyy-MM-dd')
       if (!grouped[date]) {
         grouped[date] = []
       }
       grouped[date].push(log)
+    })
+    
+    // 對每個日期的工作記錄進行降序排序
+    Object.keys(grouped).forEach(date => {
+      grouped[date].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
     })
     
     return grouped
@@ -389,13 +404,15 @@ export default function AdminPage() {
   }
 
   // 篩選記錄
-  const filteredWorkLogs = workLogs.filter(log => 
-    searchTerm === '' || 
-    log.projectCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.category.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredWorkLogs = workLogs
+    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()) // 按時間降序排序
+    .filter(log => 
+      searchTerm === '' || 
+      log.projectCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.category.toLowerCase().includes(searchTerm.toLowerCase())
+    )
 
   const filteredClockRecords = clockRecords.filter(record =>
     searchTerm === '' ||
@@ -434,28 +451,6 @@ export default function AdminPage() {
         <Card className="bg-white/5 backdrop-blur border-white/10">
           <CardContent className="p-4">
             <div className="flex flex-wrap items-center gap-4">
-              {/* 視圖模式 */}
-              <div className="flex bg-white/10 rounded-lg p-1">
-                {[
-                  { value: 'worklogs', label: '工作記錄', icon: FileText },
-                  { value: 'attendance', label: '考勤記錄', icon: Clock },
-                ].map((mode) => {
-                  const Icon = mode.icon
-                  return (
-                    <Button
-                      key={mode.value}
-                      variant={viewMode === mode.value ? "secondary" : "ghost"}
-                      size="sm"
-                      onClick={() => setViewMode(mode.value as ViewMode)}
-                      className="flex items-center gap-2"
-                    >
-                      <Icon className="w-4 h-4" />
-                      {mode.label}
-                    </Button>
-                  )
-                })}
-              </div>
-
               {/* 用戶選擇器 */}
               <div className="flex items-center gap-2">
                 <Button
@@ -529,406 +524,74 @@ export default function AdminPage() {
           </CardContent>
         </Card>
 
+        {/* 模組選擇 */}
+        <div className="grid grid-cols-3 gap-4">
+          <Card 
+            className={`bg-white/5 backdrop-blur border-white/10 p-6 cursor-pointer transition-all hover:bg-white/10 ${currentModule === 'worklogs' ? 'ring-2 ring-purple-500' : ''}`}
+            onClick={() => setCurrentModule('worklogs')}
+          >
+            <div className="flex items-center gap-3">
+              <FileText className="w-6 h-6 text-purple-400" />
+              <h2 className="text-lg font-semibold text-white">工作記錄</h2>
+            </div>
+            <p className="text-white/60 mt-2">查看和管理員工的工作記錄</p>
+          </Card>
+
+          <Card 
+            className={`bg-white/5 backdrop-blur border-white/10 p-6 cursor-pointer transition-all hover:bg-white/10 ${currentModule === 'attendance' ? 'ring-2 ring-blue-500' : ''}`}
+            onClick={() => setCurrentModule('attendance')}
+          >
+            <div className="flex items-center gap-3">
+              <Clock className="w-6 h-6 text-blue-400" />
+              <h2 className="text-lg font-semibold text-white">考勤記錄</h2>
+            </div>
+            <p className="text-white/60 mt-2">管理打卡記錄和簽核</p>
+          </Card>
+
+          <Card 
+            className={`bg-white/5 backdrop-blur border-white/10 p-6 cursor-pointer transition-all hover:bg-white/10 ${currentModule === 'overtime' ? 'ring-2 ring-orange-500' : ''}`}
+            onClick={() => setCurrentModule('overtime')}
+          >
+            <div className="flex items-center gap-3">
+              <TrendingUp className="w-6 h-6 text-orange-400" />
+              <h2 className="text-lg font-semibold text-white">加班管理</h2>
+            </div>
+            <p className="text-white/60 mt-2">管理和審核加班申請</p>
+          </Card>
+        </div>
+
         {/* 內容區域 */}
         <Card className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl overflow-hidden">
           <div className="p-6">
-            {viewMode === 'worklogs' ? (
-              <>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
-                    📋 工作記錄 - {selectedUserObj?.name || selectedUserObj?.email}
-                  </h2>
-                </div>
-
-                <div className="space-y-4">
-                  {(() => {
-                    const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 })
-                    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 })
-                    const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd })
-                    const groupedLogs = groupWorkLogsByDate()
-
-                    return weekDays.map(day => {
-                      const dateKey = format(day, 'yyyy-MM-dd')
-                      const dayName = format(day, 'EEEE', { locale: zhTW })
-                      const dayLogs = groupedLogs[dateKey]?.filter(log => 
-                        searchTerm === '' || 
-                        log.projectCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        log.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        log.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        log.category.toLowerCase().includes(searchTerm.toLowerCase())
-                      ) || []
-                      const isToday = format(new Date(), 'yyyy-MM-dd') === dateKey
-
-                      return (
-                        <div key={dateKey} className="border-l-4 border-purple-400/50 pl-4">
-                          <div className={`flex items-center justify-between mb-3 ${isToday ? 'text-yellow-300' : 'text-white'}`}>
-                            <div className="flex items-center gap-3">
-                              <Calendar className="h-5 w-5" />
-                              <h3 className="text-lg font-semibold">
-                                {format(day, 'MM/dd')} ({dayName})
-                                {isToday && <span className="ml-2 text-yellow-400">今天</span>}
-                              </h3>
-                              <span className="text-white/60 text-sm">
-                                {dayLogs.length} 項工作
-                              </span>
-                            </div>
-                          </div>
-
-                          {dayLogs.length === 0 ? (
-                            <div className="text-white/60 text-sm ml-8 py-2">
-                              無工作紀錄
-                            </div>
-                          ) : (
-                            <div className="space-y-2 ml-8">
-                              {dayLogs.map(log => {
-                                const startTime = format(parseISO(log.startTime), 'HH:mm')
-                                const duration = calculateDuration(log.startTime, log.endTime)
-                                
-                                return (
-                                  <Card key={log.id} className="bg-white/5 backdrop-blur border border-white/10 p-4">
-                                    <div className="flex items-start justify-between">
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-3 mb-2">
-                                          <span className="text-white/70 font-mono text-sm bg-blue-500/20 px-2 py-1 rounded">
-                                            {log.projectCode}
-                                          </span>
-                                          <span className="text-white font-medium">
-                                            {log.projectName}
-                                          </span>
-                                          <span className="text-white/80 font-mono text-sm bg-white/10 px-2 py-1 rounded">
-                                            {startTime} ~ {log.endTime ? format(parseISO(log.endTime), 'HH:mm') : '進行中'}
-                                          </span>
-                                          {log.isEdited && (
-                                            <span className="text-orange-400 text-xs bg-orange-500/20 px-2 py-1 rounded-full">
-                                              已編輯
-                                            </span>
-                                          )}
-                                        </div>
-                                        <p className="text-white/80 text-sm mb-2">
-                                          {log.content}
-                                        </p>
-                                        <div className="flex items-center gap-3">
-                                          <span className="text-white/60 text-sm bg-purple-500/20 px-2 py-1 rounded">
-                                            {log.category}
-                                          </span>
-                                          <div className="text-white/60 text-xs">
-                                            工作時數: {duration}
-                                          </div>
-                                          {log.editedAt && (
-                                            <div className="text-orange-300/60 text-xs">
-                                              修改於: {format(parseISO(log.editedAt), 'MM/dd HH:mm')}
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </Card>
-                                )
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })
-                  })()}
-                </div>
-
-                {filteredWorkLogs.length === 0 && (
-                  <div className="text-center text-white/60 py-12">
-                    <FileText className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                    <h3 className="text-lg font-medium mb-2">本週尚無工作紀錄</h3>
-                    <p className="text-sm">此用戶在選定期間內沒有工作記錄</p>
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                                 <div className="flex items-center justify-between mb-6">
-                   <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
-                     🕒 考勤記錄 - {selectedUserObj?.name || selectedUserObj?.email}
-                   </h2>
-                   
-                   {/* 簽名操作按鈕 */}
-                   <div className="flex items-center gap-3">
-                     {selectedDates.size > 0 && (
-                       <div className="text-white/70 text-sm">
-                         已選擇 {selectedDates.size} 個日期
-                       </div>
-                     )}
-                     <Button
-                       onClick={() => setShowSignModal(true)}
-                       disabled={selectedDates.size === 0}
-                       className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
-                     >
-                       <Shield className="w-4 h-4" />
-                       簽名確認 ({selectedDates.size})
-                     </Button>
-                   </div>
-                 </div>
-
-                <div className="space-y-4">
-                  {(() => {
-                    const monthStart = startOfMonth(currentDate)
-                    const monthEnd = endOfMonth(currentDate)
-                    const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd })
-                    const groupedRecords = groupClockRecordsByDate()
-
-                    return monthDays.map(day => {
-                      const dateKey = format(day, 'yyyy-MM-dd')
-                      const dayName = format(day, 'EEEE', { locale: zhTW })
-                      const dayRecords = groupedRecords[dateKey] || []
-                      const isToday = format(new Date(), 'yyyy-MM-dd') === dateKey
-                      const hasRecords = dayRecords.length > 0
-                      const isSignedByMe = isDateSignedByCurrentUser(dateKey)
-                      const allSignatures = getDateSignatures(dateKey)
-                      const hasSignatures = hasAnySignature(dateKey)
-                      const isSelected = selectedDates.has(dateKey)
-
-                      return (
-                        <div key={dateKey} className={`border-l-4 pl-4 ${
-                          hasSignatures ? 'border-blue-400/70' : 
-                          hasRecords ? 'border-green-400/50' : 'border-gray-500/30'
-                        } ${isSelected ? 'bg-blue-500/10' : ''}`}>
-                          <div className={`flex items-center justify-between mb-3 ${isToday ? 'text-yellow-300' : 'text-white'}`}>
-                            <div className="flex items-center gap-3">
-                              {/* 勾選框 - 有打卡記錄且當前用戶未簽名可以勾選 */}
-                              {hasRecords && !isSignedByMe && (
-                                <button
-                                  onClick={() => toggleDateSelection(dateKey, hasRecords)}
-                                  className="text-white hover:text-blue-400 transition-colors"
-                                >
-                                  {isSelected ? (
-                                    <CheckSquare className="w-5 h-5 text-blue-400" />
-                                  ) : (
-                                    <Square className="w-5 h-5" />
-                                  )}
-                                </button>
-                              )}
-                              
-                              <Calendar className={`h-5 w-5 ${
-                                hasSignatures ? 'text-blue-400' :
-                                hasRecords ? 'text-green-400' : 'text-gray-500'
-                              }`} />
-                              <h3 className="text-lg font-semibold">
-                                {format(day, 'MM/dd')} ({dayName})
-                                {isToday && <span className="ml-2 text-yellow-400">今天</span>}
-                              </h3>
-                              <span className="text-white/60 text-sm">
-                                {hasRecords ? `${dayRecords.length} 次打卡` : '無打卡記錄'}
-                              </span>
-                              
-                              {/* 多重簽名狀態 */}
-                              {hasSignatures && allSignatures.length > 0 && (
-                                <div className="flex items-center gap-2">
-                                  <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs">
-                                    <Shield className="w-3 h-3" />
-                                    <span>{allSignatures.length} 位主管已簽名</span>
-                                  </div>
-                                  {/* 簽名詳情（懸停顯示） */}
-                                  <div className="group relative">
-                                    <button className="text-blue-400 hover:text-blue-300">
-                                      <Eye className="w-3 h-3" />
-                                    </button>
-                                    <div className="absolute left-0 top-6 z-10 hidden group-hover:block bg-gray-900 border border-gray-700 rounded-lg p-3 text-xs text-white min-w-[250px] max-w-[400px]">
-                                      <div className="space-y-2">
-                                        {allSignatures.map((sig, index) => (
-                                          <div key={sig.id} className="border-b border-gray-700 last:border-b-0 pb-2 last:pb-0">
-                                            <div className="flex justify-between items-center">
-                                              <span className="font-medium text-blue-300">{sig.signerName}</span>
-                                              <span className="text-gray-400">{format(parseISO(sig.signedAt), 'MM/dd HH:mm')}</span>
-                                            </div>
-                                            {sig.note && (
-                                              <div className="mt-1 text-gray-300 text-xs">
-                                                <span className="text-gray-500">備註：</span>
-                                                {sig.note}
-                                              </div>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="ml-8">
-                            {hasRecords ? (() => {
-                              // 分析當日打卡記錄
-                              const workRecords = dayRecords.filter(r => r.type === 'IN' || r.type === 'OUT')
-                              const workStart = workRecords.find(r => r.type === 'IN')
-                              const workEnd = workRecords.filter(r => r.type === 'OUT').pop() // 最後一次下班
-                              
-                              // 計算總工作時間
-                              let totalWorkTime = '無記錄'
-                              if (workStart && workEnd) {
-                                const diffMs = new Date(workEnd.timestamp).getTime() - new Date(workStart.timestamp).getTime()
-                                const totalMinutes = diffMs / (1000 * 60)
-                                const hours = Math.floor(totalMinutes / 60)
-                                const minutes = Math.round(totalMinutes % 60)
-                                
-                                if (hours === 0) {
-                                  totalWorkTime = `${minutes}分`
-                                } else {
-                                  totalWorkTime = minutes > 0 ? `${hours}h${minutes}m` : `${hours}h`
-                                }
-                              }
-
-                              return (
-                                <Card className="bg-white/5 backdrop-blur border border-white/10 p-4">
-                                  {/* 打卡記錄摘要 - 左右排列 */}
-                                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                                    {/* 上班時間 */}
-                                    <div className="flex items-center gap-2">
-                                      <div className="p-1.5 rounded-full bg-green-500/20">
-                                        <Clock className="w-3 h-3 text-green-400" />
-                                      </div>
-                                      <div>
-                                        <div className="text-white/60 text-xs">上班</div>
-                                        <div className="text-white font-mono text-sm">
-                                          {workStart 
-                                            ? format(parseISO(workStart.timestamp), 'HH:mm')
-                                            : '--:--'
-                                          }
-                                        </div>
-                                        {workStart?.isEdited && (
-                                          <div className="text-orange-400 text-xs">已編輯</div>
-                                        )}
-                                      </div>
-                                    </div>
-                                    
-                                    {/* 下班時間 */}
-                                    <div className="flex items-center gap-2">
-                                      <div className="p-1.5 rounded-full bg-red-500/20">
-                                        <Clock className="w-3 h-3 text-red-400" />
-                                      </div>
-                                      <div>
-                                        <div className="text-white/60 text-xs">下班</div>
-                                        <div className="text-white font-mono text-sm">
-                                          {workEnd 
-                                            ? format(parseISO(workEnd.timestamp), 'HH:mm')
-                                            : '--:--'
-                                          }
-                                        </div>
-                                        {workEnd?.isEdited && (
-                                          <div className="text-orange-400 text-xs">已編輯</div>
-                                        )}
-                                      </div>
-                                    </div>
-                                    
-                                    {/* 工作時長 */}
-                                    <div className="flex items-center gap-2">
-                                      <div className="p-1.5 rounded-full bg-blue-500/20">
-                                        <Clock className="w-3 h-3 text-blue-400" />
-                                      </div>
-                                      <div>
-                                        <div className="text-white/60 text-xs">時長</div>
-                                        <div className="text-white font-mono text-sm">
-                                          {totalWorkTime}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    
-                                    {/* 打卡次數 */}
-                                    <div className="flex items-center gap-2">
-                                      <div className="p-1.5 rounded-full bg-purple-500/20">
-                                        <Clock className="w-3 h-3 text-purple-400" />
-                                      </div>
-                                      <div>
-                                        <div className="text-white/60 text-xs">次數</div>
-                                        <div className="text-white font-mono text-sm">
-                                          {dayRecords.length} 次
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* 詳細打卡記錄（可收合） */}
-                                  <details className="group">
-                                    <summary className="cursor-pointer text-white/70 text-sm hover:text-white transition-colors list-none">
-                                      <div className="flex items-center gap-2">
-                                        <span className="group-open:rotate-90 transition-transform duration-200">▶</span>
-                                        <span className="group-open:hidden">查看詳細打卡記錄 ({dayRecords.length} 筆)</span>
-                                        <span className="hidden group-open:inline">隱藏詳細打卡記錄</span>
-                                      </div>
-                                    </summary>
-                                    <div className="mt-3 space-y-2">
-                                      {dayRecords.sort((a, b) => 
-                                        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-                                      ).map(record => (
-                                        <div key={record.id} className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
-                                          <div className={`p-2 rounded-full ${
-                                            record.type === 'IN' 
-                                              ? 'bg-green-500/20 text-green-400' 
-                                              : 'bg-red-500/20 text-red-400'
-                                          }`}>
-                                            {record.type === 'IN' ? '上' : '下'}
-                                          </div>
-                                          
-                                          <div className="flex-1">
-                                            <div className="flex items-center gap-2">
-                                              <span className="text-white font-medium">
-                                                {record.type === 'IN' ? '上班打卡' : '下班打卡'}
-                                              </span>
-                                              {record.isEdited && (
-                                                <span className="text-orange-400 text-xs bg-orange-500/20 px-2 py-1 rounded-full">
-                                                  已編輯
-                                                </span>
-                                              )}
-                                            </div>
-                                            <div className="text-white/70 text-sm">
-                                              {format(parseISO(record.timestamp), 'HH:mm:ss')}
-                                              {record.editedAt && (
-                                                <span className="text-orange-300/60 ml-2">
-                                                  (修改於 {format(parseISO(record.editedAt), 'MM/dd HH:mm')})
-                                                </span>
-                                              )}
-                                            </div>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </details>
-                                </Card>
-                              )
-                            })() : (
-                              <div className="text-white/50 text-center py-6 bg-gray-500/10 rounded-lg border border-gray-500/20">
-                                <Clock className="h-12 w-12 mx-auto mb-2 text-gray-500" />
-                                <div className="text-gray-400">當日無打卡記錄</div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })
-                  })()}
-                </div>
-
-                {filteredClockRecords.length === 0 && (
-                  <div className="text-center text-white/60 py-12">
-                    <Clock className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                    <h3 className="text-lg font-medium mb-2">本月尚無考勤記錄</h3>
-                    <p className="text-sm">此用戶在選定期間內沒有打卡記錄</p>
-                  </div>
-                )}
-              </>
+            {currentModule === 'worklogs' && (
+              <div key="worklogs">
+                <WorkLogsPage
+                  selectedUser={selectedUser}
+                  currentDate={currentDate}
+                  searchTerm={searchTerm}
+                />
+              </div>
+            )}
+            {currentModule === 'attendance' && (
+              <div key="attendance">
+                <AttendancePage
+                  selectedUser={selectedUser}
+                  currentDate={currentDate}
+                  searchTerm={searchTerm}
+                />
+              </div>
+            )}
+            {currentModule === 'overtime' && (
+              <div key="overtime">
+                <OvertimePage
+                  selectedUser={selectedUser}
+                  currentDate={currentDate}
+                  searchTerm={searchTerm}
+                />
+              </div>
             )}
           </div>
         </Card>
-
-        {/* 工作時長統計 - 只在考勤模式下顯示 */}
-        {viewMode === 'attendance' && selectedUser && (
-          <Card className="bg-gradient-to-br from-gray-900/40 to-gray-800/40 backdrop-blur-lg border border-white/20">
-            <CardContent className="p-6">
-              <WorkTimeStatsCard 
-                userId={selectedUser}
-                timeRange="month"
-                currentDate={currentDate}
-              />
-            </CardContent>
-          </Card>
-        )}
       </div>
 
       {/* 簽名確認彈窗 */}

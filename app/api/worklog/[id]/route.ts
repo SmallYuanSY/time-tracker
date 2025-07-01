@@ -7,7 +7,7 @@ import { getClientIP } from '@/lib/ip-utils'
 // 更新工作記錄
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const {
@@ -21,7 +21,7 @@ export async function PUT(
       editReason,
     } = await req.json()
 
-    const { id } = params
+    const { id } = await params
 
     if (
       !userId || !startTime || !endTime ||
@@ -156,15 +156,69 @@ export async function PUT(
   }
 }
 
+// 部分更新工作記錄（例如結束時間、加班狀態等）
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const body = await req.json()
+    const { userId, endTime, isOvertime } = body
+    const { id } = await params
+
+    if (!userId) {
+      return new NextResponse('缺少 userId', { status: 400 })
+    }
+
+    const session = await getServerSession(authOptions)
+    if (!session?.user || !(session.user as any).id || (session.user as any).id !== userId) {
+      return new NextResponse('Unauthorized', { status: 401 })
+    }
+
+    // 檢查工作記錄是否存在且屬於該用戶
+    const existingLog = await prisma.workLog.findFirst({
+      where: {
+        id,
+        userId,
+      },
+    })
+
+    if (!existingLog) {
+      return new NextResponse('工作記錄不存在或無權限編輯', { status: 404 })
+    }
+
+    // 準備更新數據
+    const updateData: any = {}
+    
+    if (endTime !== undefined) {
+      updateData.endTime = new Date(endTime)
+    }
+    
+    if (isOvertime !== undefined) {
+      updateData.isOvertime = isOvertime
+    }
+
+    const result = await prisma.workLog.update({
+      where: { id },
+      data: updateData,
+    })
+
+    return NextResponse.json(result)
+  } catch (error) {
+    console.error('[PATCH /api/worklog/[id]]', error)
+    return new NextResponse('伺服器內部錯誤', { status: 500 })
+  }
+}
+
 // 刪除工作記錄
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { searchParams } = new URL(req.url)
     const userId = searchParams.get('userId')
-    const { id } = params
+    const { id } = await params
 
     if (!userId) {
       return new NextResponse('缺少 userId', { status: 400 })

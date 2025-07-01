@@ -6,70 +6,62 @@ import { prisma } from '@/lib/prisma'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: '未授權' }, { status: 401 })
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
-    // 檢查用戶權限
+    // 檢查是否為管理員
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
+      where: { email: session.user.email! },
+      select: { role: true }
     })
 
     if (!user || (user.role !== 'ADMIN' && user.role !== 'WEB_ADMIN')) {
-      return NextResponse.json({ error: '權限不足，只有管理員可以查看工作記錄' }, { status: 403 })
+      return new NextResponse('Forbidden', { status: 403 })
     }
 
-    const { searchParams } = new URL(request.url)
+    // 獲取查詢參數
+    const searchParams = request.nextUrl.searchParams
     const start = searchParams.get('start')
-    const end = searchParams.get('end')
+    const end = searchParams.get('end') || new Date(new Date(start!).getTime() + 24 * 60 * 60 * 1000).toISOString() // 如果沒有提供 end，預設為 start + 1 天
+    const isOvertime = searchParams.get('isOvertime') === 'true'
     const userId = searchParams.get('userId')
 
-    if (!start || !end) {
-      return NextResponse.json({ error: '缺少時間範圍參數' }, { status: 400 })
+    if (!start) {
+      return new NextResponse('Missing start parameter', { status: 400 })
     }
-
-    const startDate = new Date(start)
-    const endDate = new Date(end)
 
     // 構建查詢條件
-    let whereCondition: any = {
+    const where: any = {
       startTime: {
-        gte: startDate,
-        lte: endDate,
+        gte: new Date(start),
+        lte: new Date(end)
       },
+      ...(isOvertime && { isOvertime: true }),
+      ...(userId && { userId })
     }
 
-    // 如果指定了特定用戶，添加用戶過濾
-    if (userId && userId !== 'all') {
-      whereCondition.userId = userId
-    } else {
-      // 只查詢員工的工作記錄
-      whereCondition.user = {
-        role: 'EMPLOYEE'
-      }
-    }
-
+    // 查詢工作記錄
     const workLogs = await prisma.workLog.findMany({
-      where: whereCondition,
+      where,
       include: {
         user: {
           select: {
             id: true,
             name: true,
             email: true,
+            role: true
           }
         }
       },
       orderBy: {
-        startTime: 'desc',
-      },
-      take: 100, // 限制返回數量避免過多數據
+        startTime: 'desc'
+      }
     })
 
     return NextResponse.json(workLogs)
   } catch (error) {
-    console.error('獲取工作記錄失敗:', error)
-    return NextResponse.json({ error: '獲取工作記錄失敗' }, { status: 500 })
+    console.error('Error fetching work logs:', error)
+    return new NextResponse('Internal Server Error', { status: 500 })
   }
 } 

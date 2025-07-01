@@ -20,8 +20,10 @@ export async function POST(req: NextRequest) {
 
     const ipAddress = getClientIP(req)
     const userAgent = req.headers.get('user-agent') || ''
+    const endTime = nowInTaiwan()
 
-    const ongoing = await prisma.workLog.findFirst({
+    // 查找進行中的加班工作記錄
+    const ongoingWork = await prisma.workLog.findFirst({
       where: {
         userId,
         endTime: null,
@@ -30,19 +32,11 @@ export async function POST(req: NextRequest) {
       orderBy: { startTime: 'desc' },
     })
 
-    if (!ongoing) {
-      return new NextResponse('No ongoing overtime', { status: 400 })
+    if (!ongoingWork) {
+      return new NextResponse('找不到進行中的加班記錄', { status: 400 })
     }
 
-    const endTime = nowInTaiwan()
-
-    // 更新工作記錄
-    const result = await prisma.workLog.update({
-      where: { id: ongoing.id },
-      data: { endTime },
-    })
-
-    // 同時更新加班記錄（如果存在）
+    // 查找對應的加班記錄
     const ongoingOvertime = await prisma.overtime.findFirst({
       where: {
         userId,
@@ -51,18 +45,32 @@ export async function POST(req: NextRequest) {
       orderBy: { startTime: 'desc' },
     })
 
-    if (ongoingOvertime) {
-      await prisma.overtime.update({
-        where: { id: ongoingOvertime.id },
-        data: {
-          endTime,
-          endIpAddress: ipAddress,
-          endMacAddress: deviceInfo?.macAddress || null,
-          endUserAgent: userAgent,
-          endDeviceInfo: deviceInfo ? JSON.stringify(deviceInfo) : null,
-        },
+    // 使用事務同時更新兩個記錄
+    const result = await prisma.$transaction(async (tx) => {
+      // 更新工作記錄
+      const updatedWorkLog = await tx.workLog.update({
+        where: { id: ongoingWork.id },
+        data: { endTime },
       })
-    }
+
+      // 更新加班記錄（如果存在）
+      let updatedOvertime = null
+      if (ongoingOvertime) {
+        updatedOvertime = await tx.overtime.update({
+          where: { id: ongoingOvertime.id },
+          data: {
+            endTime,
+            endIpAddress: ipAddress,
+            endMacAddress: deviceInfo?.macAddress || null,
+            endUserAgent: userAgent,
+            endDeviceInfo: deviceInfo ? JSON.stringify(deviceInfo) : null,
+            status: 'COMPLETED', // 更新狀態為已完成
+          },
+        })
+      }
+
+      return { workLog: updatedWorkLog, overtime: updatedOvertime }
+    })
 
     return NextResponse.json(result)
   } catch (error) {

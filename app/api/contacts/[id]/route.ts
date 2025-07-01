@@ -3,14 +3,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
+type ContactType = 'CONTACT' | 'SUPPLIER' | 'CUSTOMER' | 'BUILDER'
+
 // 更新聯絡人
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const { companyName, address, phone, contactName, notes } = await req.json()
-    const { id } = params
+    const { companyName, address, phone, contactName, type, notes } = await req.json()
+    const { id } = await context.params
 
     if (!companyName || !address || !phone || !contactName) {
       return new NextResponse('缺少必要欄位', { status: 400 })
@@ -21,15 +23,21 @@ export async function PUT(
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
+    const updateData = {
+      companyName,
+      address,
+      phone,
+      contactName,
+      notes: notes || null,
+    }
+
+    if (type && ['CONTACT', 'SUPPLIER', 'CUSTOMER', 'BUILDER'].includes(type)) {
+      Object.assign(updateData, { type })
+    }
+
     const contact = await prisma.contact.update({
       where: { id },
-      data: {
-        companyName,
-        address,
-        phone,
-        contactName,
-        notes: notes || null,
-      },
+      data: updateData
     })
 
     return NextResponse.json(contact)
@@ -42,10 +50,10 @@ export async function PUT(
 // 刪除聯絡人
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const { id } = params
+    const { id } = await context.params
 
     const session = await getServerSession(authOptions)
     if (!session?.user) {

@@ -10,6 +10,12 @@ import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
 import { Button, buttonVariants } from "@/components/ui/button"
+import { Holiday } from "@prisma/client"
+
+export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
+  holidays?: Holiday[]
+  onHolidayClick?: (holiday: Holiday) => void
+}
 
 function Calendar({
   className,
@@ -19,11 +25,39 @@ function Calendar({
   buttonVariant = "ghost",
   formatters,
   components,
+  holidays = [],
+  onHolidayClick,
   ...props
-}: React.ComponentProps<typeof DayPicker> & {
+}: CalendarProps & {
   buttonVariant?: React.ComponentProps<typeof Button>["variant"]
 }) {
   const defaultClassNames = getDefaultClassNames()
+
+  // 將假日資料轉換為日期映射，方便查詢
+  const holidayMap = React.useMemo(() => {
+    const map = new Map<string, Holiday>()
+    holidays.forEach(holiday => {
+      const date = new Date(holiday.date)
+      map.set(date.toISOString().split('T')[0], holiday)
+    })
+    return map
+  }, [holidays])
+
+  // 自定義日期渲染
+  const modifiers = {
+    holiday: (date: Date) => {
+      const dateStr = date.toISOString().split('T')[0]
+      return holidayMap.has(dateStr)
+    }
+  }
+
+  const modifiersStyles = {
+    holiday: {
+      color: 'var(--holiday-color)',
+      backgroundColor: 'var(--holiday-bg)',
+      borderRadius: '4px'
+    }
+  }
 
   return (
     <DayPicker
@@ -163,6 +197,15 @@ function Calendar({
           )
         },
         ...components,
+      }}
+      modifiers={modifiers}
+      modifiersStyles={modifiersStyles}
+      onDayClick={(date) => {
+        const dateStr = date.toISOString().split('T')[0]
+        const holiday = holidayMap.get(dateStr)
+        if (holiday && onHolidayClick) {
+          onHolidayClick(holiday)
+        }
       }}
       {...props}
     />

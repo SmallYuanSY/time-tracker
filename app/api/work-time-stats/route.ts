@@ -4,6 +4,29 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { format, parseISO, isWeekend, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 
+// 新增 ClockRecord 型別定義
+interface ClockRecord {
+  id: string
+  userId: string
+  type: 'IN' | 'OUT'
+  timestamp: string
+  deviceInfo?: {
+    ip?: string
+    userAgent?: string
+    location?: string
+  } | null
+}
+
+// 新增 Holiday 型別定義
+type Holiday = {
+  id: string
+  date: string
+  name: string
+  type: string
+  isHoliday: boolean
+  description?: string | null
+}
+
 // 將實際工時轉換為法定計算工時（以半小時為單位向下取整）
 function calculateLegalHours(actualHours: number): number {
   if (!actualHours || actualHours === 0 || isNaN(actualHours)) return 0
@@ -11,16 +34,11 @@ function calculateLegalHours(actualHours: number): number {
   return Math.floor(actualHours * 2) / 2
 }
 
-interface ClockRecord {
-  id: string
-  userId: string
-  type: 'IN' | 'OUT'
-  timestamp: string
-}
-
 interface DayWorkStats {
   date: string
   isWeekend: boolean
+  isHoliday: boolean
+  holidayType: string | null
   regularHours: number
   overtime1Hours: number
   overtime1ActualHours: number
@@ -63,13 +81,27 @@ interface WorkTimeStats {
   dailyStats: DayWorkStats[]
 }
 
-function analyzeDayWorkTime(dayRecords: ClockRecord[], isWeekendDay: boolean): DayWorkStats {
+// 新增假日判斷函數
+async function getHolidayInfo(date: string) {
+  const holiday = await prisma.holiday.findUnique({
+    where: { date }
+  });
+  return holiday;
+}
+
+function analyzeDayWorkTime(dayRecords: ClockRecord[], isWeekendDay: boolean, holiday: Holiday | null): DayWorkStats {
   const dateStr = dayRecords.length > 0 ? format(parseISO(dayRecords[0].timestamp), 'yyyy-MM-dd') : ''
+  
+  // 判斷是否為假日工作
+  const isHolidayWork = holiday?.isHoliday || isWeekendDay;
+  const holidayType = holiday?.type || null;
   
   if (dayRecords.length === 0) {
     return { 
       date: dateStr,
       isWeekend: isWeekendDay,
+      isHoliday: isHolidayWork,
+      holidayType,
       regularHours: 0, 
       overtime1Hours: 0, 
       overtime1ActualHours: 0,
@@ -136,8 +168,8 @@ function analyzeDayWorkTime(dayRecords: ClockRecord[], isWeekendDay: boolean): D
 
   const totalWorkHours = totalWorkMinutes > 0 ? totalWorkMinutes / 60 : 0
 
-  if (isWeekendDay) {
-    // 假日工時：全部都算加班
+  if (isHolidayWork) {
+    // 假日工時：全部都算加班，但費率依假日類型而定
     const overtime1ActualHours = Math.min(totalWorkHours, 2) // 假日前2小時（實際）
     const overtime2ActualHours = Math.min(Math.max(0, totalWorkHours - 2), 10) // 假日第3-12小時（實際）
     const exceedActualHours = Math.max(0, totalWorkHours - 12) // 超過12小時的部分（實際）
@@ -151,6 +183,8 @@ function analyzeDayWorkTime(dayRecords: ClockRecord[], isWeekendDay: boolean): D
     return { 
       date: dateStr,
       isWeekend: isWeekendDay,
+      isHoliday: isHolidayWork,
+      holidayType,
       regularHours: 0, 
       overtime1Hours, 
       overtime1ActualHours,
@@ -161,39 +195,41 @@ function analyzeDayWorkTime(dayRecords: ClockRecord[], isWeekendDay: boolean): D
       exceedActualHours,
       totalWorkHours
     }
-  } else {
-    // 平日工時
-    const regularHours = Math.min(totalWorkHours, 8) // 每日正常工作時間最多8小時
-    const overtimeActualHours = Math.max(0, totalWorkHours - 8) // 超過8小時的部分為加班（實際）
-    
-    // 分段計算加班時間（實際）
-    const overtime1ActualHours = Math.min(overtimeActualHours, 2) // 前2小時加班（實際）
-    const overtime2ActualHours = Math.min(Math.max(0, overtimeActualHours - 2), 2) // 後2小時加班（實際）
-    const exceedActualHours = Math.max(0, totalWorkHours - 12) // 超過12小時的部分（實際）
-    
-    // 法定計算（以半小時為單位向下取整）
-    const overtime1Hours = calculateLegalHours(overtime1ActualHours)
-    const overtime2Hours = calculateLegalHours(overtime2ActualHours)
-    const exceedHours = calculateLegalHours(exceedActualHours)
-    const totalOvertimeHours = overtime1Hours + overtime2Hours
+  }
 
-    return { 
-      date: dateStr,
-      isWeekend: isWeekendDay,
-      regularHours, 
-      overtime1Hours, 
-      overtime1ActualHours,
-      overtime2Hours, 
-      overtime2ActualHours,
-      totalOvertimeHours,
-      exceedHours,
-      exceedActualHours,
-      totalWorkHours
-    }
+  // 平日工時（包含補班日）
+  const regularHours = Math.min(totalWorkHours, 8) // 每日正常工作時間最多8小時
+  const overtimeActualHours = Math.max(0, totalWorkHours - 8) // 超過8小時的部分為加班（實際）
+  
+  // 分段計算加班時間（實際）
+  const overtime1ActualHours = Math.min(overtimeActualHours, 2) // 前2小時加班（實際）
+  const overtime2ActualHours = Math.min(Math.max(0, overtimeActualHours - 2), 2) // 後2小時加班（實際）
+  const exceedActualHours = Math.max(0, totalWorkHours - 12) // 超過12小時的部分（實際）
+  
+  // 法定計算（以半小時為單位向下取整）
+  const overtime1Hours = calculateLegalHours(overtime1ActualHours)
+  const overtime2Hours = calculateLegalHours(overtime2ActualHours)
+  const exceedHours = calculateLegalHours(exceedActualHours)
+  const totalOvertimeHours = overtime1Hours + overtime2Hours
+
+  return { 
+    date: dateStr,
+    isWeekend: isWeekendDay,
+    isHoliday: isHolidayWork,
+    holidayType,
+    regularHours, 
+    overtime1Hours, 
+    overtime1ActualHours,
+    overtime2Hours, 
+    overtime2ActualHours,
+    totalOvertimeHours,
+    exceedHours,
+    exceedActualHours,
+    totalWorkHours
   }
 }
 
-function calculateWorkTimeStats(records: ClockRecord[], periodStart: Date, periodEnd: Date): WorkTimeStats {
+async function calculateWorkTimeStats(records: ClockRecord[], periodStart: Date, periodEnd: Date): Promise<WorkTimeStats> {
   // 按日期分組記錄
   const recordsByDate: { [key: string]: ClockRecord[] } = {}
   
@@ -208,11 +244,15 @@ function calculateWorkTimeStats(records: ClockRecord[], periodStart: Date, perio
   // 計算每日工作時間
   const dailyStats: DayWorkStats[] = []
   
-  Object.entries(recordsByDate).forEach(([dateStr, dayRecords]) => {
-    const date = new Date(dateStr)
-    const stats = analyzeDayWorkTime(dayRecords, isWeekend(date))
-    dailyStats.push(stats)
-  })
+  // 使用 Promise.all 處理非同步操作
+  await Promise.all(
+    Object.entries(recordsByDate).map(async ([dateStr, dayRecords]) => {
+      const date = new Date(dateStr)
+      const holiday = await getHolidayInfo(dateStr)
+      const stats = analyzeDayWorkTime(dayRecords, isWeekend(date), holiday)
+      dailyStats.push(stats)
+    })
+  )
 
   // 分別計算平日和假日時間
   const weekdayStats = dailyStats.filter(day => !day.isWeekend)
@@ -346,7 +386,7 @@ export async function GET(request: NextRequest) {
     }))
 
     // 計算統計數據
-    const stats = calculateWorkTimeStats(formattedRecords, rangeStart, rangeEnd)
+    const stats = await calculateWorkTimeStats(formattedRecords, rangeStart, rangeEnd)
 
     return NextResponse.json({
       success: true,

@@ -5,31 +5,28 @@ import { useSession } from 'next-auth/react'
 import DashboardLayout from '@/components/layouts/DashboardLayout'
 import ContactModal from '@/components/ui/ContactModal'
 import ContactSelectionModal from '@/components/ui/ContactSelectionModal'
+import { Card } from '@/components/ui/card'
+import Link from 'next/link'
+
+type ContactType = 'CONTACT' | 'SUPPLIER' | 'CUSTOMER' | 'BUILDER'
 
 interface Contact {
   id: string
   companyName: string
-  address: string
-  phone: string
   contactName: string
-  projects?: {
-    id: string
-    code: string
-    name: string
-  }[]
+  phone: string
+  type: ContactType
+  address: string
 }
 
 interface Project {
-  projectCode: string
-  projectName: string
+  id: string
+  code: string
+  name: string
+  description: string | null
   category: string
-  contact?: Contact
-  lastUsedTime?: string | null
-  lastUsedBy?: {
-    name: string | null
-    email: string
-  } | null
-  totalWorkLogs?: number
+  status: string
+  Contact: Contact | null
 }
 
 export default function ProjectsPage() {
@@ -74,10 +71,13 @@ export default function ProjectsPage() {
       const projectsResponse = await fetch(`/api/projects?${params}`)
       if (projectsResponse.ok) {
         const projectsData = await projectsResponse.json()
+        console.log('Fetched projects:', projectsData)
         setProjects(projectsData)
+      } else {
+        console.error('Failed to fetch projects:', await projectsResponse.text())
       }
     } catch (error) {
-      console.error('載入資料失敗:', error)
+      console.error('Error fetching projects:', error)
     } finally {
       setLoading(false)
     }
@@ -114,8 +114,6 @@ export default function ProjectsPage() {
     }
   }
 
-
-
   const handleSaveContact = async (contactData: { companyName: string; address: string; phone: string; contactName: string; notes: string }) => {
     try {
       const url = editingContact ? `/api/contacts/${editingContact.id}` : '/api/contacts'
@@ -144,7 +142,7 @@ export default function ProjectsPage() {
     if (!selectedProject) return
 
     try {
-      const response = await fetch(`/api/projects/${selectedProject.projectCode}/assign-contact`, {
+      const response = await fetch(`/api/projects/${selectedProject.code}/assign-contact`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contactIds }),
@@ -287,76 +285,32 @@ export default function ProjectsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {projects.map((project, index) => (
-                <div key={index} className="bg-white/5 rounded-xl p-4 border border-white/10 hover:bg-white/10 transition-all duration-200">
-
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="bg-blue-500/20 text-blue-300 px-2 py-1 rounded text-sm font-medium">
-                            {project.projectCode}
-                          </span>
-                        </div>
-                        <div className="text-white font-medium mb-1">{project.projectName}</div>
-                        <div className="text-white/70 text-sm mb-2">{project.category}</div>
-                        
-                        {/* 最後使用時間和統計資訊 */}
-                        <div className="space-y-1 mb-3">
-                          <div className="flex items-center gap-1 text-white/60 text-xs">
-                            <span>⏱️</span>
-                            <span>最後使用：{formatLastUsedTime(project.lastUsedTime || null)}</span>
-                          </div>
-                          {project.lastUsedBy && (
-                            <div className="flex items-center gap-1 text-white/50 text-xs">
-                              <span>👤</span>
-                              <span>使用者：{project.lastUsedBy.name || project.lastUsedBy.email}</span>
-                            </div>
-                          )}
-                          {project.totalWorkLogs && (
-                            <div className="flex items-center gap-1 text-white/50 text-xs">
-                              <span>📊</span>
-                              <span>總工作記錄：{project.totalWorkLogs} 筆</span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {project.contact && (
-                          <div className="bg-green-500/20 border border-green-400/30 rounded-lg p-3">
-                            <div className="text-green-200 text-sm">
-                              <div className="font-medium flex items-center gap-1">
-                                🏢 {project.contact.companyName}
-                              </div>
-                              <div className="text-xs mt-1 flex items-center gap-1">
-                                👤 {project.contact.contactName}
-                              </div>
-                              <div className="text-xs mt-1 flex items-center gap-1">
-                                📞 {project.contact.phone}
-                              </div>
-                            </div>
-                          </div>
-                        )}
+              {projects.map((project) => (
+                <div key={project.id}>
+                  <Link href={`/projects/${project.code}`}>
+                    <Card className="p-4 hover:shadow-lg transition-shadow cursor-pointer">
+                      <div className="flex justify-between items-start mb-2">
+                        <h2 className="text-xl font-semibold">{project.code}</h2>
+                        <span className={`px-2 py-1 rounded text-sm ${
+                          project.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {project.status === 'ACTIVE' ? '進行中' : '已結案'}
+                        </span>
                       </div>
-                    </div>
-                    
-                    <div className="flex gap-2 mt-4">
-                      <button
-                        onClick={() => openContactSelection(project)}
-                        className="flex-1 px-3 py-2 bg-blue-600/20 text-blue-300 rounded-lg hover:bg-blue-600/30 transition text-sm font-medium"
-                      >
-                        {project.contact ? '📝 更換聯絡人' : '👥 指派聯絡人'}
-                      </button>
-                      {project.contact && (
-                        <button
-                          onClick={() => openContactSelection(project)}
-                          className="px-3 py-2 bg-purple-600/20 text-purple-300 rounded-lg hover:bg-purple-600/30 transition text-sm"
-                          title="管理聯絡人"
-                        >
-                          ⚙️
-                        </button>
+                      <h3 className="text-lg mb-2">{project.name}</h3>
+                      {project.description && (
+                        <p className="text-gray-600 mb-2">{project.description}</p>
                       )}
-                    </div>
-                  </div>
-                ))}
+                      {project.Contact && (
+                        <div className="text-sm text-gray-500">
+                          <p>聯絡人：{project.Contact.contactName}</p>
+                          <p>公司：{project.Contact.companyName}</p>
+                        </div>
+                      )}
+                    </Card>
+                  </Link>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -381,9 +335,9 @@ export default function ProjectsPage() {
           setSelectedProject(null)
         }}
         onConfirm={handleAssignContacts}
-        selectedContactIds={selectedProject?.contact ? [selectedProject.contact.id] : []}
-        projectCode={selectedProject?.projectCode}
-        projectName={selectedProject?.projectName}
+        selectedContactIds={selectedProject?.Contact ? [selectedProject.Contact.id] : []}
+        projectCode={selectedProject?.code}
+        projectName={selectedProject?.name}
       />
     </DashboardLayout>
   )

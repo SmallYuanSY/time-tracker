@@ -19,6 +19,7 @@ interface WorkLog {
   content: string
   startTime: string
   endTime: string | null
+  isOvertime?: boolean // 加班標記
 }
 
 interface TodayWorkSummaryProps {
@@ -271,21 +272,21 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
           <div className={`space-y-3 transition-all duration-300 ${
             dateAnimation !== 'none' ? 'opacity-0 transform scale-95' : 'opacity-100 transform scale-100'
           }`}>
-            {logs.slice(-6).map((log) => {
+            {logs.slice(-6).reverse().map((log) => {
               const start = format(parseISO(log.startTime), "HH:mm")
               const end = log.endTime ? format(parseISO(log.endTime), "HH:mm") : "進行中"
               
               // 根據工作狀態決定卡片顏色
               let bgColor = ""
               if (!log.endTime) {
-                // 進行中的工作 - 綠色
-                bgColor = "bg-green-500/20 border-green-400/30"
-              } else if (isOvertime(log.startTime)) {
-                // 加班且已完成 - 橘色
+                // 進行中的工作：藍色
+                bgColor = "bg-blue-500/20 border-blue-400/30"
+              } else if ((log as any).isOvertime) {
+                // 已完成的加班工作：橘色
                 bgColor = "bg-orange-500/20 border-orange-400/30"
               } else {
-                // 一般已完成工作 - 藍色
-                bgColor = "bg-blue-500/20 border-blue-400/30"
+                // 已完成的一般工作：綠色
+                bgColor = "bg-green-500/20 border-green-400/30"
               }
 
               return (

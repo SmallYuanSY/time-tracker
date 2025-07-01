@@ -36,6 +36,7 @@ export default function HomePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [summaryKey, setSummaryKey] = useState(0);
+  const [punchWidgetKey, setPunchWidgetKey] = useState(0); // 用於觸發 SmartPunchWidget 刷新
   const [activeTab, setActiveTab] = useState<'today' | 'scheduled'>('today');
   
   // 預定工作相關狀態
@@ -43,6 +44,7 @@ export default function HomePage() {
   const [editingScheduledWork, setEditingScheduledWork] = useState<ScheduledWork | null>(null);
   const [showWorkLogModal, setShowWorkLogModal] = useState(false);
   const [workLogFromScheduled, setWorkLogFromScheduled] = useState<ScheduledWork | null>(null);
+  const [isOvertimeMode, setIsOvertimeMode] = useState(false);
   const [scheduledWorkRefreshKey, setScheduledWorkRefreshKey] = useState(0);
 
   // 週導航相關狀態
@@ -98,11 +100,13 @@ export default function HomePage() {
   const handleWorkLogModalClose = () => {
     setShowWorkLogModal(false);
     setWorkLogFromScheduled(null);
+    setIsOvertimeMode(false);
   };
 
   // 處理工作記錄保存
   const handleWorkLogSave = () => {
     setSummaryKey(k => k + 1);
+    setPunchWidgetKey(k => k + 1); // 觸發 SmartPunchWidget 刷新
     setScheduledWorkRefreshKey(k => k + 1);
     handleWorkLogModalClose();
   };
@@ -176,7 +180,17 @@ export default function HomePage() {
           
           {/* 智能打卡系統卡片 */}
           <div className="lg:col-span-1">
-            <SmartPunchWidget onWorkLogSaved={() => setSummaryKey(k => k + 1)} />
+            <SmartPunchWidget 
+              key={punchWidgetKey} // 使用 key 來觸發重新渲染
+              onWorkLogSaved={() => setSummaryKey(k => k + 1)} 
+              onOpenWorkLogModal={(isOvertime) => {
+                if (isOvertime) {
+                  setWorkLogFromScheduled(null); // 清空預定工作數據
+                  setIsOvertimeMode(true);
+                  setShowWorkLogModal(true);
+                }
+              }}
+            />
           </div>
           
           {/* 今日統計卡片 */}
@@ -354,13 +368,14 @@ export default function HomePage() {
         editData={editingScheduledWork}
       />
 
-      {/* 工作記錄模態框 (從預定工作開始) */}
-      {showWorkLogModal && workLogFromScheduled && (
+      {/* 工作記錄模態框 */}
+      {showWorkLogModal && (
         <WorkLogModal
           onClose={handleWorkLogModalClose}
           onSave={handleWorkLogSave}
-          initialMode="start"
-          copyData={{
+          initialMode={isOvertimeMode ? "start" : "start"}
+          isOvertimeMode={isOvertimeMode}
+          copyData={workLogFromScheduled ? {
             id: '',
             projectCode: workLogFromScheduled.projectCode,
             projectName: workLogFromScheduled.projectName,
@@ -368,7 +383,7 @@ export default function HomePage() {
             content: workLogFromScheduled.content,
             startTime: new Date().toISOString(),
             endTime: null,
-          }}
+          } : undefined}
         />
       )}
     </DashboardLayout>

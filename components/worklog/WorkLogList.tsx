@@ -14,6 +14,7 @@ interface WorkLog {
   content: string
   startTime: string // ISO string
   endTime: string | null
+  isOvertime: boolean // 新增加班標記
 }
 
 interface WorkLogListProps {
@@ -112,7 +113,7 @@ export default function WorkLogList({ onRefresh, onEdit, onLogsLoaded }: WorkLog
     }
   }
 
-  const sortedLogs = [...logs].sort((a, b) => a.startTime.localeCompare(b.startTime))
+  const sortedLogs = [...logs].sort((a, b) => b.startTime.localeCompare(a.startTime))
 
   if (loading) {
     return (
@@ -147,6 +148,24 @@ export default function WorkLogList({ onRefresh, onEdit, onLogsLoaded }: WorkLog
 
   return (
     <div className="space-y-4">
+      {/* 顏色圖例說明 */}
+      <div className="bg-white/5 backdrop-blur rounded-xl p-3 border border-white/10">
+        <div className="flex items-center justify-center gap-6 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🔵</span>
+            <span className="text-white/70">進行中</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🟢</span>
+            <span className="text-white/70">一般工作</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🟠</span>
+            <span className="text-white/70">加班工作</span>
+          </div>
+        </div>
+      </div>
+      
       {message && (
         <div className="bg-green-500/20 border border-green-400/30 rounded-xl p-3 text-green-100 text-center">
           {message}
@@ -155,10 +174,30 @@ export default function WorkLogList({ onRefresh, onEdit, onLogsLoaded }: WorkLog
       {sortedLogs.map((log) => {
         const start = format(parseISO(log.startTime), "HH:mm")
         const end = log.endTime ? format(parseISO(log.endTime), "HH:mm") : "現在"
-        const bgColor = isOvertime(log.startTime) ? "bg-orange-100/10 border-orange-300/20" : "bg-emerald-100/10 border-emerald-300/20"
+        
+        // 決定工作狀態和顏色
+        let bgColor = ""
+        let statusIcon = ""
+        
+        if (!log.endTime) {
+          // 進行中的工作：藍色
+          bgColor = "bg-blue-100/10 border-blue-300/20"
+          statusIcon = "🔵"
+        } else if (log.isOvertime) {
+          // 已完成的加班工作：橘色
+          bgColor = "bg-orange-100/10 border-orange-300/20"
+          statusIcon = "🟠"
+        } else {
+          // 已完成的一般工作：綠色
+          bgColor = "bg-emerald-100/10 border-emerald-300/20"
+          statusIcon = "🟢"
+        }
 
         return (
           <Card key={log.id} className={`flex items-center gap-2 px-4 py-3 rounded-xl border ${bgColor}`}>
+            <div className="flex items-center gap-2 text-lg">
+              {statusIcon}
+            </div>
             <div className="flex-1 grid grid-cols-4 gap-2">
               <div className="px-2 py-1 rounded bg-white/20 text-white text-center">{log.projectCode}</div>
               <div className="px-2 py-1 rounded bg-white/20 text-white text-center">{log.projectName}</div>

@@ -12,6 +12,7 @@ interface Contact {
   address: string
   phone: string
   contactName: string
+  type: 'CONTACT' | 'SUPPLIER' | 'CUSTOMER' | 'BUILDER'
   notes?: string
   Project?: {
     id: string
@@ -59,8 +60,8 @@ export default function ContactsPage() {
       setLoading(true)
       const response = await fetch('/api/contacts')
       if (response.ok) {
-        const data = await response.json()
-        setContacts(data)
+        const result = await response.json()
+        setContacts(result.data || [])
       }
     } catch (error) {
       console.error('載入聯絡人失敗:', error)
@@ -69,7 +70,7 @@ export default function ContactsPage() {
     }
   }
 
-  const handleSaveContact = async (contactData: { companyName: string; address: string; phone: string; contactName: string; notes: string }) => {
+  const handleSaveContact = async (contactData: { companyName: string; address: string; phone: string; contactName: string; type: 'CONTACT' | 'SUPPLIER' | 'CUSTOMER' | 'BUILDER'; notes: string }) => {
     try {
       const url = editingContact ? `/api/contacts/${editingContact.id}` : '/api/contacts'
       const method = editingContact ? 'PUT' : 'POST'
@@ -188,7 +189,17 @@ export default function ContactsPage() {
               <div key={contact.id} className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6 hover:bg-white/15 transition-all duration-200">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <h3 className="text-white font-semibold text-lg mb-1">{contact.companyName}</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-white font-semibold text-lg">{contact.companyName}</h3>
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        contact.type === 'CUSTOMER' ? 'bg-blue-500/20 text-blue-300' :
+                        contact.type === 'SUPPLIER' ? 'bg-green-500/20 text-green-300' :
+                        'bg-gray-500/20 text-gray-300'
+                      }`}>
+                        {contact.type === 'CUSTOMER' ? '客戶' :
+                         contact.type === 'SUPPLIER' ? '供應商' : '聯絡人'}
+                      </span>
+                    </div>
                     <div className="text-white/70 text-sm space-y-1">
                       <div className="flex items-center gap-2">
                         <span>👤</span>

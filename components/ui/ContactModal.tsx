@@ -16,6 +16,7 @@ interface Contact {
   address: string
   phone: string
   contactName: string
+  type: 'CONTACT' | 'SUPPLIER' | 'CUSTOMER' | 'BUILDER'
   notes?: string
 }
 
@@ -24,6 +25,7 @@ interface ContactFormData {
   address: string
   phone: string
   contactName: string
+  type: 'CONTACT' | 'SUPPLIER' | 'CUSTOMER' | 'BUILDER'
   notes: string
 }
 
@@ -40,6 +42,7 @@ export default function ContactModal({ open, onClose, onSave, editData }: Contac
     address: '',
     phone: '',
     contactName: '',
+    type: 'CONTACT',
     notes: '',
   })
   const [errors, setErrors] = useState<string[]>([])
@@ -52,6 +55,7 @@ export default function ContactModal({ open, onClose, onSave, editData }: Contac
         address: editData.address,
         phone: editData.phone,
         contactName: editData.contactName,
+        type: editData.type,
         notes: editData.notes || '',
       })
     } else {
@@ -60,13 +64,14 @@ export default function ContactModal({ open, onClose, onSave, editData }: Contac
         address: '',
         phone: '',
         contactName: '',
+        type: 'CONTACT',
         notes: '',
       })
     }
     setErrors([])
   }, [editData, open])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
   }
@@ -148,6 +153,23 @@ export default function ContactModal({ open, onClose, onSave, editData }: Contac
               rows={3}
               className="w-full rounded-xl bg-white/20 border border-white/30 px-4 py-3 text-white placeholder:text-white/60 focus:outline-none focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/20 resize-none"
             />
+          </div>
+
+          <div>
+            <label className="text-sm text-white/80 font-medium block mb-2">
+              聯絡人類型 *
+            </label>
+            <select
+              name="type"
+              value={formData.type}
+              onChange={handleChange}
+              className="w-full rounded-xl bg-white/20 border border-white/30 px-4 py-3 text-white focus:outline-none focus:border-blue-400/50 focus:ring-2 focus:ring-blue-400/20"
+            >
+              <option value="CONTACT">一般聯絡人</option>
+              <option value="SUPPLIER">供應商</option>
+              <option value="CUSTOMER">客戶</option>
+              <option value="BUILDER">建商</option>
+            </select>
           </div>
 
           <div>

@@ -10,11 +10,21 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { getDeviceInfo, type DeviceInfo } from "@/lib/utils"
 
-interface PunchCardWidgetProps {
-  onWorkLogSaved?: () => void
+interface Holiday {
+  id: string
+  date: string
+  name: string
+  type: string
+  isHoliday: boolean
+  description?: string | null
 }
 
-export default function PunchCardWidget({ onWorkLogSaved }: PunchCardWidgetProps) {
+interface PunchCardWidgetProps {
+  onWorkLogSaved?: () => void
+  holidayInfo?: Holiday | null
+}
+
+export default function PunchCardWidget({ onWorkLogSaved, holidayInfo }: PunchCardWidgetProps) {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [clockedIn, setClockedIn] = useState(false)

@@ -27,6 +27,7 @@ interface WorkLog {
   editedAt?: string
   editedBy?: string
   editIpAddress?: string
+  isOvertime?: boolean
 }
 
 export default function JournalPage() {
@@ -74,9 +75,9 @@ export default function JournalPage() {
         
         if (response.ok) {
           const data = await response.json()
-          // 按日期和時間排序
+          // 按日期和時間排序 (最新的在前)
           const sortedLogs = data.sort((a: WorkLog, b: WorkLog) => {
-            return new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+            return new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
           })
           setWeeklyLogs(sortedLogs)
         }
@@ -136,6 +137,13 @@ export default function JournalPage() {
         grouped[date] = []
       }
       grouped[date].push(log)
+    })
+    
+    // 對每日的記錄按時間降序排序 (最新的在最下面)
+    Object.keys(grouped).forEach(date => {
+      grouped[date].sort((a, b) => 
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+      )
     })
     
     return grouped
@@ -320,9 +328,9 @@ export default function JournalPage() {
           
           if (response.ok) {
             const data = await response.json()
-            // 按日期和時間排序
+            // 按日期和時間排序 (最新的在前)
             const sortedLogs = data.sort((a: WorkLog, b: WorkLog) => {
-              return new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+              return new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
             })
             setWeeklyLogs(sortedLogs)
           }
@@ -543,9 +551,7 @@ export default function JournalPage() {
                     </div>
                   </div>
 
-
-
-                                {/* 工作紀錄內容區域 - 帶動畫效果 */}
+                  {/* 工作紀錄內容區域 - 帶動畫效果 */}
                   <div className={`transition-all duration-300 ease-in-out ${
                     isTransitioning 
                       ? 'opacity-0 transform translate-y-4' 
@@ -595,8 +601,15 @@ export default function JournalPage() {
                                       const startTime = format(parseISO(log.startTime), 'HH:mm')
                                       const duration = calculateDuration(log.startTime, log.endTime)
                                       
+                                      // 決定工作記錄的顏色和狀態
+                                      const isOngoing = !log.endTime
+                                      const isOvertime = log.isOvertime || false
+                                      
+                                      // 狀態顏色
+                                      const borderColor = isOngoing ? 'border-blue-500/50' : (isOvertime ? 'border-orange-500/50' : 'border-green-500/50')
+                                      
                                       return (
-                                        <Card key={log.id} className="bg-white/5 backdrop-blur border border-white/10 p-4">
+                                        <Card key={log.id} className={`bg-white/5 backdrop-blur border-l-4 ${borderColor} border-white/10 p-4`}>
                                           <div className="flex items-start justify-between">
                                             <div className="flex-1">
                                               <div className="flex items-center gap-3 mb-2">
@@ -609,6 +622,11 @@ export default function JournalPage() {
                                                 <span className="text-white/80 font-mono text-sm bg-white/10 px-2 py-1 rounded">
                                                   {startTime} ~ {log.endTime ? format(parseISO(log.endTime), 'HH:mm') : '進行中'}
                                                 </span>
+                                                {log.isOvertime && (
+                                                  <span className="text-orange-400 text-xs bg-orange-500/20 px-2 py-1 rounded-full">
+                                                    加班
+                                                  </span>
+                                                )}
                                                 {log.isEdited && (
                                                   <span className="text-orange-400 text-xs bg-orange-500/20 px-2 py-1 rounded-full">
                                                     已編輯

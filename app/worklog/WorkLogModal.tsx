@@ -32,9 +32,10 @@ interface WorkLogModalProps {
   initialMode?: 'start' | 'full' | 'end' | 'quick'
   editData?: WorkLog | null
   copyData?: WorkLog | null // 複製模式，只複製基本資訊，不複製時間
+  isOvertimeMode?: boolean // 是否為加班模式
 }
 
-export default function WorkLogModal({ onClose, onSave, onNext, showNext = false, initialMode = 'full', editData, copyData }: WorkLogModalProps) {
+export default function WorkLogModal({ onClose, onSave, onNext, showNext = false, initialMode = 'full', editData, copyData, isOvertimeMode = false }: WorkLogModalProps) {
   const { data: session } = useSession()
   const [useFullTimeMode, setUseFullTimeMode] = useState(false) // 完整時間模式切換
   
@@ -252,6 +253,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
             projectName: proj.projectName,
             category: formData.category,
             content: formData.content,
+            confirmConflicts: true
           }
         } else {
           const today = new Date().toISOString().split('T')[0]
@@ -275,6 +277,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
             startTime: fullStart,
             ...(fullEnd && { endTime: fullEnd }),
             ...(editData && { editReason: formData.editReason }),
+            confirmConflicts: true
           }
         }
 
@@ -486,13 +489,18 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
           url = `/api/worklog/${editData.id}`
         }
 
-        // 在打卡模式下添加相關參數
-        if (initialMode === 'start') {
+        // 在打卡模式下添加相關參數（但加班模式除外）
+        if (initialMode === 'start' && !isOvertimeMode) {
           payload.isClockMode = true
           // 只有在需要修改原因且有填寫時才傳遞
           if (timeModified && needsEditReason() && formData.editReason) {
             payload.clockEditReason = formData.editReason
           }
+        }
+
+        // 在加班模式下標記為加班記錄
+        if (isOvertimeMode) {
+          payload.isOvertime = true
         }
 
         if (process.env.NODE_ENV !== 'production') {
@@ -576,8 +584,16 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
           {/* 主要工作紀錄表單 */}
           <div className="relative bg-white/10 backdrop-blur-lg border border-white/20 ring-1 ring-white/10 rounded-3xl shadow-xl p-8 flex-1 max-w-2xl mx-auto animate-in zoom-in-95 slide-in-from-bottom-6 duration-500 delay-100">
             <h2 className="text-white text-xl font-bold mb-4">
-              {editData ? '編輯工作紀錄' : copyData ? '複製並新增工作紀錄' : '新增工作紀錄'}
+              {editData ? '編輯工作紀錄' : copyData ? '複製並新增工作紀錄' : isOvertimeMode ? '⏱ 新增加班紀錄' : '新增工作紀錄'}
             </h2>
+
+            {isOvertimeMode && (
+              <div className="mb-4 p-3 bg-orange-500/20 border border-orange-400/30 rounded-xl">
+                <div className="text-orange-100 text-sm text-center">
+                  🔥 加班模式：此記錄將標記為加班工作
+                </div>
+              </div>
+            )}
 
             {errors.length > 0 && (
               <div className="mb-4 p-3 rounded-xl bg-red-500/20 text-red-100 border border-red-400/30">

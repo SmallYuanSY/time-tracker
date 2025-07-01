@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
       content,
       isClockMode,
       clockEditReason,
+      isOvertime,
     } = body
 
     if (
@@ -195,6 +196,7 @@ export async function POST(req: NextRequest) {
           category,
           content,
           projectId: project.id, // 關聯到 Project 記錄
+          isOvertime: isOvertime || false, // 標記是否為加班記錄
         },
       })
 
@@ -262,37 +264,43 @@ export async function GET(req: NextRequest) {
     const dateStr = searchParams.get('date') // 格式應為 YYYY-MM-DD
     const fromStr = searchParams.get('from') // ISO 字串
     const toStr = searchParams.get('to') // ISO 字串
-    const ongoingOnly = searchParams.get('ongoingOnly') === 'true'
+    const ongoingOnly = searchParams.get('ongoing') === 'true'
+    const overtimeOnly = searchParams.get('overtime') === 'true'
 
     if (!userId) {
       return new NextResponse('缺少 userId', { status: 400 })
     }
 
-    let startDate: Date
-    let endDate: Date
-
-    // 支援兩種查詢模式：按日期 或 按時間範圍（使用台灣時間）
-    if (fromStr && toStr) {
-      // 使用 from/to 範圍查詢
-      startDate = parseTaiwanTime(fromStr)
-      endDate = parseTaiwanTime(toStr)
-    } else if (dateStr) {
-      // 使用日期查詢（向後兼容）
-      const targetDate = parseTaiwanTime(dateStr)
-      const { start, end } = getTaiwanDayRange(targetDate)
-      startDate = start
-      endDate = end
-    } else {
-      return new NextResponse('缺少 date 或 from/to 參數', { status: 400 })
-    }
-
     // 建立查詢條件
     const whereConditions: any = {
       userId,
-      startTime: {
+    }
+
+    // 如果不是只查詢進行中記錄，需要時間範圍
+    if (!ongoingOnly) {
+      let startDate: Date
+      let endDate: Date
+
+      // 支援兩種查詢模式：按日期 或 按時間範圍（使用台灣時間）
+      if (fromStr && toStr) {
+        // 使用 from/to 範圍查詢
+        startDate = parseTaiwanTime(fromStr)
+        endDate = parseTaiwanTime(toStr)
+      } else if (dateStr) {
+        // 使用日期查詢（向後兼容）
+        const targetDate = parseTaiwanTime(dateStr)
+        const { start, end } = getTaiwanDayRange(targetDate)
+        startDate = start
+        endDate = end
+      } else {
+        return new NextResponse('缺少 date 或 from/to 參數', { status: 400 })
+      }
+
+      // 添加時間範圍條件
+      whereConditions.startTime = {
         gte: startDate,
         lt: endDate,
-      },
+      }
     }
 
     // 如果只要進行中的記錄（沒有結束時間）
@@ -300,10 +308,15 @@ export async function GET(req: NextRequest) {
       whereConditions.endTime = null
     }
 
+    // 如果只要加班記錄
+    if (overtimeOnly) {
+      whereConditions.isOvertime = true
+    }
+
     const results = await prisma.workLog.findMany({
       where: whereConditions,
       orderBy: {
-        startTime: 'asc',
+        startTime: 'desc',
       },
     })
 

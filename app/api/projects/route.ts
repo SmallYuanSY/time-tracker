@@ -3,205 +3,24 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
-// 獲取用戶的案件列表
+// 獲取專案列表
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
-    const projectCode = searchParams.get('projectCode')
-    const includeContacts = searchParams.get('includeContacts') === 'true'
-    const sortBy = searchParams.get('sortBy') || 'code' // code, lastUsed
-    const search = searchParams.get('search') || ''
-
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
-    // 如果是案件管理頁面（不需要 userId）
-    if (!userId && includeContacts) {
-      // 取得所有已使用的案件及其聯絡人資訊和最後使用時間
-      const distinctProjects = await prisma.workLog.groupBy({
-        by: ['projectCode'],
-        _max: {
-          endTime: true,
-          startTime: true,
-        },
-        _count: {
-          id: true,
-        },
-        where: search ? {
-          OR: [
-            { projectCode: { contains: search } },
-            { projectName: { contains: search } },
-            { category: { contains: search } },
-          ]
-        } : undefined,
-      })
-
-      // 對每個案件查找關聯的 Project 記錄和聯絡人，以及更準確的最後使用時間
-      const projectsWithContacts = await Promise.all(
-        distinctProjects.map(async (project) => {
-          const projectRecord = await prisma.project.findUnique({
-            where: { code: project.projectCode },
-            include: {
-              Contact: true,
-            },
-          })
-
-          // 獲取該案件的最後一筆工作記錄的時間和基本資訊（更準確的方法）
-          const lastWorkLog = await prisma.workLog.findFirst({
-            where: {
-              projectCode: project.projectCode,
-            },
-            orderBy: [
-              { endTime: 'desc' },
-              { startTime: 'desc' },
-            ],
-            select: {
-              endTime: true,
-              startTime: true,
-              projectName: true,
-              category: true,
-              user: {
-                select: {
-                  name: true,
-                  email: true,
-                }
-              }
-            },
-          })
-
-          // 計算最後使用時間（endTime 優先，如果沒有則用 startTime）
-          const lastUsedTime = lastWorkLog ? (lastWorkLog.endTime || lastWorkLog.startTime) : null
-          const lastUsedBy = lastWorkLog ? lastWorkLog.user : null
-
-          // 使用最後一筆工作記錄的項目名稱和分類，如果沒有則從 Project 記錄取得
-          const projectName = projectRecord?.name || lastWorkLog?.projectName || project.projectCode
-          const category = projectRecord?.category || lastWorkLog?.category || ''
-
-          return {
-            projectCode: project.projectCode,
-            projectName,
-            category,
-            contact: projectRecord?.Contact || null,
-            lastUsedTime,
-            lastUsedBy,
-            totalWorkLogs: project._count.id,
-          }
-        })
-      )
-
-      // 根據排序方式排序
-      let sortedProjects = projectsWithContacts
-      if (sortBy === 'code') {
-        sortedProjects = projectsWithContacts.sort((a, b) => 
-          a.projectCode.localeCompare(b.projectCode)
-        )
-      } else if (sortBy === 'lastUsed') {
-        sortedProjects = projectsWithContacts.sort((a, b) => {
-          if (!a.lastUsedTime && !b.lastUsedTime) return 0
-          if (!a.lastUsedTime) return 1
-          if (!b.lastUsedTime) return -1
-          return new Date(b.lastUsedTime).getTime() - new Date(a.lastUsedTime).getTime()
-        })
-      }
-
-      return NextResponse.json(sortedProjects)
-    }
-
-    if (!userId) {
-      return new NextResponse('缺少 userId', { status: 400 })
-    }
-
-    // 如果提供了案件編號，搜尋特定案件
-    if (projectCode) {
-      // 先從 Project 表查找
-      const project = await prisma.project.findUnique({
-        where: { code: projectCode },
-        select: {
-          code: true,
-          name: true,
-          category: true,
-          status: true,
-        },
-      })
-
-      if (project) {
-        return NextResponse.json({
-          projectCode: project.code,
-          projectName: project.name,
-          category: project.category,
-          status: project.status,
-        })
-      }
-
-      // 如果 Project 表沒有，回退到 workLog 表（兼容舊資料）
-      const workLogProject = await prisma.workLog.findFirst({
-        where: {
-          userId,
-          projectCode,
-        },
-        select: {
-          projectCode: true,
-          projectName: true,
-          category: true,
-        },
-      })
-
-      return NextResponse.json(workLogProject)
-    }
-
-    // 獲取用戶所有的案件列表
-    // 先從 Project 表取得所有專案
     const projects = await prisma.project.findMany({
-      where: {
-        OR: [
-          { managerId: userId },
-          { workLogs: { some: { userId } } }
-        ]
+      include: {
+        Contact: true,
       },
-      select: {
-        code: true,
-        name: true,
-        category: true,
-        status: true,
+      orderBy: {
+        code: 'asc',
       },
-      orderBy: { code: 'asc' },
     })
 
-    // 轉換格式以兼容前端
-    const formattedProjects = projects.map(p => ({
-      projectCode: p.code,
-      projectName: p.name,
-      category: p.category,
-      status: p.status,
-    }))
-
-    // 如果 Project 表沒有資料，回退到 workLog 表
-    if (formattedProjects.length === 0) {
-      const workLogs = await prisma.workLog.findMany({
-        where: { userId },
-        select: {
-          projectCode: true,
-          projectName: true,
-          category: true,
-        },
-        distinct: ['projectCode'],
-        orderBy: { projectCode: 'asc' },
-      })
-
-      const projectsMap = new Map()
-      workLogs.forEach(log => {
-        if (!projectsMap.has(log.projectCode)) {
-          projectsMap.set(log.projectCode, log)
-        }
-      })
-      
-      return NextResponse.json(Array.from(projectsMap.values()))
-    }
-
-    return NextResponse.json(formattedProjects)
+    return NextResponse.json(projects)
   } catch (error) {
     console.error('[GET /api/projects]', error)
     return new NextResponse('伺服器內部錯誤', { status: 500 })
@@ -211,44 +30,42 @@ export async function GET(req: NextRequest) {
 // 創建新案件
 export async function POST(req: NextRequest) {
   try {
-    const { userId, projectCode, projectName, category, description } = await req.json()
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 })
+    }
 
-    if (!userId || !projectCode || !projectName) {
+    const { code, name, category, description } = await req.json()
+
+    if (!code || !name) {
       return new NextResponse('缺少必要欄位', { status: 400 })
     }
 
     // 檢查案件是否已存在
     const existingProject = await prisma.project.findUnique({
-      where: { code: projectCode },
+      where: { code },
     })
 
     if (existingProject) {
-      return NextResponse.json({
-        projectCode: existingProject.code,
-        projectName: existingProject.name,
-        category: existingProject.category,
-        status: existingProject.status,
-      })
+      return new NextResponse('案件代號已存在', { status: 400 })
     }
 
     // 創建新專案
     const newProject = await prisma.project.create({
       data: {
-        code: projectCode,
-        name: projectName,
+        code,
+        name,
         category: category || '',
         description: description || '',
-        managerId: userId,
+        managerId: session.user.id,
+        status: 'ACTIVE',
+      },
+      include: {
+        Contact: true,
       },
     })
 
-    return NextResponse.json({
-      projectCode: newProject.code,
-      projectName: newProject.name,
-      category: newProject.category,
-      status: newProject.status,
-      isNew: true,
-    })
+    return NextResponse.json(newProject)
   } catch (error) {
     console.error('[POST /api/projects]', error)
     return new NextResponse('伺服器內部錯誤', { status: 500 })

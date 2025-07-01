@@ -18,20 +18,86 @@ export async function POST(req: NextRequest) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
+    // 檢查是否已有進行中的加班
+    const ongoingOvertime = await prisma.overtime.findFirst({
+      where: {
+        userId,
+        endTime: null,
+      },
+      orderBy: { startTime: 'desc' },
+    })
+
+    if (ongoingOvertime) {
+      return new NextResponse('已有進行中的加班記錄', { status: 400 })
+    }
+
+    // 檢查是否已有進行中的加班工作記錄
+    const ongoingWork = await prisma.workLog.findFirst({
+      where: {
+        userId,
+        endTime: null,
+        projectCode: 'OT',
+      },
+      orderBy: { startTime: 'desc' },
+    })
+
+    if (ongoingWork) {
+      return new NextResponse('已有進行中的加班工作記錄', { status: 400 })
+    }
+
     const ipAddress = getClientIP(req)
     const userAgent = req.headers.get('user-agent') || ''
+    const startTime = nowInTaiwan()
 
-    const result = await prisma.overtime.create({
-      data: {
-        userId,
-        startTime: nowInTaiwan(),
-        reason: reason || '加班',
-        status: 'PENDING',
-        startIpAddress: ipAddress,
-        startMacAddress: deviceInfo?.macAddress || null,
-        startUserAgent: userAgent,
-        startDeviceInfo: deviceInfo ? JSON.stringify(deviceInfo) : null,
-      },
+    // 確保OT專案存在
+    let otProject = await prisma.project.findUnique({
+      where: { code: 'OT' }
+    })
+
+    if (!otProject) {
+      // 創建OT專案
+      otProject = await prisma.project.create({
+        data: {
+          code: 'OT',
+          name: '加班',
+          description: '加班時間記錄',
+          category: '管理',
+          managerId: userId, // 暫時設為當前用戶，實際上應該是管理員
+          status: 'ACTIVE'
+        }
+      })
+    }
+
+    // 使用事務同時創建Overtime記錄和workLog記錄
+    const result = await prisma.$transaction(async (tx) => {
+      // 創建加班記錄
+      const overtimeRecord = await tx.overtime.create({
+        data: {
+          userId,
+          startTime,
+          reason: reason || '加班',
+          status: 'PENDING',
+          startIpAddress: ipAddress,
+          startMacAddress: deviceInfo?.macAddress || null,
+          startUserAgent: userAgent,
+          startDeviceInfo: deviceInfo ? JSON.stringify(deviceInfo) : null,
+        },
+      })
+
+      // 創建工作記錄
+      const workLogRecord = await tx.workLog.create({
+        data: {
+          userId,
+          projectId: otProject.id,
+          projectCode: 'OT',
+          projectName: '加班',
+          category: '管理',
+          content: reason || '加班',
+          startTime,
+        },
+      })
+
+      return { overtimeRecord, workLogRecord }
     })
 
     return NextResponse.json(result)
