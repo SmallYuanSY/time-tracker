@@ -208,6 +208,40 @@ export default function HolidaysPage() {
           </div>
           
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  setLoading(true)
+                  const response = await fetch('/api/admin/holidays/import-tw', {
+                    method: 'POST'
+                  })
+                  if (response.ok) {
+                    const data = await response.json()
+                    toast({
+                      title: "成功",
+                      description: `已匯入 ${data.count} 筆台灣假日資料`
+                    })
+                    loadHolidays(currentDate)
+                  } else {
+                    throw new Error('匯入失敗')
+                  }
+                } catch (error) {
+                  console.error('匯入台灣假日失敗:', error)
+                  toast({
+                    title: "錯誤",
+                    description: "匯入台灣假日失敗",
+                    variant: "destructive"
+                  })
+                } finally {
+                  setLoading(false)
+                }
+              }}
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              匯入台灣假日
+            </Button>
             <Button variant="outline" size="icon" onClick={handlePrevMonth}>
               <ChevronLeft className="h-4 w-4" />
             </Button>

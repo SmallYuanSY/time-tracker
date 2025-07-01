@@ -19,6 +19,10 @@ export async function GET(
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
+    if (!params?.date) {
+      return new NextResponse('Date is required', { status: 400 })
+    }
+
     // 查詢指定日期的假日資訊
     const holiday = await prisma.holiday.findUnique({
       where: {
@@ -33,6 +37,6 @@ export async function GET(
     return NextResponse.json(holiday)
   } catch (error) {
     console.error('Error fetching holiday:', error)
-    return new NextResponse('Internal Server Error', { status: 500 })
+    return new NextResponse('Internal Error', { status: 500 })
   }
 } 

@@ -11,13 +11,17 @@ type RouteParams = {
 
 export async function GET(
   request: NextRequest,
-  { params }: RouteParams
+  context: RouteParams
 ) {
   try {
     const session = await getServerSession(authOptions)
-
     if (!session?.user) {
       return new NextResponse('Unauthorized', { status: 401 })
+    }
+
+    const { params } = context
+    if (!params?.code) {
+      return new NextResponse('Project code is required', { status: 400 })
     }
 
     const project = await prisma.project.findUnique({
@@ -26,8 +30,6 @@ export async function GET(
       },
       include: {
         Contact: true,
-        manager: true,
-        users: true,
       },
     })
 
@@ -38,6 +40,6 @@ export async function GET(
     return NextResponse.json(project)
   } catch (error) {
     console.error('Error fetching project:', error)
-    return new NextResponse('Internal Server Error', { status: 500 })
+    return new NextResponse('Internal Error', { status: 500 })
   }
 } 
