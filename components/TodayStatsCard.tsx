@@ -63,14 +63,47 @@ export default function TodayStatsCard() {
       if (log.endTime) {
         const start = parseISO(log.startTime)
         const end = parseISO(log.endTime)
-        const duration = differenceInMinutes(end, start)
+        let duration = differenceInMinutes(end, start)
+
+        // 扣除午休時間 (12:30-13:30)
+        const lunchStart = new Date(start)
+        lunchStart.setHours(12, 30, 0, 0)
+        const lunchEnd = new Date(start)
+        lunchEnd.setHours(13, 30, 0, 0)
+
+        // 檢查工作時間是否與午休時間重疊
+        if (start < lunchEnd && end > lunchStart) {
+          // 計算重疊時間
+          const overlapStart = new Date(Math.max(start.getTime(), lunchStart.getTime()))
+          const overlapEnd = new Date(Math.min(end.getTime(), lunchEnd.getTime()))
+          const overlapMinutes = differenceInMinutes(overlapEnd, overlapStart)
+          
+          // 扣除重疊的午休時間
+          duration = Math.max(0, duration - overlapMinutes)
+        }
+
         totalMinutes += duration
 
-        // 計算加班時間（18:00 之後或 6:00 之前）
+        // 計算加班時間（18:00 之後或 6:00 之前）- 也要扣除午休時間
         const startHour = start.getHours()
         const endHour = end.getHours()
         if (startHour >= 18 || startHour < 6 || endHour >= 18 || endHour < 6) {
-          overtimeMinutes += duration
+          let overtimeDuration = differenceInMinutes(end, start)
+          
+          // 加班時間也要扣除午休時間
+          if (start < lunchEnd && end > lunchStart) {
+            const overlapStart = new Date(Math.max(start.getTime(), lunchStart.getTime()))
+            const overlapEnd = new Date(Math.min(end.getTime(), lunchEnd.getTime()))
+            const overlapMinutes = differenceInMinutes(overlapEnd, overlapStart)
+            overtimeDuration = Math.max(0, overtimeDuration - overlapMinutes)
+          }
+          
+          // 加班時數計算：以30分鐘為單位計算
+          if (overtimeDuration >= 30) {
+            // 以30分鐘為單位，向下取整到最接近的30分鐘倍數
+            const overtimeHalfHours = Math.floor(overtimeDuration / 30)
+            overtimeMinutes += overtimeHalfHours * 30
+          }
         }
       }
     })
@@ -78,7 +111,8 @@ export default function TodayStatsCard() {
     return {
       totalHours: Math.round((totalMinutes / 60) * 10) / 10,
       completedTasks,
-      overtimeHours: Math.round((overtimeMinutes / 60) * 10) / 10
+      // 加班時數：已經按半小時單位計算，直接轉換
+      overtimeHours: Math.round((overtimeMinutes / 60) * 2) / 2
     }
   }
 

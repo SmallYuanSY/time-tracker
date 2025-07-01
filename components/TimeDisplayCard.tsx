@@ -60,8 +60,8 @@ export default function TimeDisplayCard() {
         {/* 裝飾性小點 */}
         <div className="flex gap-2 mt-4">
           <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-          <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse delay-100"></div>
-          <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse delay-200"></div>
+          <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse "></div>
+          <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse "></div>
         </div>
       </CardContent>
     </Card>

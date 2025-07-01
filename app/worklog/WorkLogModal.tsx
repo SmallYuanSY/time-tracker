@@ -38,8 +38,31 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
   const { data: session } = useSession()
   const [useFullTimeMode, setUseFullTimeMode] = useState(false) // 完整時間模式切換
   
-  // 記錄原始時間（用於檢測是否修改時間）
-  const originalStartTime = initialMode === 'start' ? new Date().toTimeString().slice(0, 5) : '09:00'
+  // 記錄原始時間（用於檢測是否修改時間）- 固定在組件初始化時
+  const [originalStartTime] = useState(() => 
+    initialMode === 'start' ? new Date().toTimeString().slice(0, 5) : '09:00'
+  )
+
+  // 計算時間差（分鐘）
+  const calculateTimeDifferenceInMinutes = (originalTime: string, modifiedTime: string): number => {
+    const [originalHour, originalMinute] = originalTime.split(':').map(Number)
+    const [modifiedHour, modifiedMinute] = modifiedTime.split(':').map(Number)
+    
+    const originalTotalMinutes = originalHour * 60 + originalMinute
+    const modifiedTotalMinutes = modifiedHour * 60 + modifiedMinute
+    
+    return Math.abs(modifiedTotalMinutes - originalTotalMinutes)
+  }
+
+  // 檢查是否需要填寫修改原因（超過5分鐘才需要）
+  const needsEditReason = () => {
+    if (initialMode !== 'start' || formData.startTime === originalStartTime) {
+      return false
+    }
+    
+    const timeDiff = calculateTimeDifferenceInMinutes(originalStartTime, formData.startTime)
+    return timeDiff > 5 // 超過5分鐘才需要原因
+  }
   
   const [formData, setFormData] = useState({
     projectCode: editData?.projectCode || '',
@@ -374,8 +397,9 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
     const isClockMode = initialMode === 'start'
     if (isClockMode && formData.startTime !== originalStartTime) {
       setTimeModified(true)
-      if (!formData.editReason.trim()) {
-        newErrors.push('修改打卡時間需要填寫修改原因')
+      // 只有超過5分鐘的修改才需要填寫原因
+      if (needsEditReason() && !formData.editReason.trim()) {
+        newErrors.push('修改打卡時間超過5分鐘需要填寫修改原因')
       }
     } else if (isClockMode) {
       setTimeModified(false)
@@ -465,7 +489,8 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
         // 在打卡模式下添加相關參數
         if (initialMode === 'start') {
           payload.isClockMode = true
-          if (timeModified && formData.editReason) {
+          // 只有在需要修改原因且有填寫時才傳遞
+          if (timeModified && needsEditReason() && formData.editReason) {
             payload.clockEditReason = formData.editReason
           }
         }
@@ -525,8 +550,8 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
         })
         onNext()
       } else if (onSave) {
-        // 如果是打卡模式且修改了時間，傳遞修改原因
-        const clockEditReason = (initialMode === 'start' && timeModified) ? formData.editReason : undefined
+        // 如果是打卡模式且修改了時間超過5分鐘，傳遞修改原因
+        const clockEditReason = (initialMode === 'start' && timeModified && needsEditReason()) ? formData.editReason : undefined
         onSave(clockEditReason)
       } else {
         onClose()
@@ -543,13 +568,13 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
 
   return (
     <Portal>
-      <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40 backdrop-blur-sm p-4">
-        <div className="flex items-start gap-4 w-full max-w-6xl">
+      <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40 backdrop-blur-sm p-4 animate-in fade-in-0 duration-300">
+        <div className="flex items-start gap-4 w-full max-w-6xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
           {/* 左側空白區域（保持平衡） */}
           <div className="w-64 flex-shrink-0"></div>
           
           {/* 主要工作紀錄表單 */}
-          <div className="relative bg-white/10 backdrop-blur-lg border border-white/20 ring-1 ring-white/10 rounded-3xl shadow-xl p-8 flex-1 max-w-2xl mx-auto">
+          <div className="relative bg-white/10 backdrop-blur-lg border border-white/20 ring-1 ring-white/10 rounded-3xl shadow-xl p-8 flex-1 max-w-2xl mx-auto animate-in zoom-in-95 slide-in-from-bottom-6 duration-500 delay-100">
             <h2 className="text-white text-xl font-bold mb-4">
               {editData ? '編輯工作紀錄' : copyData ? '複製並新增工作紀錄' : '新增工作紀錄'}
             </h2>
@@ -700,33 +725,47 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
             
             {/* 快速記錄模式的時間切換撥桿 */}
             {(initialMode === 'quick' || copyData) && (
-              <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
-                <span className="text-white/80 text-sm">完整時間模式</span>
-                <label className="relative inline-flex items-center cursor-pointer">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300 group">
+                <span className={`text-sm transition-all duration-300 ${useFullTimeMode ? 'text-blue-300 font-medium' : 'text-white/80'} group-hover:text-white`}>
+                  完整時間模式
+                </span>
+                <label className="relative inline-flex items-center cursor-pointer group-hover:scale-105 transition-transform duration-200">
                   <input
                     type="checkbox"
                     checked={useFullTimeMode}
                     onChange={(e) => setUseFullTimeMode(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-white/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  <div className={`w-11 h-6 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-400/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all after:duration-300 after:shadow-sm peer-checked:after:shadow-md transition-all duration-300 ${useFullTimeMode ? 'bg-blue-600 shadow-md shadow-blue-500/30' : 'bg-white/20 hover:bg-white/30'}`}></div>
                 </label>
               </div>
             )}
 
-            {(initialMode === 'quick' || copyData) && !useFullTimeMode ? (
-              <div className="text-white/60 text-sm">開始與結束時間將自動填入</div>
-            ) : (
-              <div className="grid grid-cols-2 gap-4">
-                <SimpleTimePicker label="開始時間" value={formData.startTime} onChange={(time: string) => setFormData({ ...formData, startTime: time })} />
-                {(initialMode === 'full' || initialMode === 'end' || editData || ((initialMode === 'quick' || copyData) && useFullTimeMode)) && (
-                  <SimpleTimePicker label="結束時間" value={formData.endTime} onChange={(time: string) => setFormData({ ...formData, endTime: time })} />
-                )}
-              </div>
-            )}
+            <div className="relative overflow-hidden">
+              {(initialMode === 'quick' || copyData) && !useFullTimeMode ? (
+                <div 
+                  key="auto-fill-message"
+                  className="text-white/60 text-sm animate-in fade-in-0 slide-in-from-top-2 duration-300"
+                >
+                  開始與結束時間將自動填入
+                </div>
+              ) : (
+                <div 
+                  key="time-pickers"
+                  className="grid grid-cols-2 gap-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
+                >
+                  <SimpleTimePicker label="開始時間" value={formData.startTime} onChange={(time: string) => setFormData({ ...formData, startTime: time })} />
+                  {(initialMode === 'full' || initialMode === 'end' || editData || ((initialMode === 'quick' || copyData) && useFullTimeMode)) && (
+                    <div className="animate-in fade-in-0 slide-in-from-right-2 duration-500 delay-150">
+                      <SimpleTimePicker label="結束時間" value={formData.endTime} onChange={(time: string) => setFormData({ ...formData, endTime: time })} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             
-            {/* 打卡時間修改原因（僅在打卡模式且修改時間時顯示） */}
-            {initialMode === 'start' && formData.startTime !== originalStartTime && (
+            {/* 打卡時間修改原因（僅在打卡模式且修改時間超過5分鐘時顯示） */}
+            {needsEditReason() && (
               <div className="space-y-2">
                 <label className="text-sm text-white font-medium block">
                   時間修改原因 <span className="text-red-400">*</span>
@@ -740,8 +779,17 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
                   className="w-full rounded-xl bg-yellow-500/20 border border-yellow-400/50 px-4 py-2 text-white placeholder:text-yellow-200/60 focus:outline-none focus:border-yellow-400" 
                 />
                 <p className="text-xs text-yellow-200/80">
-                  ⚠️ 修改原因將同時記錄到打卡記錄和工作記錄中，供管理員審核使用
+                  ⚠️ 修改時間超過5分鐘需要說明原因，將記錄到打卡記錄中供管理員審核
                 </p>
+              </div>
+            )}
+
+            {/* 時間修改提示（5分鐘內的小幅修改） */}
+            {initialMode === 'start' && formData.startTime !== originalStartTime && !needsEditReason() && (
+              <div className="bg-green-500/20 border border-green-400/30 rounded-xl p-3 text-green-100 text-sm">
+                <div className="flex items-center gap-2">
+                  <span>✅ 時間修改在5分鐘內，無需填寫原因</span>
+                </div>
               </div>
             )}
             </div>
@@ -756,7 +804,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
                   <button 
                     onClick={() => handleSubmit(true)}
                     disabled={isSubmitting}
-                    className="px-4 py-2 text-sm rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-semibold shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 text-sm rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-semibold shadow-md hover:scale-105 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                   >
                     {isSubmitting ? '處理中...' : '儲存並新增'}
                   </button>
@@ -775,7 +823,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
           </div>
 
           {/* 其他工作側邊欄 */}
-          <div className="relative bg-white/10 backdrop-blur-lg border border-white/20 ring-1 ring-white/10 rounded-3xl shadow-xl p-6 w-64 flex-shrink-0">
+          <div className="relative bg-white/10 backdrop-blur-lg border border-white/20 ring-1 ring-white/10 rounded-3xl shadow-xl p-6 w-64 flex-shrink-0 animate-in zoom-in-95 slide-in-from-right-4 duration-500 delay-200">
             <div className="text-white font-bold text-lg mb-4 text-center">其他工作</div>
             <div className="space-y-3">
               {extraTasks.map(task => (

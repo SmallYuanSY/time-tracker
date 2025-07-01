@@ -132,7 +132,6 @@ export async function DELETE(
       return new NextResponse('打卡記錄不存在', { status: 404 })
     }
 
-    // TODO: 可以考慮軟刪除而不是硬刪除，記錄刪除原因
     await prisma.clock.delete({
       where: { id },
     })
