@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import DashboardLayout from '@/components/layouts/DashboardLayout'
 import ContactModal from '@/components/ui/ContactModal'
@@ -40,7 +40,27 @@ export default function ProjectsPage() {
   const [migrating, setMigrating] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [searchInput, setSearchInput] = useState('')
-  const [sortBy, setSortBy] = useState<'code' | 'lastUsed'>('code')
+  const [sortBy, setSortBy] = useState<'lastUsed' | 'name'>('lastUsed')
+
+  const loadProjects = useCallback(async () => {
+    if (!session?.user) return
+    
+    try {
+      setLoading(true)
+      const response = await fetch(`/api/projects?search=${searchTerm}&sort=${sortBy}`)
+      if (!response.ok) throw new Error('Failed to fetch projects')
+      const data = await response.json()
+      setProjects(data)
+    } catch (error) {
+      console.error('Error loading projects:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [session, searchTerm, sortBy])
+
+  useEffect(() => {
+    loadProjects()
+  }, [loadProjects])
 
   // 防抖搜尋
   useEffect(() => {
@@ -50,37 +70,6 @@ export default function ProjectsPage() {
 
     return () => clearTimeout(timer)
   }, [searchInput])
-
-  useEffect(() => {
-    if (session?.user) {
-      loadProjects()
-    }
-  }, [session, searchTerm, sortBy])
-
-  const loadProjects = async () => {
-    try {
-      setLoading(true)
-      
-      // 載入所有已使用的案件
-      const params = new URLSearchParams({
-        includeContacts: 'true',
-        sortBy,
-        ...(searchTerm && { search: searchTerm })
-      })
-      
-      const projectsResponse = await fetch(`/api/projects?${params}`)
-      if (projectsResponse.ok) {
-        const projectsData = await projectsResponse.json()
-        setProjects(projectsData)
-      } else {
-        console.error('Failed to fetch projects:', await projectsResponse.text())
-      }
-    } catch (error) {
-      console.error('Error fetching projects:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const formatLastUsedTime = (lastUsedTime: string | null) => {
     if (!lastUsedTime) return '未使用'
@@ -263,11 +252,11 @@ export default function ProjectsPage() {
               {/* 排序選項 */}
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'code' | 'lastUsed')}
+                onChange={(e) => setSortBy(e.target.value as 'lastUsed' | 'name')}
                 className="px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent"
               >
-                <option value="code" className="bg-gray-800">依編號排序</option>
                 <option value="lastUsed" className="bg-gray-800">依使用時間排序</option>
+                <option value="name" className="bg-gray-800">依名稱排序</option>
               </select>
             </div>
           </div>
