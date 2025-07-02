@@ -20,6 +20,8 @@ import {
   BookOpen,
   Calendar,
 } from "lucide-react"
+import { useEffect, useState } from 'react'
+import { notificationService } from '@/lib/notification'
 
 const sidebarItems = [
   { name: "總覽", icon: <LayoutDashboard className="w-4 h-4 mr-2" />, href: "/" },
@@ -27,7 +29,7 @@ const sidebarItems = [
   { name: "案件管理", icon: <Briefcase className="w-4 h-4 mr-2" />, href: "/projects" },
   { name: "聯絡人", icon: <Users className="w-4 h-4 mr-2" />, href: "/contacts" },
   { name: "請假", icon: <FileClock className="w-4 h-4 mr-2" />, href: "/leave" },
-  { name: "設定", icon: <Settings className="w-4 h-4 mr-2" />, href: "#" },
+  { name: "設定", icon: <Settings className="w-4 h-4 mr-2" />, href: "/settings" },
 ]
 
 const adminItems = [
@@ -42,6 +44,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter()
   const pathname = usePathname()
   const [userRole, setUserRole] = React.useState<string | null>(null)
+  const [hasNotified, setHasNotified] = useState(false)
+  const [hasCheckedClockIn, setHasCheckedClockIn] = useState(false)
 
   // 獲取用戶角色
   React.useEffect(() => {
@@ -61,6 +65,102 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       fetchUserRole()
     }
   }, [session?.user?.email])
+
+  // 檢查今日打卡狀態
+  useEffect(() => {
+    if (!session?.user || hasCheckedClockIn) return
+
+    const checkClockInStatus = async () => {
+      try {
+        // 獲取今天的打卡記錄
+        const today = new Date().toISOString().split('T')[0]
+        const response = await fetch(`/api/clock/history?date=${today}`)
+        const data = await response.json()
+
+        // 檢查是否有今天的上班打卡記錄
+        const hasClockIn = data.some((record: any) => 
+          record.type === 'IN' && 
+          new Date(record.timestamp).toISOString().split('T')[0] === today
+        )
+
+        // 如果沒有打卡記錄，且現在是工作時間（週一到週五 9:00-17:30）
+        const now = new Date()
+        const isWorkday = now.getDay() >= 1 && now.getDay() <= 5
+        const isWorktime = now.getHours() >= 9 && (now.getHours() < 17 || (now.getHours() === 17 && now.getMinutes() <= 30))
+
+        if (!hasClockIn && isWorkday && isWorktime) {
+          await notificationService.sendPushNotification(
+            '上班打卡提醒',
+            {
+              body: '您今天還沒有打卡，請記得打卡！',
+              tag: 'clock-in-reminder',
+              data: {
+                url: '/clock' // 點擊通知時跳轉到打卡頁面
+              }
+            }
+          )
+        }
+
+        setHasCheckedClockIn(true)
+      } catch (error) {
+        console.error('檢查打卡狀態失敗:', error)
+      }
+    }
+
+    // 檢查打卡狀態
+    checkClockInStatus()
+
+    // 如果是工作時間，每 30 分鐘檢查一次
+    const interval = setInterval(() => {
+      const now = new Date()
+      const isWorkday = now.getDay() >= 1 && now.getDay() <= 5
+      const isWorktime = now.getHours() >= 9 && (now.getHours() < 17 || (now.getHours() === 17 && now.getMinutes() <= 30))
+
+      if (isWorkday && isWorktime) {
+        setHasCheckedClockIn(false) // 重置檢查狀態
+        checkClockInStatus()
+      }
+    }, 30 * 60 * 1000) // 30 分鐘
+
+    return () => clearInterval(interval)
+  }, [session, hasCheckedClockIn])
+
+  // 監控工作時長
+  useEffect(() => {
+    if (!session?.user) return
+
+    const checkWorkTime = async () => {
+      try {
+        const response = await fetch('/api/work-time-stats')
+        const data = await response.json()
+
+        if (data.success && !hasNotified) {
+          const todayStats = data.data.dailyStats.find((day: any) => 
+            day.date === new Date().toISOString().split('T')[0]
+          )
+
+          if (todayStats && todayStats.totalWorkHours >= 8) {
+            await notificationService.sendPushNotification(
+              '工作時間提醒',
+              {
+                body: '您今天的工作時間已達到 8 小時（已扣除午休時間）',
+                tag: 'work-time-notification'
+              }
+            )
+            setHasNotified(true)
+          }
+        }
+      } catch (error) {
+        console.error('檢查工作時間失敗:', error)
+      }
+    }
+
+    // 每 5 分鐘檢查一次
+    const interval = setInterval(checkWorkTime, 5 * 60 * 1000)
+    checkWorkTime() // 初始檢查
+
+    return () => clearInterval(interval)
+  }, [session, hasNotified])
 
   const handleLogout = async () => {
     await signOut({ 

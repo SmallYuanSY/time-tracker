@@ -32,12 +32,20 @@ interface ScheduledWork {
   updatedAt: string
 }
 
+interface Setting {
+  id: string
+  key: string
+  value: string
+  updatedAt: string
+}
+
 export default function HomePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [summaryKey, setSummaryKey] = useState(0);
   const [punchWidgetKey, setPunchWidgetKey] = useState(0); // 用於觸發 SmartPunchWidget 刷新
   const [activeTab, setActiveTab] = useState<'today' | 'scheduled'>('today');
+  const [useClassicLayout, setUseClassicLayout] = useState(false);
   
   // 預定工作相關狀態
   const [showScheduledWorkModal, setShowScheduledWorkModal] = useState(false);
@@ -111,6 +119,26 @@ export default function HomePage() {
     handleWorkLogModalClose();
   };
 
+  // 載入使用者設定
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const response = await fetch('/api/users/settings');
+        if (response.ok) {
+          const settings: Setting[] = await response.json();
+          const layoutSetting = settings.find(s => s.key === 'USE_CLASSIC_LAYOUT');
+          setUseClassicLayout(layoutSetting?.value === 'true');
+        }
+      } catch (error) {
+        console.error('載入設定失敗:', error);
+      }
+    };
+
+    if (status === 'authenticated') {
+      loadSettings();
+    }
+  }, [status]);
+
   // 身份驗證檢查
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -161,45 +189,10 @@ export default function HomePage() {
     );
   }
 
-  return (
-    <DashboardLayout>
-      {/* 通知中心 - 使用 Portal 渲染到最頂層 */}
-      <Portal>
-        <div className="fixed top-20 right-4 lg:top-6 lg:right-6 z-[9998]">
-          <NovuInbox />
-        </div>
-      </Portal>
-
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-purple-900 space-y-6 p-6">
-        {/* 頂部功能區域 - 分成多個卡片 */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 時間和日期卡片 */}
-          <div className="lg:col-span-1">
-            <TimeDisplayCard />
-          </div>
-          
-          {/* 智能打卡系統卡片 */}
-          <div className="lg:col-span-1">
-            <SmartPunchWidget 
-              key={punchWidgetKey} // 使用 key 來觸發重新渲染
-              onWorkLogSaved={() => setSummaryKey(k => k + 1)} 
-              onOpenWorkLogModal={(isOvertime) => {
-                if (isOvertime) {
-                  setWorkLogFromScheduled(null); // 清空預定工作數據
-                  setIsOvertimeMode(true);
-                  setShowWorkLogModal(true);
-                }
-              }}
-            />
-          </div>
-          
-          {/* 今日統計卡片 */}
-          <div className="lg:col-span-1">
-            <TodayStatsCard />
-          </div>
-        </div>
-
-        {/* 工作內容切換區域 */}
+  // 渲染工作內容區域
+  const renderWorkContent = () => {
+    if (useClassicLayout) {
+      return (
         <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl overflow-hidden">
           {/* 切換標籤 */}
           <div className="relative flex bg-white/5 p-1 rounded-t-2xl">
@@ -358,6 +351,156 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+      );
+    } else {
+      return (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* 今日工作區域 */}
+          <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl overflow-hidden">
+            <div className="bg-white/5 p-4 flex items-center gap-2">
+              <Clock className="h-5 w-5 text-white" />
+              <h2 className="text-lg font-semibold text-white">今日工作</h2>
+            </div>
+            <div className="p-6">
+              <TodayWorkSummary 
+                key={summaryKey} 
+                onRefresh={() => setSummaryKey(k => k + 1)}
+                refreshTrigger={summaryKey}
+              />
+            </div>
+          </div>
+
+          {/* 預定工作區域 */}
+          <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl overflow-hidden">
+            <div className="bg-white/5 p-4">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-white" />
+                  <h2 className="text-lg font-semibold text-white">預定工作</h2>
+                </div>
+                
+                {/* 顯示模式切換 */}
+                <div className="flex bg-white/10 rounded-lg p-1">
+                  <button
+                    onClick={() => setScheduledWorkMode('week')}
+                    className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                      scheduledWorkMode === 'week'
+                        ? 'bg-purple-500 text-white'
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    本週範圍
+                  </button>
+                  <button
+                    onClick={() => setScheduledWorkMode('all')}
+                    className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                      scheduledWorkMode === 'all'
+                        ? 'bg-purple-500 text-white'
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    所有時間
+                  </button>
+                </div>
+              </div>
+
+              {/* 週導航和新增按鈕 */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-4">
+                {/* 週導航 - 只在本週範圍模式下顯示 */}
+                {scheduledWorkMode === 'week' && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => navigateWeek('prev')}
+                      variant="outline"
+                      size="sm"
+                      className="border-white/20 text-white hover:bg-white/10"
+                    >
+                      ← 上週
+                    </Button>
+                    <span className="text-white/80 text-sm px-3 whitespace-nowrap">
+                      {format(weekStart, 'yyyy/MM/dd')} - {format(weekEnd, 'yyyy/MM/dd')}
+                    </span>
+                    <Button
+                      onClick={() => navigateWeek('next')}
+                      variant="outline"
+                      size="sm"
+                      className="border-white/20 text-white hover:bg-white/10"
+                    >
+                      下週 →
+                    </Button>
+                  </div>
+                )}
+                
+                {/* 新增按鈕 */}
+                <Button
+                  onClick={() => setShowScheduledWorkModal(true)}
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  新增預定工作
+                </Button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <ScheduledWorkList
+                key={scheduledWorkRefreshKey}
+                mode={scheduledWorkMode}
+                currentWeek={currentWeek}
+                onEdit={handleEditScheduledWork}
+                onStartWork={handleStartWork}
+                onCopy={handleCopyScheduledWork}
+                onRefresh={(refreshFn) => {
+                  // 可以在這裡保存 refreshFn 以供後續使用
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    }
+  };
+
+  return (
+    <DashboardLayout>
+      {/* 通知中心 - 使用 Portal 渲染到最頂層 */}
+      <Portal>
+        <div className="fixed top-20 right-4 lg:top-6 lg:right-6 z-[9998]">
+          <NovuInbox />
+        </div>
+      </Portal>
+
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-purple-900 space-y-6 p-6">
+        {/* 頂部功能區域 - 分成多個卡片 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* 時間和日期卡片 */}
+          <div className="lg:col-span-1">
+            <TimeDisplayCard />
+          </div>
+          
+          {/* 智能打卡系統卡片 */}
+          <div className="lg:col-span-1">
+            <SmartPunchWidget 
+              key={punchWidgetKey} // 使用 key 來觸發重新渲染
+              onWorkLogSaved={() => setSummaryKey(k => k + 1)} 
+              onOpenWorkLogModal={(isOvertime) => {
+                if (isOvertime) {
+                  setWorkLogFromScheduled(null); // 清空預定工作數據
+                  setIsOvertimeMode(true);
+                  setShowWorkLogModal(true);
+                }
+              }}
+            />
+          </div>
+          
+          {/* 今日統計卡片 */}
+          <div className="lg:col-span-1">
+            <TodayStatsCard />
+          </div>
+        </div>
+
+        {/* 工作內容區域 */}
+        {renderWorkContent()}
       </div>
 
       {/* 預定工作編輯/新增模態框 */}

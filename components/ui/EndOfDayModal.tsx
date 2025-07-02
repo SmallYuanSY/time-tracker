@@ -53,7 +53,7 @@ export function EndOfDayModal({
         tomorrow.setDate(tomorrow.getDate() + 1)
 
         // 1. 獲取進行中的工作記錄
-        const ongoingResponse = await fetch(`/api/worklog?userId=${userId}&from=${today.toISOString()}&to=${tomorrow.toISOString()}&ongoingOnly=true`)
+        const ongoingResponse = await fetch(`/api/worklog?userId=${userId}&ongoing=true`)
         if (ongoingResponse.ok) {
           const ongoingData = await ongoingResponse.json()
           setOngoingWorkLogs(ongoingData)
@@ -199,9 +199,7 @@ export function EndOfDayModal({
     <Portal>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md">
         <div className="bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-lg border border-white/20 rounded-2xl p-6 w-full max-w-lg shadow-2xl">
-          
           {currentStep === 1 ? (
-            // 第一層檢查：進行中工作記錄 + 未完成預定工作
             <>
               <h2 className="text-lg font-semibold mb-4 text-white">🏁 下班確認</h2>
               
@@ -277,7 +275,6 @@ export function EndOfDayModal({
               </div>
             </>
           ) : (
-            // 第二層檢查：工時警告
             <>
               <h2 className="text-lg font-semibold mb-4 text-white">⚠️ 工時檢查</h2>
               

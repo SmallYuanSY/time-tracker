@@ -1,10 +1,12 @@
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["referentialIntegrity"]
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider = "postgresql" // 或 "mysql" 如果使用 PlanetScale
+  url = env("DATABASE_URL")
+  relationMode = "prisma" // 支援 Vercel 的無伺服器環境
 }
 
 enum UserRole {
@@ -37,6 +39,14 @@ enum ContactType {
   BUILDER
 }
 
+enum SettingKey {
+  USE_CLASSIC_LAYOUT  // 使用傳統佈局（標籤式）
+  ENABLE_NOTIFICATIONS // 啟用通知
+  DARK_MODE          // 深色模式
+  COMPACT_VIEW       // 精簡視圖
+  AUTO_CLOCK_OUT     // 自動下班提醒
+}
+
 model User {
   id                 String    @id @default(cuid())
   name               String?
@@ -47,6 +57,9 @@ model User {
   role               UserRole  @default(EMPLOYEE)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+  
+  // 使用者設定
+  settings          UserSetting[]
 
   // 工作記錄關聯
   workLogs           workLog[]
@@ -73,6 +86,9 @@ model User {
   // 加班簽名關聯
   signedOvertime     OvertimeSignature[] @relation("SignedOvertime")
   overtimeSignatures OvertimeSignature[] @relation("OvertimeSigner")
+
+  // 推送訂閱關聯
+  pushSubscriptions  PushSubscription[]
 }
 
 model clock {
@@ -270,4 +286,29 @@ model Holiday {
   updatedAt   DateTime    @updatedAt
 
   @@unique([date])
+}
+
+model UserSetting {
+  id          String     @id @default(cuid())
+  userId      String
+  key         SettingKey
+  value       String     // 使用 JSON 字串儲存值
+  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime   @default(now())
+  user        User       @relation(fields: [userId], references: [id])
+
+  @@unique([userId, key])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String
+  auth      String
+  p256dh    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, endpoint])
 }

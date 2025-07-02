@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "buildCommand": "prisma generate && next build",
+  "installCommand": "pnpm install",
+  "framework": "nextjs",
+  "regions": ["hkg1"],
+  "env": {
+    "NEXTAUTH_URL": "https://${VERCEL_URL}",
+    "VERCEL_URL": "${VERCEL_URL}"
+  }
+} 
