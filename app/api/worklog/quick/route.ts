@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       })
       
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`[快速新增] 結束了 ${ongoingLogs.length} 個進行中的工作記錄`)
+        //console.log(`[快速新增] 結束了 ${ongoingLogs.length} 個進行中的工作記錄`)
       }
     }
 

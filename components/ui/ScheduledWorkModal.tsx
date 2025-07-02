@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Calendar, Target, FileText } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import ProjectSelector from '@/components/ui/ProjectSelector'
@@ -184,8 +184,6 @@ export default function ScheduledWorkModal({
     }))
   }
 
-
-
   // 表單驗證
   const validateForm = () => {
     const newErrors: string[] = []
@@ -285,6 +283,9 @@ export default function ScheduledWorkModal({
             <Target className="h-5 w-5" />
             {editData ? '編輯預定工作' : '新增預定工作'}
           </DialogTitle>
+          <DialogDescription>
+            請填寫以下表單來{editData ? '編輯' : '新增'}預定工作的詳細資訊
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
@@ -322,8 +323,14 @@ export default function ScheduledWorkModal({
             projectName={formData.projectName}
             onProjectCodeInputChange={(code) => setFormData(prev => ({ ...prev, projectCode: code }))}
             onProjectNameChange={(name) => setFormData(prev => ({ ...prev, projectName: name }))}
+            onProjectCodeChange={(code, project) => {
+              if (project) {
+                handleProjectSelect(project)
+              }
+            }}
             showRecentProjects={true}
             showExtraTasks={false}
+            disabled={isSubmitting}
           />
 
           {/* 工作分類選擇器 */}

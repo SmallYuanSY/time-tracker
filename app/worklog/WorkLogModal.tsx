@@ -68,8 +68,8 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
   const [formData, setFormData] = useState({
     projectCode: editData?.projectCode || '',
     projectName: editData?.projectName || '',
-    category: editData?.category || copyData?.category || '', // 只保留分類，因為這是重要的預設值
-    content: editData?.content || '', // copyData 模式下不預填內容
+    category: editData?.category || copyData?.category || '', // 保留分類
+    content: editData?.content || copyData?.content || '', // 在複製模式下也保留工作內容
     startTime: editData
       ? new Date(editData.startTime).toTimeString().slice(0, 5)
       : initialMode === 'quick'
@@ -117,12 +117,14 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
         const response = await fetch(`/api/projects?includeContacts=true`)
         if (response.ok) {
           const allProjects = await response.json()
+          console.log('API 返回的原始資料:', allProjects)
           // 轉換格式
           const convertedProjects = allProjects.map((p: any) => ({
-            projectCode: p.projectCode,
-            projectName: p.projectName,
+            projectCode: p.code || p.projectCode,
+            projectName: p.name || p.projectName,
             category: p.category || ''
           }))
+          console.log('轉換後的專案資料:', convertedProjects)
           setProjects(convertedProjects)
         }
       } catch (error) {
@@ -147,9 +149,15 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
     // 當輸入兩位數或更多時，嘗試搜尋案件
     if (code.length >= 2) {
       
+      // 確保 projects 已經載入
+      if (!projects || projects.length === 0) {
+        console.log('案件列表尚未載入完成')
+        return
+      }
+      
       // 搜尋現有案件（精確匹配開頭）
       const matchingProjects = projects.filter(p => 
-        p.projectCode.toLowerCase().startsWith(code.toLowerCase())
+        p.projectCode?.toLowerCase().startsWith(code.toLowerCase())
       )
       
       console.log('輸入的編號:', code, '已載入案件數量:', projects.length, '匹配案件:', matchingProjects)
@@ -159,7 +167,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
       if (matchingProjects.length > 0) {
         // 如果有完全匹配的案件，自動帶入案件名稱
         const exactMatch = matchingProjects.find(p =>
-          p.projectCode.toLowerCase() === code.toLowerCase()
+          p.projectCode?.toLowerCase() === code.toLowerCase()
         )
         if (exactMatch) {
           // 完全匹配，自動帶入案件名稱
@@ -177,7 +185,6 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
         }
       } else if (code.length >= 2) {
         // 沒有找到現有案件，顯示新建案件模式
-        console.log('沒有找到匹配案件，顯示新建模式')
         setIsNewProject(true)
         setShowProjectDropdown(false)
         setFormData({
@@ -275,6 +282,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
             category: formData.category,
             content: formData.content,
             startTime: fullStart,
+            date: new Date().toISOString().split('T')[0],
             ...(fullEnd && { endTime: fullEnd }),
             ...(editData && { editReason: formData.editReason }),
             confirmConflicts: true
@@ -347,6 +355,22 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
   // 確認新增案件為選項
   const handleConfirmNewProject = () => {
     if (!formData.projectCode || !formData.projectName) return
+
+    // 檢查是否已經存在相同的案件
+    const existingProject = projects.find(p => 
+      p.projectCode?.toLowerCase() === formData.projectCode.toLowerCase()
+    )
+
+    if (existingProject) {
+      // 如果找到現有案件，使用現有案件資料
+      const project: Project = {
+        projectCode: existingProject.projectCode,
+        projectName: existingProject.projectName,
+        category: existingProject.category || '',
+      }
+      selectProject(project)
+      return
+    }
 
     const newProject: Project = {
       projectCode: formData.projectCode,
@@ -480,6 +504,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
             category: formData.category,
             content: formData.content,
             startTime: fullStart,
+            date: new Date().toISOString().split('T')[0],
             ...(fullEnd && { endTime: fullEnd }),
             ...(editData && { editReason: formData.editReason }),
           }

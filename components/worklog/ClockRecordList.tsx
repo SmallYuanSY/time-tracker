@@ -477,9 +477,17 @@ export default function ClockRecordList({ userId, currentWeek, timeRange = 'week
         
         // 決定卡片顏色：有打卡記錄時使用淡綠色，無打卡記錄時使用預設色
         const hasRecords = dayRecords.length > 0
-        const cardBgClass = hasRecords 
-          ? "bg-green-500/8 border-green-500/15 backdrop-blur-sm" 
-          : "bg-white/5 border-white/10 backdrop-blur-sm"
+        const isPastDate = new Date(day).setHours(23, 59, 59, 999) < new Date().getTime()
+        const missingClockOut = isPastDate && dayRecords.length > 0 && !dayRecords.some(r => r.type === 'OUT')
+        
+        let cardBgClass = "backdrop-blur-sm "
+        if (missingClockOut) {
+          cardBgClass += "bg-orange-500/15 border-orange-500/30"
+        } else if (hasRecords) {
+          cardBgClass += "bg-green-500/8 border-green-500/15"
+        } else {
+          cardBgClass += "bg-white/5 border-white/10"
+        }
         
         return (
           <Card key={dateKey} className={cardBgClass}>
@@ -487,12 +495,20 @@ export default function ClockRecordList({ userId, currentWeek, timeRange = 'week
               {/* 日期標題 */}
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <Calendar className={`w-4 h-4 ${hasRecords ? 'text-green-400' : 'text-blue-400'}`} />
+                  <Calendar className={`w-4 h-4 ${
+                    missingClockOut ? 'text-orange-400' :
+                    hasRecords ? 'text-green-400' : 'text-blue-400'
+                  }`} />
                   <span className="text-white font-medium">
                     {format(day, 'MM/dd')} ({dayName})
                   </span>
-                  {hasRecords && (
+                  {hasRecords && !missingClockOut && (
                     <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                  )}
+                  {missingClockOut && (
+                    <div className="flex items-center gap-1 px-2 py-1 bg-orange-500/20 text-orange-300 rounded-full text-xs">
+                      ⚠️ 缺少下班打卡
+                    </div>
                   )}
                   {leaveInfo && (
                     <div className="flex items-center gap-1 px-2 py-1 bg-purple-500/20 text-purple-300 rounded-full text-xs">

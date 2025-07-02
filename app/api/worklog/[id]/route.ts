@@ -55,10 +55,21 @@ export async function PUT(
     const startDate = new Date(startTime)
     const endDate = new Date(endTime)
     
+    // 獲取當天的開始和結束時間
+    const dayStart = new Date(startDate)
+    dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(startDate)
+    dayEnd.setHours(23, 59, 59, 999)
+    
     const conflictingLogs = await prisma.workLog.findMany({
       where: {
         userId,
         id: { not: id }, // 排除當前編輯的記錄
+        // 只檢查同一天的記錄
+        startTime: {
+          gte: dayStart,
+          lt: dayEnd
+        },
         OR: [
           // 現有記錄的開始時間在新記錄時間範圍內
           {

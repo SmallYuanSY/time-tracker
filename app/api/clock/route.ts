@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (process.env.NODE_ENV !== 'production') {
-          console.log(`下班打卡：自動結算了 ${ongoingWorkLogs.length} 個進行中的工作記錄`)
+          //console.log(`下班打卡：自動結算了 ${ongoingWorkLogs.length} 個進行中的工作記錄`)
         }
       }
     }

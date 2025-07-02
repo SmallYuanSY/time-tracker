@@ -31,16 +31,18 @@ export const useProjectSelection = (initialProjects: Project[] = []) => {
     if (!session?.user) return
 
     try {
-      const userId = (session.user as any).id
-      const response = await fetch(`/api/projects?userId=${userId}`)
+      const response = await fetch(`/api/projects?includeContacts=true`)
       if (response.ok) {
         const data = await response.json()
-        setProjects(data)
+        const convertedProjects = data.map((p: any) => ({
+          projectCode: p.code || p.projectCode,
+          projectName: p.name || p.projectName,
+          category: p.category || ''
+        }))
+        setProjects(convertedProjects)
       }
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('載入專案列表失敗:', error)
-      }
+      console.error('載入專案列表失敗:', error)
     }
   }, [session])
 
@@ -80,74 +82,41 @@ export const useProjectSelection = (initialProjects: Project[] = []) => {
     }
   }, [session, loadProjects, loadRecentProjects])
 
-  // 處理專案編號輸入
-  const handleProjectCodeChange = useCallback((code: string) => {
-    // 當輸入兩位數或更多時，嘗試搜尋專案
-    if (code.length >= 2) {
-      // 搜尋現有專案（精確匹配開頭）
-      const matchingProjects = projects.filter(p => 
-        p.projectCode.toLowerCase().startsWith(code.toLowerCase())
-      )
-      
-      setFilteredProjects(matchingProjects)
-      
-      if (matchingProjects.length > 0) {
-        setShowProjectDropdown(true)
-        setIsNewProject(false)
-
-        // 如果只有一個完全匹配的專案，返回它
-        const exactMatch = matchingProjects.find(p =>
-          p.projectCode.toLowerCase() === code.toLowerCase()
-        )
-        if (exactMatch) {
-          return exactMatch
-        }
-      } else {
-        // 沒有找到現有專案，顯示新建專案模式
-        setIsNewProject(true)
-        setShowProjectDropdown(false)
-      }
-    } else {
+  // 處理專案代號輸入
+  const handleProjectCodeChange = useCallback((code: string): Project | null => {
+    if (!code) {
+      setFilteredProjects([])
       setShowProjectDropdown(false)
       setIsNewProject(false)
+      return null
     }
-    
-    return null
+
+    const searchLower = code.toLowerCase()
+    const filtered = [...extraTasks, ...projects].filter(project => 
+      project.projectCode.toLowerCase().startsWith(searchLower)
+    )
+
+    setFilteredProjects(filtered)
+    setShowProjectDropdown(filtered.length > 0)
+
+    // 檢查是否為新專案
+    const exactMatch = filtered.find(
+      project => project.projectCode.toLowerCase() === searchLower
+    )
+    setIsNewProject(!exactMatch && code.length > 0)
+
+    return exactMatch || null
   }, [projects])
 
-  // 選擇現有專案
-  const selectProject = useCallback((project: Project) => {
+  // 選擇專案
+  const selectProject = useCallback((project: Project): Project => {
     setSelectedProjects(prev => {
-      if (prev.find(p => p.projectCode === project.projectCode)) return prev
+      const exists = prev.some(p => p.projectCode === project.projectCode)
+      if (exists) return prev
       return [...prev, project]
     })
     setShowProjectDropdown(false)
-    setIsNewProject(false)
     return project
-  }, [])
-
-  // 移除專案
-  const removeProject = useCallback((code: string) => {
-    setSelectedProjects(prev => prev.filter(p => p.projectCode !== code))
-  }, [])
-
-  // 切換額外工作類型
-  const toggleExtraTask = useCallback((task: Project) => {
-    setSelectedProjects(prev => {
-      const exists = prev.find(p => p.projectCode === task.projectCode)
-      if (exists) {
-        return prev.filter(p => p.projectCode !== task.projectCode)
-      } else {
-        return [...prev, task]
-      }
-    })
-  }, [])
-
-  // 清空所有選擇
-  const clearSelection = useCallback(() => {
-    setSelectedProjects([])
-    setShowProjectDropdown(false)
-    setIsNewProject(false)
   }, [])
 
   // 關閉下拉選單
@@ -156,28 +125,18 @@ export const useProjectSelection = (initialProjects: Project[] = []) => {
   }, [])
 
   return {
-    // 狀態
     projects,
     filteredProjects,
     showProjectDropdown,
+    setShowProjectDropdown,
     isNewProject,
+    setIsNewProject,
     selectedProjects,
     recentProjects,
     extraTasks,
-    
-    // 方法
     handleProjectCodeChange,
     selectProject,
-    removeProject,
-    toggleExtraTask,
-    clearSelection,
     closeDropdown,
     loadProjects,
-    loadRecentProjects,
-    
-    // 設置狀態的方法
-    setSelectedProjects,
-    setIsNewProject,
-    setShowProjectDropdown,
   }
 } 

@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "只有網頁管理員可以執行資料遷移" }, { status: 403 })
     }
 
-    console.log('🔄 開始遷移現有工作記錄到案件管理系統...')
+    //console.log('🔄 開始遷移現有工作記錄到案件管理系統...')
 
     // 獲取所有不重複的案件資訊
     const distinctProjects = await prisma.workLog.groupBy({
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    console.log(`📊 找到 ${distinctProjects.length} 個不重複的案件`)
+    //console.log(`📊 找到 ${distinctProjects.length} 個不重複的案件`)
 
     let createdCount = 0
     let skippedCount = 0
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
         })
 
         if (existingProject) {
-          console.log(`⏭️  案件 ${projectData.projectCode} 已存在，跳過`)
+          //console.log(`⏭️  案件 ${projectData.projectCode} 已存在，跳過`)
           skippedCount++
           continue
         }
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
         })
 
         if (!firstWorkLog) {
-          console.log(`❌ 案件 ${projectData.projectCode} 找不到對應的工作記錄`)
+          //console.log(`❌ 案件 ${projectData.projectCode} 找不到對應的工作記錄`)
           errorCount++
           errors.push(`案件 ${projectData.projectCode} 找不到對應的工作記錄`)
           continue
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
           },
         })
 
-        console.log(`✅ 成功創建案件: ${newProject.code} - ${newProject.name}`)
+        //console.log(`✅ 成功創建案件: ${newProject.code} - ${newProject.name}`)
         createdCount++
 
         // 更新該案件的所有工作記錄，關聯到新創建的 Project
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
           },
         })
 
-        console.log(`🔗 已關聯 ${projectData._count.id} 筆工作記錄到案件 ${newProject.code}`)
+        //console.log(`🔗 已關聯 ${projectData._count.id} 筆工作記錄到案件 ${newProject.code}`)
 
       } catch (error) {
         console.error(`❌ 創建案件 ${projectData.projectCode} 時發生錯誤:`, error)
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
       errorDetails: errors,
     }
 
-    console.log('🎉 遷移完成:', summary)
+    //console.log('🎉 遷移完成:', summary)
 
     return NextResponse.json({
       success: true,

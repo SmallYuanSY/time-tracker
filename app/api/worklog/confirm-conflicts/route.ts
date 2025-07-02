@@ -33,10 +33,21 @@ export async function POST(req: NextRequest) {
     const startDate = new Date(startTime)
     const endDate = new Date(endTime)
 
+    // 獲取當天的開始和結束時間
+    const dayStart = new Date(startDate)
+    dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(startDate)
+    dayEnd.setHours(23, 59, 59, 999)
+
     // 重新查找衝突記錄並處理
     const conflictingLogs = await prisma.workLog.findMany({
       where: {
         userId,
+        // 只檢查同一天的記錄
+        startTime: {
+          gte: dayStart,
+          lt: dayEnd
+        },
         OR: [
           {
             startTime: {
@@ -169,7 +180,7 @@ export async function POST(req: NextRequest) {
           })
 
           if (process.env.NODE_ENV !== 'production') {
-            console.log('[POST /api/worklog/confirm-conflicts] 同步更新打卡記錄:', recentClockIn.id)
+            //console.log('[POST /api/worklog/confirm-conflicts] 同步更新打卡記錄:', recentClockIn.id)
           }
         }
       }
@@ -178,7 +189,7 @@ export async function POST(req: NextRequest) {
     })
 
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`[POST /api/worklog/confirm-conflicts] 處理了 ${conflictingLogs.length} 個時間衝突並建立新記錄`)
+      //console.log(`[POST /api/worklog/confirm-conflicts] 處理了 ${conflictingLogs.length} 個時間衝突並建立新記錄`)
     }
 
     return NextResponse.json(result)

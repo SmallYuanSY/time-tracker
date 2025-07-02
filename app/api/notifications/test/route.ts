@@ -36,13 +36,13 @@ export async function POST(req: NextRequest) {
             }
           })
           if (process.env.NODE_ENV !== 'production') {
-            console.log(`✅ Subscriber ${subscriberId} 資料已更新`)
+            //console.log(`✅ Subscriber ${subscriberId} 資料已更新`)
           }
         }
       } catch (updateError) {
         // 更新失敗不影響發送通知
         if (process.env.NODE_ENV !== 'production') {
-          console.log('⚠️ 更新 subscriber 資料失敗，但繼續發送通知:', updateError)
+          //console.log('⚠️ 更新 subscriber 資料失敗，但繼續發送通知:', updateError)
         }
       }
     }

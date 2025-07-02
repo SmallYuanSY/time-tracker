@@ -188,7 +188,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
           })
 
           if (process.env.NODE_ENV !== 'production') {
-            console.log('[PUT /api/worklog/[id]/confirm-conflicts] 同步更新打卡記錄:', recentClockIn.id)
+            //console.log('[PUT /api/worklog/[id]/confirm-conflicts] 同步更新打卡記錄:', recentClockIn.id)
           }
         }
       }
@@ -197,7 +197,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
     })
 
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`[PUT /api/worklog/[id]/confirm-conflicts] 處理了 ${conflictingLogs.length} 個時間衝突並更新記錄`)
+      //console.log(`[PUT /api/worklog/[id]/confirm-conflicts] 處理了 ${conflictingLogs.length} 個時間衝突並更新記錄`)
     }
 
     return NextResponse.json(result)

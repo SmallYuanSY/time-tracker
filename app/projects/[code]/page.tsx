@@ -130,12 +130,14 @@ export default function ProjectDetailPage() {
           <div className="space-y-4">
             <div>
               <h3 className="text-sm font-medium text-gray-500">專案管理者</h3>
-              <p className="mt-1">{project.manager.name || project.manager.email}</p>
+              <p className="mt-1">
+                {project.manager ? (project.manager.name || project.manager.email) : '未指派管理者'}
+              </p>
             </div>
             
             <div>
               <h3 className="text-sm font-medium text-gray-500">專案成員</h3>
-              {project.users.length > 0 ? (
+              {project.users && project.users.length > 0 ? (
                 <div className="mt-2 space-y-2">
                   {project.users.map(user => (
                     <div key={user.id} className="p-2 bg-gray-50 rounded">

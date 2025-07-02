@@ -170,26 +170,6 @@ export default function ProjectSelector({
         )}
       </div>
 
-      {/* 已選擇的專案 */}
-      {selectedProjects.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {selectedProjects.map(project => (
-            <span key={project.projectCode} className="bg-blue-500/20 text-white text-sm px-2 py-1 rounded-full flex items-center gap-1">
-              {project.projectCode} {project.projectName}
-              {!disabled && (
-                <button 
-                  type="button" 
-                  onClick={() => onProjectRemove(project.projectCode)} 
-                  className="ml-1 hover:text-red-300 transition-colors"
-                >
-                  ✕
-                </button>
-              )}
-            </span>
-          ))}
-        </div>
-      )}
-
       {/* 專案名稱輸入 */}
       <div className="relative">
         <label className="text-sm font-medium text-white mb-2 block">專案名稱</label>
@@ -225,6 +205,26 @@ export default function ProjectSelector({
               </button>
             )}
           </div>
+        </div>
+      )}
+
+      {/* 已選擇的專案 */}
+      {selectedProjects.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {selectedProjects.map(project => (
+            <span key={project.projectCode} className="bg-blue-500/20 text-white text-sm px-2 py-1 rounded-full flex items-center gap-1">
+              {project.projectCode} {project.projectName}
+              {!disabled && (
+                <button 
+                  type="button" 
+                  onClick={() => onProjectRemove(project.projectCode)} 
+                  className="ml-1 hover:text-red-300 transition-colors"
+                >
+                  ✕
+                </button>
+              )}
+            </span>
+          ))}
         </div>
       )}
 

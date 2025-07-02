@@ -71,7 +71,6 @@ export default function ProjectsPage() {
       const projectsResponse = await fetch(`/api/projects?${params}`)
       if (projectsResponse.ok) {
         const projectsData = await projectsResponse.json()
-        console.log('Fetched projects:', projectsData)
         setProjects(projectsData)
       } else {
         console.error('Failed to fetch projects:', await projectsResponse.text())

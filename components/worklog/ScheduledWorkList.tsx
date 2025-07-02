@@ -93,9 +93,13 @@ function SortableWorkItem({
     opacity: isDragging ? 0.5 : 1,
   }
 
-  const priorityColor = work.priority <= 2 ? "bg-red-100/10 border-red-300/30" :
-                       work.priority <= 5 ? "bg-yellow-100/10 border-yellow-300/30" :
-                       "bg-green-100/10 border-green-300/30"
+  const priorityColor = 
+    work.priority === 1 ? "from-red-500/20 to-red-400/25 border-red-400/40" :      // 最高
+    work.priority === 2 ? "from-orange-500/20 to-orange-400/25 border-orange-400/40" :  // 高
+    work.priority === 3 ? "from-yellow-500/20 to-yellow-400/25 border-yellow-400/40" :  // 中高
+    work.priority === 4 ? "from-green-500/20 to-green-400/25 border-green-400/40" :     // 中等
+    work.priority === 5 ? "from-blue-500/20 to-blue-400/25 border-blue-400/40" :        // 普通
+    "from-slate-500/20 to-slate-400/25 border-slate-400/40"                             // 低
 
   const completedStyle = work.isCompleted ? "opacity-60" : ""
 
@@ -103,7 +107,7 @@ function SortableWorkItem({
     <Card 
       ref={setNodeRef} 
       style={style} 
-      className={`group hover:shadow-lg transition-all duration-200 bg-gradient-to-r from-white/5 to-white/10 backdrop-blur border border-white/20 rounded-2xl overflow-hidden ${completedStyle}`}
+      className={`group hover:shadow-lg transition-all duration-200 bg-gradient-to-r ${priorityColor} backdrop-blur border rounded-2xl overflow-hidden ${completedStyle}`}
     >
       <div className="flex items-center p-4">
         {/* 左側：拖拽手柄和狀態 */}
@@ -128,17 +132,6 @@ function SortableWorkItem({
               <Circle className="w-5 h-5" />
             )}
           </button>
-
-          {/* 優先級和工作類型指示器 */}
-          <div className="flex flex-col items-center gap-1">
-            <div className={`w-3 h-3 rounded-full ${
-              work.workType === 'URGENT' ? 'bg-orange-400' : 'bg-blue-400'
-            }`}></div>
-            <div className={`w-2 h-2 rounded-full ${
-              work.priority <= 2 ? 'bg-red-400' :
-              work.priority <= 5 ? 'bg-yellow-400' : 'bg-green-400'
-            }`}></div>
-          </div>
         </div>
 
         {/* 中間：主要內容 */}
@@ -186,14 +179,12 @@ function SortableWorkItem({
                 if (category) {
                   return (
                     <>
-                      <div className={`w-2 h-2 rounded-full ${category.color.accent}`}></div>
                       <span className={category.color.text}>{category.icon || ''} {category.title}</span>
                     </>
                   )
                 }
                 return (
                   <>
-                    <div className="w-2 h-2 rounded-full bg-white/40"></div>
                     <span className="text-white/60">{work.category}</span>
                   </>
                 )

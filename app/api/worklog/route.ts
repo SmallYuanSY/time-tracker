@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[POST /api/worklog] 收到的資料:', body)
+      //console.log('[POST /api/worklog] 收到的資料:', body)
     }
 
     const {
@@ -69,10 +69,21 @@ export async function POST(req: NextRequest) {
 
     // 時間衝突檢查
     if (endDate) {
+      // 獲取當天的開始和結束時間
+      const dayStart = new Date(startDate)
+      dayStart.setHours(0, 0, 0, 0)
+      const dayEnd = new Date(startDate)
+      dayEnd.setHours(23, 59, 59, 999)
+
       // 查找與新時間區間有衝突的工作記錄
       const conflictingLogs = await prisma.workLog.findMany({
         where: {
           userId,
+          // 只檢查同一天的記錄
+          startTime: {
+            gte: dayStart,
+            lt: dayEnd
+          },
           OR: [
             // 現有記錄的開始時間在新記錄時間範圍內
             {
@@ -144,9 +155,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[POST /api/worklog] 嘗試建立工作記錄...')
-      console.log('[POST /api/worklog] startDate:', startDate)
-      console.log('[POST /api/worklog] endDate:', endDate)
+      //console.log('[POST /api/worklog] 嘗試建立工作記錄...')
+      //console.log('[POST /api/worklog] 專案資料:', {
+      //  projectCode,
+      //  projectName,
+      //  category
+      //})
+      //console.log('[POST /api/worklog] startDate:', startDate)
+      //console.log('[POST /api/worklog] endDate:', endDate)
     }
 
     // 使用資料庫事務來確保工作記錄和案件記錄都能成功創建
@@ -171,7 +187,7 @@ export async function POST(req: NextRequest) {
           })
           
           if (process.env.NODE_ENV !== 'production') {
-            console.log('[POST /api/worklog] 自動創建案件記錄:', project.code)
+            //console.log('[POST /api/worklog] 自動創建案件記錄:', project.code)
           }
         } catch (error) {
           // 如果創建案件失敗（可能是並發創建），重新查詢
@@ -226,7 +242,7 @@ export async function POST(req: NextRequest) {
         })
 
         if (process.env.NODE_ENV !== 'production') {
-          console.log('[POST /api/worklog] 創建打卡記錄，時間:', startDate.toISOString())
+          //console.log('[POST /api/worklog] 創建打卡記錄，時間:', startDate.toISOString())
         }
       }
 
@@ -234,7 +250,7 @@ export async function POST(req: NextRequest) {
     })
 
     if (process.env.NODE_ENV !== 'production') {
-      console.log('[POST /api/worklog] 成功建立工作記錄:', result.id)
+      //console.log('[POST /api/worklog] 成功建立工作記錄:', result.id)
     }
     return NextResponse.json(result)
   } catch (error) {

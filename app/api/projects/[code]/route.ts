@@ -24,17 +24,71 @@ export async function GET(
       return new NextResponse('Project code is required', { status: 400 })
     }
 
-    const project = await prisma.project.findUnique({
+    const code = (await params).code
+
+    // 先從 Project 表中查找
+    let project = await prisma.project.findUnique({
       where: {
-        code: (await params).code,
+        code,
       },
       include: {
         Contact: true,
+        manager: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        },
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        }
       },
     })
 
     if (!project) {
-      return new NextResponse('Project not found', { status: 404 })
+      // 如果在 Project 表中找不到，從 WorkLog 表中查找
+      const workLog = await prisma.workLog.findFirst({
+        where: { projectCode: code },
+        orderBy: { startTime: 'desc' },
+      })
+
+      if (workLog) {
+        // 從工作記錄創建一個新的 Project 記錄
+        project = await prisma.project.create({
+          data: {
+            code: workLog.projectCode,
+            name: workLog.projectName,
+            category: workLog.category,
+            managerId: workLog.userId,
+            status: 'ACTIVE',
+            description: '從工作記錄自動創建',
+          },
+          include: {
+            Contact: true,
+            manager: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              }
+            },
+            users: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              }
+            }
+          },
+        })
+      } else {
+        return new NextResponse('Project not found', { status: 404 })
+      }
     }
 
     return NextResponse.json(project)
