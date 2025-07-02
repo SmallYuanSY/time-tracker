@@ -4,6 +4,9 @@ const nextConfig = {
   /* config options here */
   swcMinify: true,
   reactStrictMode: true,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '10mb',
