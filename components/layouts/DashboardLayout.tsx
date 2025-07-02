@@ -74,7 +74,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       try {
         // 獲取今天的打卡記錄
         const today = new Date().toISOString().split('T')[0]
-        const response = await fetch(`/api/clock/history?date=${today}`)
+        const userId = (session.user as any).id
+        const response = await fetch(`/api/clock/history?date=${today}&userId=${userId}`)
         const data = await response.json()
 
         // 檢查是否有今天的上班打卡記錄

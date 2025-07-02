@@ -3,7 +3,15 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(request: NextRequest) {
+interface WhereCondition {
+  userId?: string;
+  date?: {
+    gte?: Date;
+    lte?: Date;
+  };
+}
+
+export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
@@ -20,33 +28,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '權限不足，只有管理員可以查看考勤記錄' }, { status: 403 })
     }
 
-    const { searchParams } = new URL(request.url)
-    const start = searchParams.get('start')
-    const end = searchParams.get('end')
+    const searchParams = req.nextUrl.searchParams
     const userId = searchParams.get('userId')
+    const startDate = searchParams.get('startDate')
+    const endDate = searchParams.get('endDate')
 
-    if (!start || !end) {
-      return NextResponse.json({ error: '缺少時間範圍參數' }, { status: 400 })
-    }
+    const whereCondition: WhereCondition = {}
 
-    const startDate = new Date(start)
-    const endDate = new Date(end)
-
-    // 構建查詢條件
-    let whereCondition: any = {
-      timestamp: {
-        gte: startDate,
-        lte: endDate,
-      },
-    }
-
-    // 如果指定了特定用戶，添加用戶過濾
-    if (userId && userId !== 'all') {
+    if (userId) {
       whereCondition.userId = userId
-    } else {
-      // 只查詢員工的打卡記錄
-      whereCondition.user = {
-        role: 'EMPLOYEE'
+    }
+
+    if (startDate && endDate) {
+      whereCondition.date = {
+        gte: new Date(startDate),
+        lte: new Date(endDate)
       }
     }
 

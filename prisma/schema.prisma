@@ -5,13 +5,12 @@ generator client {
 
 datasource db {
   provider     = "postgresql"
-  url          = env("POSTGRES_URL")
+  url          = env("DATABASE_URL")
   relationMode = "prisma"
 }
 
 model User {
   id                   String                @id @default(cuid())
-  employeeId           String                @unique
   name                 String?
   email                String                @unique
   emailVerified        DateTime?
@@ -39,7 +38,7 @@ model User {
 model clock {
   id                String    @id @default(cuid())
   userId            String
-  type              ClockType
+  type              String
   timestamp         DateTime  @default(now())
   ipAddress         String?
   macAddress        String?
@@ -129,12 +128,12 @@ model LeaveRequest {
 }
 
 model Overtime {
-  id              String      @id @default(cuid())
+  id              String    @id @default(cuid())
   userId          String
   startTime       DateTime
   endTime         DateTime?
   reason          String?
-  status          LeaveStatus @default(PENDING_ADMIN)
+  status          String    @default("PENDING")
   startIpAddress  String?
   startMacAddress String?
   startUserAgent  String?
@@ -143,9 +142,9 @@ model Overtime {
   endMacAddress   String?
   endUserAgent    String?
   endDeviceInfo   String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  user            User        @relation(fields: [userId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id])
 }
 
 model Project {
@@ -154,12 +153,12 @@ model Project {
   name           String
   description    String?
   category       String
-  status         ProjectStatus   @default(ACTIVE)
+  status         String          @default("ACTIVE")
   managerId      String
   contactId      String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
-  contact        Contact?        @relation(fields: [contactId], references: [id])
+  Contact        Contact?        @relation(fields: [contactId], references: [id])
   manager        User            @relation("ProjectManager", fields: [managerId], references: [id])
   users          User[]
   workLogs       workLog[]
@@ -211,9 +210,10 @@ model OvertimeSignature {
 
 model Holiday {
   id          String      @id @default(cuid())
-  date        DateTime    @unique
+  date        String      @unique
   name        String
-  type        HolidayType @default(OTHER)
+  type        HolidayType
+  isHoliday   Boolean     @default(true)
   description String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
