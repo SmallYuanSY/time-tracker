@@ -225,32 +225,7 @@ export default function TestTimezonePage() {
                     </div>
                   )}
                   
-                  {session?.user && (session.user as any).role === 'ADMIN' ? (
-                    <Button 
-                      onClick={runMigration}
-                      disabled={isMigrating}
-                      className="bg-red-600 hover:bg-red-700 disabled:opacity-50"
-                    >
-                      {isMigrating ? '⏳ 遷移中...' : '🚀 執行時區遷移'}
-                    </Button>
-                  ) : (
-                    <div className="p-3 bg-orange-500/20 rounded-lg border border-orange-400/30">
-                      <p className="text-orange-200 text-sm">
-                        ⚠️ 需要管理員權限才能執行遷移操作
-                      </p>
-                      {session?.user && (
-                        <p className="text-orange-200 text-xs mt-1">
-                          您的角色是：{(session.user as any).role || 'EMPLOYEE'}，需要：ADMIN
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  
-                  {migrationStatus && (
-                    <p className="mt-2 text-sm font-mono bg-black/30 p-2 rounded">
-                      {migrationStatus}
-                    </p>
-                  )}
+                  {/* 遷移功能已移除 */}
                 </div>
               </div>
               

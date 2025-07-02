@@ -283,6 +283,20 @@ enum ContactType {
   BUILDER
 }
 
+enum ClockType {
+  CLOCK_IN
+  CLOCK_OUT
+  BREAK_START
+  BREAK_END
+}
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  SUSPENDED
+  CANCELLED
+}
+
 enum SettingKey {
   USE_CLASSIC_LAYOUT
   ENABLE_NOTIFICATIONS

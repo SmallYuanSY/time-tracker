@@ -2,7 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig = {
   /* config options here */
-  swcMinify: true,
   reactStrictMode: true,
   typescript: {
     ignoreBuildErrors: true,

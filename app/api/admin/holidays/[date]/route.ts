@@ -16,12 +16,12 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
-      return new NextResponse('Unauthorized', { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { date } = await context.params
     if (!date) {
-      return new NextResponse('Date is required', { status: 400 })
+      return NextResponse.json({ error: 'Date is required' }, { status: 400 })
     }
 
     // 查詢指定日期的假日資訊
@@ -39,6 +39,6 @@ export async function GET(
     })
   } catch (error) {
     console.error('Error fetching holiday:', error)
-    return new NextResponse('Internal Error', { status: 500 })
+    return NextResponse.json({ error: 'Internal Error' }, { status: 500 })
   }
 } 

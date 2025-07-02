@@ -1,28 +1,28 @@
-const { PrismaClient } = require('@prisma/client')
-const { hash } = require('bcryptjs')
+import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
 async function main() {
-  // 創建管理員帳號
-  const hashedPassword = await hash('admin123', 12)
-  await prisma.user.create({
-    data: {
-      email: 'admin@example.com',
-      password: hashedPassword,
-      name: '管理員',
-      role: 'ADMIN'
-    }
-  })
+  const admin = await prisma.user.upsert({
+    where: { email: 'alan6716s@gmail.com' },
+    update: {},
+    create: {
+      email: 'alan6716s@gmail.com',
+      employeeId: '20',
+      name: '羅祺翔',
+      role: 'WEB_ADMIN', // 直接使用 enum 名稱（Prisma 會自動轉換為 DB enum）
+      password: '$2b$10$lX/gEob3Zt0cHeb/.GJrYOzXLajTGKYUllWk4oKvB2jz4/9bH0A0W',
+    },
+  });
 
-  console.log('種子資料已建立')
+  console.log(`✅ Admin created: ${admin.name}`);
 }
 
 main()
   .catch((e) => {
-    console.error(e)
-    process.exit(1)
+    console.error(e);
+    process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect()
-  }) 
+    await prisma.$disconnect();
+  });

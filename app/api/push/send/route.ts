@@ -80,4 +80,4 @@ export async function POST(req: NextRequest) {
     console.error('發送推送通知失敗:', error);
     return new NextResponse('伺服器錯誤', { status: 500 });
   }
-} 
+}
