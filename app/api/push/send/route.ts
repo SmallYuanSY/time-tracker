@@ -5,11 +5,15 @@ import { prisma } from '@/lib/prisma';
 import webpush from 'web-push';
 
 // 設定 VAPID 詳細資訊
-webpush.setVapidDetails(
-  'mailto:' + process.env.VAPID_MAILTO_EMAIL!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
+if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    "mailto:" + (process.env.VAPID_MAILTO_EMAIL || "example@example.com"),
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY,
+  );
+} else {
+  console.warn("VAPID keys not configured, push notifications disabled");
+}
 
 export async function POST(req: NextRequest) {
   try {

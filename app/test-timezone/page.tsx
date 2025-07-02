@@ -13,6 +13,8 @@ export default function TestTimezonePage() {
 
   const [dataCheck, setDataCheck] = useState<any>(null)
   const [isChecking, setIsChecking] = useState(false)
+  const [isMigrating, setIsMigrating] = useState(false)
+  const [migrationStatus, setMigrationStatus] = useState<string | null>(null)
 
   useEffect(() => {
     const updateTime = () => {
@@ -72,6 +74,25 @@ export default function TestTimezonePage() {
       console.error('檢查資料失敗:', error)
     } finally {
       setIsChecking(false)
+    }
+  }
+
+  const runMigration = async () => {
+    setIsMigrating(true)
+    setMigrationStatus(null)
+    try {
+      const response = await fetch('/api/migrate-timezone', { method: 'POST' })
+      if (response.ok) {
+        const result = await response.json()
+        setMigrationStatus(result.message || '遷移成功')
+      } else {
+        setMigrationStatus('遷移失敗')
+      }
+    } catch (error) {
+      console.error('遷移失敗:', error)
+      setMigrationStatus('遷移失敗')
+    } finally {
+      setIsMigrating(false)
     }
   }
 
