@@ -1,4 +1,4 @@
-import { prisma } from '../prisma'
+import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcrypt'
 
 async function initAdmin() {
@@ -47,4 +47,4 @@ if (require.main === module) {
     })
 }
 
-export { initAdmin } 
+module.exports = { initAdmin } 

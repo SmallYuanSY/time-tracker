@@ -8,7 +8,7 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        identifier: { label: "Email 或姓名", type: "text" },
+        identifier: { label: "員工編號/Email/姓名", type: "text" },
         password: { label: "密碼", type: "password" },
       },
       async authorize(credentials) {
@@ -20,6 +20,7 @@ export const authOptions: NextAuthOptions = {
           const user = await prisma.user.findFirst({
             where: {
               OR: [
+                { employeeId: credentials.identifier },
                 { email: credentials.identifier },
                 { name: credentials.identifier }
               ]
@@ -41,6 +42,7 @@ export const authOptions: NextAuthOptions = {
 
           return {
             id: user.id,
+            employeeId: user.employeeId,
             name: user.name,
             email: user.email,
             role: user.role,
@@ -64,6 +66,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
+        token.employeeId = (user as any).employeeId
         token.role = (user as any).role
       }
       return token
@@ -71,6 +74,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (token && session.user) {
         (session.user as any).id = token.id as string
+        (session.user as any).employeeId = token.employeeId as string
         (session.user as any).role = token.role as string
       }
       return session

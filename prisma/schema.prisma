@@ -6,7 +6,6 @@ generator client {
 datasource db {
   provider = "postgresql"
   url = env("POSTGRES_URL")
-  directUrl = env("POSTGRES_URL_NON_POOLING")
   relationMode = "prisma"
 }
 
@@ -40,6 +39,20 @@ enum ContactType {
   BUILDER
 }
 
+enum ClockType {
+  CLOCK_IN    // 上班打卡
+  CLOCK_OUT   // 下班打卡
+  BREAK_START // 休息開始
+  BREAK_END   // 休息結束
+}
+
+enum ProjectStatus {
+  ACTIVE      // 進行中
+  COMPLETED   // 已完成
+  SUSPENDED   // 暫停
+  CANCELLED   // 已取消
+}
+
 enum SettingKey {
   USE_CLASSIC_LAYOUT  // 使用傳統佈局（標籤式）
   ENABLE_NOTIFICATIONS // 啟用通知
@@ -50,12 +63,13 @@ enum SettingKey {
 
 model User {
   id                 String    @id @default(cuid())
+  employeeId         String    @unique  // 員工編號，可用於登入
   name               String?
   email              String    @unique
   emailVerified     DateTime?
   image             String?
   password           String
-  role               UserRole  @default(EMPLOYEE)
+  role               UserRole    @default(EMPLOYEE)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   
@@ -95,7 +109,7 @@ model User {
 model clock {
   id        String   @id @default(cuid())
   userId    String
-  type      String
+  type      ClockType
   timestamp DateTime @default(now())
   ipAddress String?  // 打卡時的 IP 地址
   macAddress String? // 設備 MAC 地址
@@ -178,11 +192,11 @@ model LeaveRequest {
   id            String   @id @default(cuid())
   requesterId   String
   agentId       String
-  status        LeaveStatus @default(PENDING_AGENT)
+  status        LeaveStatus   @default(PENDING_AGENT)
   reason        String
   startDate     DateTime
   endDate       DateTime
-  agentApproved Boolean  @default(false) // 代理人是否已批准
+  agentApproved Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   agent         User     @relation("Agent", fields: [agentId], references: [id])
@@ -195,7 +209,7 @@ model Overtime {
   startTime DateTime
   endTime   DateTime?
   reason    String?
-  status    String    @default("PENDING")
+  status    LeaveStatus    @default(PENDING_ADMIN)
   startIpAddress String?  // 開始加班時的 IP 地址
   startMacAddress String? // 開始加班時的 MAC 地址
   startUserAgent String?  // 開始加班時的瀏覽器資訊
@@ -215,12 +229,12 @@ model Project {
   name        String
   description String?
   category    String
-  status      String    @default("ACTIVE")
+  status      ProjectStatus    @default(ACTIVE)
   managerId   String
   contactId   String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  Contact     Contact?  @relation(fields: [contactId], references: [id])
+  contact     Contact?  @relation(fields: [contactId], references: [id])
   manager     User      @relation("ProjectManager", fields: [managerId], references: [id])
   users       User[]
   workLogs    workLog[]
@@ -277,16 +291,13 @@ model OvertimeSignature {
 }
 
 model Holiday {
-  id          String      @id @default(cuid())
-  date        String      // 日期 (YYYY-MM-DD)
-  name        String      // 假日名稱
-  type        HolidayType // 假日類型
-  isHoliday   Boolean     @default(true) // true = 放假日, false = 補班日
-  description String?     // 額外描述
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-
-  @@unique([date])
+  id          String   @id @default(cuid())
+  date        DateTime @unique
+  name        String
+  type        HolidayType   @default(OTHER)
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model UserSetting {
