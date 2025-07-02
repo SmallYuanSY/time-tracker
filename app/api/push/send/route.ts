@@ -4,12 +4,18 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import webpush from 'web-push';
 
-// 設定 VAPID 詳細資訊
-webpush.setVapidDetails(
-  'mailto:' + process.env.VAPID_MAILTO_EMAIL!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
+// 設定 VAPID 詳細資訊 (若環境變數缺失則略過設定)
+const vapidEmail = process.env.VAPID_MAILTO_EMAIL;
+const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+
+if (vapidEmail && vapidPublicKey && vapidPrivateKey) {
+  webpush.setVapidDetails(
+    'mailto:' + vapidEmail,
+    vapidPublicKey,
+    vapidPrivateKey,
+  );
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -76,4 +82,4 @@ export async function POST(req: NextRequest) {
     console.error('發送推送通知失敗:', error);
     return new NextResponse('伺服器錯誤', { status: 500 });
   }
-} 
+}
