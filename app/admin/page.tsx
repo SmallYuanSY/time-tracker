@@ -18,9 +18,9 @@ import AttendanceSpreadsheet from '@/components/ui/AttendanceSpreadsheet'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 
-const WorkLogsPage = dynamic(() => import('./worklogs/page'), { ssr: false })
-const AttendancePage = dynamic(() => import('./attendance/page'), { ssr: false })
-const OvertimePage = dynamic(() => import('./overtime/page'), { ssr: false })
+const WorkLogsPage = dynamic(() => import('./worklogs/WorkLogsPage'), { ssr: false })
+const AttendancePage = dynamic(() => import('./attendance/AttendancePage'), { ssr: false })
+const OvertimePage = dynamic(() => import('./overtime/OvertimePage'), { ssr: false })
 
 interface User {
   id: string
