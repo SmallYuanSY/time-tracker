@@ -1,301 +1,232 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["referentialIntegrity"]
 }
 
 datasource db {
-  provider = "postgresql" // 或 "mysql" 如果使用 PlanetScale
-  url = env("DATABASE_URL")
-  relationMode = "prisma" // 支援 Vercel 的無伺服器環境
-}
-
-enum UserRole {
-  ADMIN       // 管理員
-  WEB_ADMIN   // 網頁管理
-  EMPLOYEE    // 員工
-}
-
-enum LeaveStatus {
-  PENDING_AGENT   // 等待代理人審核
-  AGENT_REJECTED  // 代理人拒絕
-  PENDING_ADMIN   // 等待管理員審核
-  ADMIN_REJECTED  // 管理員拒絕
-  APPROVED        // 已批准
-}
-
-enum HolidayType {
-  NATIONAL_HOLIDAY    // 國定假日
-  WEEKEND            // 例假日（週六日）
-  SPECIAL_HOLIDAY    // 特殊節日
-  MAKEUP_WORKDAY     // 補班日
-  TRANSFER_HOLIDAY   // 調整放假
-  OTHER              // 其他
-}
-
-enum ContactType {
-  CONTACT
-  SUPPLIER
-  CUSTOMER
-  BUILDER
-}
-
-enum SettingKey {
-  USE_CLASSIC_LAYOUT  // 使用傳統佈局（標籤式）
-  ENABLE_NOTIFICATIONS // 啟用通知
-  DARK_MODE          // 深色模式
-  COMPACT_VIEW       // 精簡視圖
-  AUTO_CLOCK_OUT     // 自動下班提醒
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
 }
 
 model User {
-  id                 String    @id @default(cuid())
-  name               String?
-  email              String    @unique
-  emailVerified     DateTime?
-  image             String?
-  password           String
-  role               UserRole  @default(EMPLOYEE)
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  
-  // 使用者設定
-  settings          UserSetting[]
-
-  // 工作記錄關聯
-  workLogs           workLog[]
-  projects           Project[]
-  managedProjects    Project[] @relation("ProjectManager")
-
-  // 打卡記錄關聯
-  clocks             clock[]
-
-  // 請假關聯
-  agentLeaves        LeaveRequest[] @relation("Agent")
-  requestedLeaves    LeaveRequest[] @relation("Requester")
-
-  // 加班記錄關聯
-  overtimes          Overtime[]
-
-  // 排程工作關聯
-  scheduledWorks     ScheduledWork[]
-
-  // 考勤簽名關聯
-  signedAttendance   AttendanceSignature[] @relation("SignedAttendance")
+  id                   String                @id @default(cuid())
+  name                 String?
+  email                String                @unique
+  emailVerified        DateTime?
+  image                String?
+  password             String
+  role                 UserRole              @default(EMPLOYEE)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  settings             UserSetting[]
+  workLogs             workLog[]
+  projects             Project[]
+  managedProjects      Project[]             @relation("ProjectManager")
+  clocks               clock[]
+  agentLeaves          LeaveRequest[]        @relation("Agent")
+  requestedLeaves      LeaveRequest[]        @relation("Requester")
+  overtimes            Overtime[]
+  scheduledWorks       ScheduledWork[]
+  signedAttendance     AttendanceSignature[] @relation("SignedAttendance")
   attendanceSignatures AttendanceSignature[] @relation("AttendanceSigner")
-
-  // 加班簽名關聯
-  signedOvertime     OvertimeSignature[] @relation("SignedOvertime")
-  overtimeSignatures OvertimeSignature[] @relation("OvertimeSigner")
-
-  // 推送訂閱關聯
-  pushSubscriptions  PushSubscription[]
+  signedOvertime       OvertimeSignature[]   @relation("SignedOvertime")
+  overtimeSignatures   OvertimeSignature[]   @relation("OvertimeSigner")
+  pushSubscriptions    PushSubscription[]
 }
 
 model clock {
-  id        String   @id @default(cuid())
-  userId    String
-  type      String
-  timestamp DateTime @default(now())
-  ipAddress String?  // 打卡時的 IP 地址
-  macAddress String? // 設備 MAC 地址
-  userAgent String?  // 瀏覽器資訊
-  deviceInfo String? // 設備信息（JSON字串）
-  isEdited      Boolean   @default(false) // 是否被編輯過
-  editReason    String?   // 編輯原因
-  editedBy      String?   // 編輯者ID
-  editedAt      DateTime? // 編輯時間
-  editIpAddress String?   // 編輯時的IP地址
-  originalTimestamp DateTime? // 原始打卡時間（如果被編輯）
-  user      User     @relation(fields: [userId], references: [id])
+  id                String    @id @default(cuid())
+  userId            String
+  type              String
+  timestamp         DateTime  @default(now())
+  ipAddress         String?
+  macAddress        String?
+  userAgent         String?
+  deviceInfo        String?
+  isEdited          Boolean   @default(false)
+  editReason        String?
+  editedBy          String?
+  editedAt          DateTime?
+  editIpAddress     String?
+  originalTimestamp DateTime?
+  user              User      @relation(fields: [userId], references: [id])
 }
 
 model workLog {
-  id          String    @id @default(cuid())
-  userId      String
-  projectId   String?
-  startTime   DateTime
-  endTime     DateTime?
-  projectCode String
-  projectName String
-  category    String
-  content     String
-  isOvertime       Boolean   @default(false) // 是否為加班記錄
-  isEdited         Boolean   @default(false) // 是否被編輯過
-  editReason       String?   // 編輯原因
-  editedBy         String?   // 編輯者ID
-  editedAt         DateTime? // 編輯時間
-  editIpAddress    String?   // 編輯時的IP地址
-  originalStartTime DateTime? // 原始開始時間（如果被編輯）
-  originalEndTime   DateTime? // 原始結束時間（如果被編輯）
-  project     Project?  @relation(fields: [projectId], references: [id])
-  user        User      @relation(fields: [userId], references: [id])
-}
-
-enum WorkType {
-  SCHEDULED  // 預定工作（下週工作）
-  URGENT     // 臨時工作（本週工作）
+  id                String    @id @default(cuid())
+  userId            String
+  projectId         String?
+  startTime         DateTime
+  endTime           DateTime?
+  projectCode       String
+  projectName       String
+  category          String
+  content           String
+  isOvertime        Boolean   @default(false)
+  isEdited          Boolean   @default(false)
+  editReason        String?
+  editedBy          String?
+  editedAt          DateTime?
+  editIpAddress     String?
+  originalStartTime DateTime?
+  originalEndTime   DateTime?
+  project           Project?  @relation(fields: [projectId], references: [id])
+  user              User      @relation(fields: [userId], references: [id])
 }
 
 model WorkCategory {
   id          String   @id @default(cuid())
-  categoryId  String   @unique // 分類唯一識別碼
-  title       String   // 分類標題
-  content     String   // 分類內容
-  icon        String?  // 圖示
-  description String?  // 描述
-  colorBg     String   // 背景顏色
-  colorText   String   // 文字顏色
-  colorBorder String   // 邊框顏色
-  colorAccent String   // 強調色
+  categoryId  String   @unique
+  title       String
+  content     String
+  icon        String?
+  description String?
+  colorBg     String
+  colorText   String
+  colorBorder String
+  colorAccent String
   isActive    Boolean  @default(true)
-  isSystem    Boolean  @default(false) // 是否為系統預設分類
-  sortOrder   Int      @default(0) // 排序順序
+  isSystem    Boolean  @default(false)
+  sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
 model ScheduledWork {
-  id          String   @id @default(cuid())
-  userId      String
-  projectId   String?
-  projectCode String
-  projectName String
-  category    String
-  content     String
-  priority    Int      @default(0) // 排序優先級
-  isCompleted Boolean  @default(false)
-  workType    WorkType @default(SCHEDULED) // 工作類型（預定/臨時）
-  scheduledStartDate DateTime // 預定開始日期
-  scheduledEndDate   DateTime // 預定結束日期
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  project     Project? @relation(fields: [projectId], references: [id])
-  user        User     @relation(fields: [userId], references: [id])
+  id                 String   @id @default(cuid())
+  userId             String
+  projectId          String?
+  projectCode        String
+  projectName        String
+  category           String
+  content            String
+  priority           Int      @default(0)
+  isCompleted        Boolean  @default(false)
+  workType           WorkType @default(SCHEDULED)
+  scheduledStartDate DateTime
+  scheduledEndDate   DateTime
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  project            Project? @relation(fields: [projectId], references: [id])
+  user               User     @relation(fields: [userId], references: [id])
 }
 
 model LeaveRequest {
-  id            String   @id @default(cuid())
+  id            String      @id @default(cuid())
   requesterId   String
   agentId       String
   status        LeaveStatus @default(PENDING_AGENT)
   reason        String
   startDate     DateTime
   endDate       DateTime
-  agentApproved Boolean  @default(false) // 代理人是否已批准
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  agent         User     @relation("Agent", fields: [agentId], references: [id])
-  requester     User     @relation("Requester", fields: [requesterId], references: [id])
+  agentApproved Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  agent         User        @relation("Agent", fields: [agentId], references: [id])
+  requester     User        @relation("Requester", fields: [requesterId], references: [id])
 }
 
 model Overtime {
-  id        String    @id @default(cuid())
-  userId    String
-  startTime DateTime
-  endTime   DateTime?
-  reason    String?
-  status    String    @default("PENDING")
-  startIpAddress String?  // 開始加班時的 IP 地址
-  startMacAddress String? // 開始加班時的 MAC 地址
-  startUserAgent String?  // 開始加班時的瀏覽器資訊
-  startDeviceInfo String? // 開始加班時的設備信息（JSON字串）
-  endIpAddress String?    // 結束加班時的 IP 地址
-  endMacAddress String?   // 結束加班時的 MAC 地址
-  endUserAgent String?    // 結束加班時的瀏覽器資訊
-  endDeviceInfo String?   // 結束加班時的設備信息（JSON字串）
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  user      User      @relation(fields: [userId], references: [id])
+  id              String    @id @default(cuid())
+  userId          String
+  startTime       DateTime
+  endTime         DateTime?
+  reason          String?
+  status          String    @default("PENDING")
+  startIpAddress  String?
+  startMacAddress String?
+  startUserAgent  String?
+  startDeviceInfo String?
+  endIpAddress    String?
+  endMacAddress   String?
+  endUserAgent    String?
+  endDeviceInfo   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id])
 }
 
 model Project {
-  id          String    @id @default(cuid())
-  code        String    @unique
-  name        String
-  description String?
-  category    String
-  status      String    @default("ACTIVE")
-  managerId   String
-  contactId   String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  Contact     Contact?  @relation(fields: [contactId], references: [id])
-  manager     User      @relation("ProjectManager", fields: [managerId], references: [id])
-  users       User[]
-  workLogs    workLog[]
+  id             String          @id @default(cuid())
+  code           String          @unique
+  name           String
+  description    String?
+  category       String
+  status         String          @default("ACTIVE")
+  managerId      String
+  contactId      String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  Contact        Contact?        @relation(fields: [contactId], references: [id])
+  manager        User            @relation("ProjectManager", fields: [managerId], references: [id])
+  users          User[]
+  workLogs       workLog[]
   scheduledWorks ScheduledWork[]
 }
 
 model Contact {
-  id          String    @id @default(cuid())
+  id          String      @id @default(cuid())
   companyName String
   address     String
   phone       String
   contactName String
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime    @default(now())
   type        ContactType @default(CONTACT)
-  updatedAt   DateTime  @updatedAt
+  updatedAt   DateTime    @updatedAt
   notes       String?
   Project     Project[]
 }
 
 model AttendanceSignature {
   id        String   @id @default(cuid())
-  userId    String   // 被簽名的員工ID
-  date      String   // 簽名的日期 (YYYY-MM-DD)
-  signedBy  String   // 簽名者ID (管理員)
-  signedAt  DateTime @default(now()) // 簽名時間
-  note      String?  // 簽名備註
+  userId    String
+  date      String
+  signedBy  String
+  signedAt  DateTime @default(now())
+  note      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  // 關聯
   user      User     @relation("SignedAttendance", fields: [userId], references: [id])
   signer    User     @relation("AttendanceSigner", fields: [signedBy], references: [id])
-  
-  // 確保同一管理員對同一用戶同一天只能簽名一次
+
   @@unique([userId, date, signedBy])
 }
 
 model OvertimeSignature {
   id        String   @id @default(cuid())
-  userId    String   // 被簽名的員工ID
-  date      String   // 簽名的日期 (YYYY-MM-DD)
-  signedBy  String   // 簽名者ID (管理員)
-  signedAt  DateTime @default(now()) // 簽名時間
-  note      String?  // 簽名備註
+  userId    String
+  date      String
+  signedBy  String
+  signedAt  DateTime @default(now())
+  note      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  // 關聯
   user      User     @relation("SignedOvertime", fields: [userId], references: [id])
   signer    User     @relation("OvertimeSigner", fields: [signedBy], references: [id])
-  
-  // 確保同一管理員對同一用戶同一天只能簽名一次
+
   @@unique([userId, date, signedBy])
 }
 
 model Holiday {
   id          String      @id @default(cuid())
-  date        String      // 日期 (YYYY-MM-DD)
-  name        String      // 假日名稱
-  type        HolidayType // 假日類型
-  isHoliday   Boolean     @default(true) // true = 放假日, false = 補班日
-  description String?     // 額外描述
+  date        String      @unique
+  name        String
+  type        HolidayType
+  isHoliday   Boolean     @default(true)
+  description String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
-
-  @@unique([date])
 }
 
 model UserSetting {
-  id          String     @id @default(cuid())
-  userId      String
-  key         SettingKey
-  value       String     // 使用 JSON 字串儲存值
-  updatedAt   DateTime   @updatedAt
-  createdAt   DateTime   @default(now())
-  user        User       @relation(fields: [userId], references: [id])
+  id        String     @id @default(cuid())
+  userId    String
+  key       SettingKey
+  value     String
+  updatedAt DateTime   @updatedAt
+  createdAt DateTime   @default(now())
+  user      User       @relation(fields: [userId], references: [id])
 
   @@unique([userId, key])
 }
@@ -311,4 +242,56 @@ model PushSubscription {
   user      User     @relation(fields: [userId], references: [id])
 
   @@unique([userId, endpoint])
+}
+
+model ProjectToUser {
+  A String
+  B String
+
+  @@id([A, B], map: "_ProjectToUser_AB_pkey")
+  @@index([B], map: "_ProjectToUser_B_index")
+  @@map("_ProjectToUser")
+}
+
+enum UserRole {
+  ADMIN
+  WEB_ADMIN
+  EMPLOYEE
+}
+
+enum LeaveStatus {
+  PENDING_AGENT
+  AGENT_REJECTED
+  PENDING_ADMIN
+  ADMIN_REJECTED
+  APPROVED
+}
+
+enum HolidayType {
+  NATIONAL_HOLIDAY
+  WEEKEND
+  SPECIAL_HOLIDAY
+  MAKEUP_WORKDAY
+  TRANSFER_HOLIDAY
+  OTHER
+}
+
+enum ContactType {
+  CONTACT
+  SUPPLIER
+  CUSTOMER
+  BUILDER
+}
+
+enum SettingKey {
+  USE_CLASSIC_LAYOUT
+  ENABLE_NOTIFICATIONS
+  DARK_MODE
+  COMPACT_VIEW
+  AUTO_CLOCK_OUT
+}
+
+enum WorkType {
+  SCHEDULED
+  URGENT
 }
