@@ -11,6 +11,12 @@ CREATE TYPE "HolidayType" AS ENUM ('NATIONAL_HOLIDAY', 'WEEKEND', 'SPECIAL_HOLID
 CREATE TYPE "ContactType" AS ENUM ('CONTACT', 'SUPPLIER', 'CUSTOMER', 'BUILDER');
 
 -- CreateEnum
+CREATE TYPE "ClockType" AS ENUM ('CLOCK_IN', 'CLOCK_OUT', 'BREAK_START', 'BREAK_END');
+
+-- CreateEnum
+CREATE TYPE "ProjectStatus" AS ENUM ('ACTIVE', 'COMPLETED', 'SUSPENDED', 'CANCELLED');
+
+-- CreateEnum
 CREATE TYPE "SettingKey" AS ENUM ('USE_CLASSIC_LAYOUT', 'ENABLE_NOTIFICATIONS', 'DARK_MODE', 'COMPACT_VIEW', 'AUTO_CLOCK_OUT');
 
 -- CreateEnum
@@ -19,6 +25,7 @@ CREATE TYPE "WorkType" AS ENUM ('SCHEDULED', 'URGENT');
 -- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
+    "employeeId" TEXT NOT NULL,
     "name" TEXT,
     "email" TEXT NOT NULL,
     "emailVerified" TIMESTAMP(3),
@@ -35,7 +42,7 @@ CREATE TABLE "User" (
 CREATE TABLE "clock" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
-    "type" TEXT NOT NULL,
+    "type" "ClockType" NOT NULL,
     "timestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "ipAddress" TEXT,
     "macAddress" TEXT,
@@ -138,7 +145,7 @@ CREATE TABLE "Overtime" (
     "startTime" TIMESTAMP(3) NOT NULL,
     "endTime" TIMESTAMP(3),
     "reason" TEXT,
-    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "status" "LeaveStatus" NOT NULL DEFAULT 'PENDING_ADMIN',
     "startIpAddress" TEXT,
     "startMacAddress" TEXT,
     "startUserAgent" TEXT,
@@ -160,7 +167,7 @@ CREATE TABLE "Project" (
     "name" TEXT NOT NULL,
     "description" TEXT,
     "category" TEXT NOT NULL,
-    "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+    "status" "ProjectStatus" NOT NULL DEFAULT 'ACTIVE',
     "managerId" TEXT NOT NULL,
     "contactId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -215,10 +222,9 @@ CREATE TABLE "OvertimeSignature" (
 -- CreateTable
 CREATE TABLE "Holiday" (
     "id" TEXT NOT NULL,
-    "date" TEXT NOT NULL,
+    "date" TIMESTAMP(3) NOT NULL,
     "name" TEXT NOT NULL,
-    "type" "HolidayType" NOT NULL,
-    "isHoliday" BOOLEAN NOT NULL DEFAULT true,
+    "type" "HolidayType" NOT NULL DEFAULT 'OTHER',
     "description" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -258,6 +264,9 @@ CREATE TABLE "_ProjectToUser" (
 
     CONSTRAINT "_ProjectToUser_AB_pkey" PRIMARY KEY ("A","B")
 );
+
+-- CreateIndex
+CREATE UNIQUE INDEX "User_employeeId_key" ON "User"("employeeId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");

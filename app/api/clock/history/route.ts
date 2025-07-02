@@ -12,12 +12,12 @@ export async function GET(req: NextRequest) {
     const includeDeviceInfo = searchParams.get('includeDeviceInfo') === 'true'
 
     if (!userId) {
-      return new NextResponse('Missing userId', { status: 400 })
+      return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
     }
 
     const session = await getServerSession(authOptions)
     if (!session?.user || !(session.user as any).id) {
-      return new NextResponse('Unauthorized', { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // 檢查權限：一般用戶只能查看自己的記錄，管理員可以查看設備資訊
@@ -32,10 +32,10 @@ export async function GET(req: NextRequest) {
       })
       
       if (!currentUser || (currentUser.role !== 'ADMIN' && currentUser.role !== 'WEB_ADMIN')) {
-        return new NextResponse('Forbidden', { status: 403 })
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
     } else if (!isOwnRecord) {
-      return new NextResponse('Forbidden', { status: 403 })
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // 建立日期範圍查詢條件
@@ -86,6 +86,6 @@ export async function GET(req: NextRequest) {
     if (process.env.NODE_ENV !== 'production') {
       console.error('[GET /api/clock/history]', error)
     }
-    return new NextResponse('Internal Server Error', { status: 500 })
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 } 
