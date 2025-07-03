@@ -346,6 +346,9 @@ export default function OvertimeSpreadsheet({
               headers={csvHeaders}
               filename={csvFilename}
               className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-green-600 bg-green-600 hover:bg-green-700 text-white h-9 px-3"
+              encodeKeysBeforeTransform={true}
+              separator=","
+              uFEFF={true}
             >
               <Download className="w-4 h-4 mr-2" />
               匯出 CSV

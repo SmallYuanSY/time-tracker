@@ -298,15 +298,24 @@ export default function AttendanceSpreadsheet({
     }
   }
 
-
-
   // 準備 CSV 資料
   const csvData = useMemo(() => {
     if (!selectedUser || spreadsheetData.length === 0) return []
     
-    return spreadsheetData.map(row => 
-      row.map(cell => cell.value)
-    )
+    return spreadsheetData.slice(1).map(row => ({
+      name: selectedUser.name || selectedUser.email,
+      date: format(parseISO(row[1].value as string), 'yyyy/MM/dd'),
+      day: row[2].value,
+      startTime: row[3].value,
+      endTime: row[4].value,
+      duration: row[5].value,
+      overtime: row[6].value,
+      isEdited: row[7].value,
+      signStatus: row[8].value,
+      signers: row[9].value,
+      signTime: row[10].value,
+      signNote: row[11].value
+    }))
   }, [selectedUser, spreadsheetData])
 
   const csvHeaders = [
@@ -346,16 +355,20 @@ export default function AttendanceSpreadsheet({
             <FileSpreadsheet className="w-5 h-5" />
             考勤記錄電子表格 - {selectedUser.name || selectedUser.email}
           </CardTitle>
-                     <div className="flex items-center gap-2">
-             <CSVLink
-               data={csvData}
-               filename={csvFilename}
-               className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-green-600 bg-green-600 hover:bg-green-700 text-white h-9 px-3"
-             >
-               <Download className="w-4 h-4 mr-2" />
-               匯出 CSV
-             </CSVLink>
-           </div>
+          <div className="flex items-center gap-2">
+            <CSVLink
+              data={csvData}
+              headers={csvHeaders}
+              filename={csvFilename}
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-green-600 bg-green-600 hover:bg-green-700 text-white h-9 px-3"
+              encodeKeysBeforeTransform={true}
+              separator=","
+              uFEFF={true}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              匯出 CSV
+            </CSVLink>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="p-6">
