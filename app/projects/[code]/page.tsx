@@ -1,38 +1,13 @@
 'use client'
 
+import Link from 'next/link'
+import { Card } from '@/components/ui/card'
 import { useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { Card } from '@/components/ui/card'
-import Link from 'next/link'
-
-interface User {
-  id: string
-  name: string | null
-  email: string
-}
-
-interface Contact {
-  id: string
-  companyName: string
-  contactName: string
-  phone: string
-  address: string
-}
-
-interface Project {
-  id: string
-  code: string
-  name: string
-  description: string | null
-  category: string
-  status: string
-  Contact: Contact | null
-  manager: User
-  users: User[]
-}
+import { Project } from '@/types/project'
 
 export default function ProjectDetailPage() {
-  const params = useParams()
+  const params = useParams() as { code: string }
   const [project, setProject] = useState<Project | null>(null)
 
   useEffect(() => {
@@ -44,17 +19,15 @@ export default function ProjectDetailPage() {
       }
     }
 
-    if (params.code) {
-      fetchProject()
-    }
+    fetchProject()
   }, [params.code])
 
   if (!project) {
-    return <div className="flex items-center justify-center min-h-screen">載入中...</div>
+    return <div>載入中...</div>
   }
 
   return (
-    <div className="container mx-auto p-4">
+    <>
       <div className="mb-4">
         <Link href="/projects" className="text-blue-500 hover:text-blue-700">
           ← 返回案件列表
@@ -152,6 +125,6 @@ export default function ProjectDetailPage() {
           </div>
         </Card>
       </div>
-    </div>
+    </>
   )
 } 
