@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Calendar, Target, FileText } from 'lucide-react'
 import { useSession } from 'next-auth/react'
@@ -10,6 +9,7 @@ import ProjectSelector from '@/components/ui/ProjectSelector'
 import CategorySelector from '@/components/ui/CategorySelector'
 import { Project } from '@/lib/hooks/useProjectSelection'
 import { WorkCategory } from '@/lib/data/workCategories'
+import { extraTasks } from '@/lib/data/extraTasks'
 
 interface ScheduledWork {
   id: string
@@ -25,6 +25,51 @@ interface ScheduledWork {
   createdAt: string
   updatedAt: string
 }
+
+interface WorkTemplate {
+  title: string
+  description: string
+  content: string
+  category: string
+  priority: number
+  tags: { text: string; color: string }[]
+}
+
+const workTemplates: WorkTemplate[] = [
+  {
+    title: '每週進度報告',
+    description: '週報撰寫與提交，包含工作進度、問題與計畫',
+    content: '1. 本週完成工作項目回顧\n2. 遇到的問題與解決方案\n3. 下週工作計畫\n4. 需要協助的事項',
+    category: '文書作業',
+    priority: 4,
+    tags: [
+      { text: '週期性', color: 'blue' },
+      { text: '文書', color: 'green' }
+    ]
+  },
+  {
+    title: '系統維護檢查',
+    description: '定期系統檢查、效能監控與維護工作',
+    content: '1. 系統效能檢查\n2. 資料庫效能監控\n3. 系統日誌分析\n4. 安全性更新檢查\n5. 效能調校建議',
+    category: '系統維護',
+    priority: 3,
+    tags: [
+      { text: '週期性', color: 'blue' },
+      { text: '維護', color: 'purple' }
+    ]
+  },
+  {
+    title: '資料備份',
+    description: '系統資料庫與檔案的定期備份作業',
+    content: '1. 資料庫完整備份\n2. 檔案系統備份\n3. 備份檔案完整性驗證\n4. 備份記錄文件製作',
+    category: '系統維護',
+    priority: 2,
+    tags: [
+      { text: '週期性', color: 'blue' },
+      { text: '資料', color: 'yellow' }
+    ]
+  }
+]
 
 interface ScheduledWorkModalProps {
   open: boolean
@@ -45,6 +90,7 @@ export default function ScheduledWorkModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [selectedProjects, setSelectedProjects] = useState<Project[]>([])
+  const [selectedExtraTasks, setSelectedExtraTasks] = useState<string[]>([])
 
   // 表單狀態
   const [formData, setFormData] = useState({
@@ -264,6 +310,16 @@ export default function ScheduledWorkModal({
     }
   }
 
+  // 在 ScheduledWorkModal 組件內添加處理函數
+  const handleTemplateClick = (template: WorkTemplate) => {
+    setFormData(prev => ({
+      ...prev,
+      category: template.category,
+      content: template.content,
+      priority: template.priority
+    }))
+  }
+
   const priorityOptions = [
     { value: 1, label: '🔴 最高', color: 'text-red-400' },
     { value: 2, label: '🟠 高', color: 'text-orange-400' },
@@ -277,7 +333,7 @@ export default function ScheduledWorkModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-gray-900/95 backdrop-blur-lg border border-white/20 text-white">
+      <DialogContent className="max-w-[1200px] max-h-[90vh] overflow-y-auto bg-gray-900/95 backdrop-blur-lg border border-white/20 text-white">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold text-white flex items-center gap-2">
             <Target className="h-5 w-5" />
@@ -288,137 +344,184 @@ export default function ScheduledWorkModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          {/* 錯誤訊息 */}
-          {errors.length > 0 && (
-            <div className="bg-red-500/20 border border-red-400/30 rounded-lg p-3">
-              <ul className="text-red-100 text-sm space-y-1">
-                {errors.map((error, index) => (
-                  <li key={index}>• {error}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+        <div className="flex gap-4">
+          {/* 主要表單區域 */}
+          <div className="flex-1 space-y-6 py-4">
+            {/* 錯誤訊息 */}
+            {errors.length > 0 && (
+              <div className="bg-red-500/20 border border-red-400/30 rounded-lg p-3">
+                <ul className="text-red-100 text-sm space-y-1">
+                  {errors.map((error, index) => (
+                    <li key={index}>• {error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
-          {/* 工作類型指示器 */}
-          <div className="bg-white/5 rounded-lg p-3 border border-white/20">
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${formData.workType === 'URGENT' ? 'bg-orange-400' : 'bg-blue-400'}`}></div>
-              <span className="text-sm font-medium text-white">
-                {formData.workType === 'URGENT' ? '🔥 臨時工作' : '📅 預定工作'}
-              </span>
-              <span className="text-xs text-white/60 ml-auto">
-                {formData.workType === 'URGENT' ? '本週執行' : '下週或以後執行'}
-              </span>
-            </div>
-          </div>
-
-          {/* 專案選擇器 */}
-          <ProjectSelector
-            selectedProjects={selectedProjects}
-            onProjectSelect={handleProjectSelect}
-            onProjectRemove={handleProjectRemove}
-            onNewProject={handleNewProject}
-            projectCode={formData.projectCode}
-            projectName={formData.projectName}
-            onProjectCodeInputChange={(code) => setFormData(prev => ({ ...prev, projectCode: code }))}
-            onProjectNameChange={(name) => setFormData(prev => ({ ...prev, projectName: name }))}
-            onProjectCodeChange={(code, project) => {
-              if (project) {
-                handleProjectSelect(project)
-              }
-            }}
-            showRecentProjects={true}
-            showExtraTasks={false}
-            disabled={isSubmitting}
-          />
-
-          {/* 工作分類選擇器 */}
-          <CategorySelector
-            value={formData.category}
-            onChange={handleCategorySelect}
-            required={true}
-          />
-
-          {/* 日期和優先級 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                預定開始日期 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={formData.scheduledStartDate}
-                onChange={(e) => handleStartDateChange(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-md bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+            {/* 工作類型指示器 */}
+            <div className="bg-white/5 rounded-lg p-3 border border-white/20">
+              <div className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${formData.workType === 'URGENT' ? 'bg-orange-400' : 'bg-blue-400'}`}></div>
+                <span className="text-sm font-medium text-white">
+                  {formData.workType === 'URGENT' ? '🔥 臨時工作' : '📅 預定工作'}
+                </span>
+                <span className="text-xs text-white/60 ml-auto">
+                  {formData.workType === 'URGENT' ? '本週執行' : '下週或以後執行'}
+                </span>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                預定結束日期 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={formData.scheduledEndDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, scheduledEndDate: e.target.value }))}
-                className="w-full p-3 border border-gray-300 rounded-md bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Target className="h-4 w-4" />
-                優先級
-              </label>
-              <select
-                value={formData.priority}
-                onChange={(e) => setFormData(prev => ({ ...prev, priority: parseInt(e.target.value) }))}
-                className="w-full p-3 border border-gray-300 rounded-md bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                {priorityOptions.map((option) => (
-                  <option key={option.value} value={option.value} className="bg-gray-800">
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* 工作內容 */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              工作內容 <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={formData.content}
-              onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
-              placeholder="請詳細描述預定要執行的工作內容..."
-              className="w-full p-3 border border-gray-300 rounded-md resize-vertical min-h-[100px] bg-white/10 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              rows={4}
-            />
-          </div>
-
-          {/* 按鈕區域 */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-white/20">
-            <Button 
-              variant="outline" 
-              onClick={onClose}
+            {/* 專案選擇器 */}
+            <ProjectSelector
+              selectedProjects={selectedProjects}
+              onProjectSelect={handleProjectSelect}
+              onProjectRemove={handleProjectRemove}
+              onNewProject={handleNewProject}
+              projectCode={formData.projectCode}
+              projectName={formData.projectName}
+              onProjectCodeInputChange={(code) => setFormData(prev => ({ ...prev, projectCode: code }))}
+              onProjectNameChange={(name) => setFormData(prev => ({ ...prev, projectName: name }))}
+              onProjectCodeChange={(code, project) => {
+                if (project) {
+                  handleProjectSelect(project)
+                }
+              }}
+              showRecentProjects={true}
+              showExtraTasks={true}
               disabled={isSubmitting}
-              className="bg-white/10 border-white/30 text-white hover:bg-white/20"
-            >
-              取消
-            </Button>
-            <Button 
-              onClick={handleSubmit}
-              disabled={isSubmitting || !formData.projectCode.trim() || !formData.projectName.trim() || !formData.category.trim() || !formData.content.trim()}
-              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold min-w-[100px]"
-            >
-              {isSubmitting ? '提交中...' : editData ? '更新' : '新增'}
-            </Button>
+              className="bg-white/5 rounded-lg p-4 border border-white/20"
+            />
+
+            {/* 工作分類選擇器 */}
+            <CategorySelector
+              value={formData.category}
+              onChange={handleCategorySelect}
+              required={true}
+              className="bg-white/5 rounded-lg p-4 border border-white/20"
+            />
+
+            {/* 日期和優先級 */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  預定開始日期 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={formData.scheduledStartDate}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-md bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  預定結束日期 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={formData.scheduledEndDate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, scheduledEndDate: e.target.value }))}
+                  className="w-full p-3 border border-gray-300 rounded-md bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  優先級
+                </label>
+                <select
+                  value={formData.priority}
+                  onChange={(e) => setFormData(prev => ({ ...prev, priority: parseInt(e.target.value) }))}
+                  className="w-full p-3 border border-gray-300 rounded-md bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  {priorityOptions.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-gray-800">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* 工作內容 */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                工作內容 <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={formData.content}
+                onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+                placeholder="請詳細描述預定要執行的工作內容..."
+                className="w-full p-3 border border-gray-300 rounded-md resize-vertical min-h-[100px] bg-white/10 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                rows={4}
+              />
+            </div>
+
+            {/* 按鈕區域 */}
+            <div className="flex justify-end gap-3 pt-4 border-t border-white/20">
+              <Button 
+                variant="outline" 
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+              >
+                取消
+              </Button>
+              <Button 
+                onClick={handleSubmit}
+                disabled={isSubmitting || !formData.projectCode.trim() || !formData.projectName.trim() || !formData.category.trim() || !formData.content.trim()}
+                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold min-w-[100px]"
+              >
+                {isSubmitting ? '提交中...' : editData ? '更新' : '新增'}
+              </Button>
+            </div>
+          </div>
+
+          {/* 其他工作側邊欄 */}
+          <div className="relative bg-white/10 backdrop-blur-lg border border-white/20 ring-1 ring-white/10 rounded-3xl shadow-xl p-6 w-64 flex-shrink-0">
+            <div className="text-white font-bold text-lg mb-4 text-center">其他工作</div>
+            <div className="space-y-3">
+              {extraTasks.map(task => (
+                <label key={task.projectCode} className="flex items-center gap-3 text-white/90 hover:text-white transition-colors cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={selectedExtraTasks.includes(task.projectCode)}
+                    onChange={() => {
+                      if (selectedExtraTasks.includes(task.projectCode)) {
+                        setSelectedExtraTasks(prev => prev.filter(code => code !== task.projectCode))
+                      } else {
+                        setSelectedExtraTasks(prev => [...prev, task.projectCode])
+                        // 當選中額外工作時,自動填入相關資訊
+                        setFormData(prev => ({
+                          ...prev,
+                          projectCode: task.projectCode,
+                          projectName: task.projectName,
+                          category: task.category || prev.category
+                        }))
+                      }
+                    }}
+                    className="w-4 h-4 rounded border-white/30 bg-white/20 text-blue-500 focus:ring-blue-500/50"
+                  />
+                  <div className="flex-1 group-hover:translate-x-1 transition-transform">
+                    <div className="font-medium text-sm">{task.projectCode}</div>
+                    <div className="text-xs text-white/70">{task.projectName}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            
+            <div className="mt-6 p-3 rounded-xl bg-white/5 border border-white/10">
+              <div className="text-white/80 text-xs text-center">
+                💡 選擇適用的其他工作類型
+              </div>
+            </div>
+
+            <div className="absolute inset-0 rounded-3xl pointer-events-none ring-1 ring-white/10 border border-white/10" />
           </div>
         </div>
       </DialogContent>

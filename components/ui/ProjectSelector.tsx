@@ -238,30 +238,6 @@ export default function ProjectSelector({
           required={false}
         />
       )}
-
-      {/* 額外工作類型 */}
-      {showExtraTasks && (
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-white">其他工作</label>
-          <div className="space-y-2">
-            {extraTasks.map(task => (
-              <label key={task.projectCode} className="flex items-center gap-3 text-white/90 hover:text-white transition-colors cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={!!selectedProjects.find(p => p.projectCode === task.projectCode)}
-                  onChange={() => !disabled && onProjectSelect(task)}
-                  disabled={disabled}
-                  className="w-4 h-4 rounded border-white/30 bg-white/20 text-blue-500 focus:ring-blue-500/50"
-                />
-                <div className="flex-1 group-hover:translate-x-1 transition-transform">
-                  <div className="font-medium text-sm">{task.projectCode}</div>
-                  <div className="text-xs text-white/70">{task.projectName}</div>
-                </div>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 } 
