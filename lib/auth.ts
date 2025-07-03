@@ -1,7 +1,7 @@
 import { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
-import bcrypt from "bcrypt"
+import { compare } from "bcryptjs"
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -29,8 +29,8 @@ export const authOptions: NextAuthOptions = {
           if (!user) {
             return null
           }
-
-          const isValidPassword = await bcrypt.compare(
+          
+          const isValidPassword = await compare(
             credentials.password,
             user.password
           )
@@ -46,10 +46,8 @@ export const authOptions: NextAuthOptions = {
             role: user.role,
           }
         } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error("Auth error:", error)
-          }
-          return null
+          console.error("認證錯誤:", error)
+          throw error
         }
       },
     }),

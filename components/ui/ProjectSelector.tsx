@@ -5,6 +5,7 @@ import { Clock, Building2, Plus } from 'lucide-react'
 import { useProjectSelection, Project } from '@/lib/hooks/useProjectSelection'
 import CategorySelector from '@/components/ui/CategorySelector'
 import { WorkCategory } from '@/lib/data/workCategories'
+import { extraTasks } from '@/lib/data/extraTasks'
 
 interface ProjectSelectorProps {
   selectedProjects: Project[]

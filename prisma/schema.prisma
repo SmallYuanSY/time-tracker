@@ -4,9 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider     = "postgresql"
-  url          = env("DATABASE_URL")
-  relationMode = "prisma"
+  provider = "sqlite"
+  url      = "file:./data/sqlite.db"
 }
 
 model User {
@@ -21,7 +20,7 @@ model User {
   updatedAt            DateTime              @updatedAt
   settings             UserSetting[]
   workLogs             workLog[]
-  projects             Project[]
+  projectAssignments   ProjectToUser[]
   managedProjects      Project[]             @relation("ProjectManager")
   clocks               clock[]
   agentLeaves          LeaveRequest[]        @relation("Agent")
@@ -160,7 +159,7 @@ model Project {
   updatedAt      DateTime        @updatedAt
   Contact        Contact?        @relation(fields: [contactId], references: [id])
   manager        User            @relation("ProjectManager", fields: [managerId], references: [id])
-  users          User[]
+  userAssignments ProjectToUser[]
   workLogs       workLog[]
   scheduledWorks ScheduledWork[]
 }
@@ -245,12 +244,13 @@ model PushSubscription {
 }
 
 model ProjectToUser {
-  A String
-  B String
+  projectId String
+  userId    String
+  assignedAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 
-  @@id([A, B], map: "_ProjectToUser_AB_pkey")
-  @@index([B], map: "_ProjectToUser_B_index")
-  @@map("_ProjectToUser")
+  @@id([projectId, userId])
 }
 
 enum UserRole {

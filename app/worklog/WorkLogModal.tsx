@@ -7,6 +7,7 @@ import { Portal } from '@/components/ui/portal'
 import ConflictConfirmModal from '@/components/ui/ConflictConfirmModal'
 import CategorySelector from '@/components/ui/CategorySelector'
 import { WorkCategory } from '@/lib/data/workCategories'
+import { extraTasks } from '@/lib/data/extraTasks'
 
 interface WorkLog {
   id: string
@@ -101,11 +102,6 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
         ? [{ projectCode: copyData.projectCode, projectName: copyData.projectName, category: copyData.category }]
         : []
   )
-
-  const extraTasks: Project[] = [
-    { projectCode: '01', projectName: '非特定工作', category: '' },
-    { projectCode: '09', projectName: '公司內務', category: '' },
-  ]
 
   // 載入系統中所有案件列表
   useEffect(() => {

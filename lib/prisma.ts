@@ -5,8 +5,16 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient()
+// 確保在開發環境中不會重複建立連接
+if (!globalForPrisma.prisma) {
+  globalForPrisma.prisma = new PrismaClient({
+    log: ['error'],  // 只顯示錯誤日誌
+  })
+}
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+export const prisma = globalForPrisma.prisma
+
+// 確保在應用關閉時斷開連接
+process.on('beforeExit', async () => {
+  await prisma.$disconnect()
+})

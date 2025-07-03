@@ -2,11 +2,48 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { Prisma } from '@prisma/client'
 
 type RouteParams = {
   params: Promise<{
     code: string
   }>
+}
+
+const projectInclude = {
+  Contact: true,
+  manager: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    }
+  },
+  userAssignments: {
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        }
+      }
+    }
+  }
+} as const
+
+type ProjectWithRelations = Prisma.ProjectGetPayload<{
+  include: typeof projectInclude
+}>
+
+type UserInfo = {
+  id: string
+  name: string | null
+  email: string
+}
+
+interface ProjectResponse extends Omit<ProjectWithRelations, 'userAssignments'> {
+  users: UserInfo[]
 }
 
 export async function GET(
@@ -31,24 +68,8 @@ export async function GET(
       where: {
         code,
       },
-      include: {
-        Contact: true,
-        manager: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          }
-        },
-        users: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          }
-        }
-      },
-    })
+      include: projectInclude,
+    }) as ProjectWithRelations | null
 
     if (!project) {
       // 如果在 Project 表中找不到，從 WorkLog 表中查找
@@ -68,30 +89,26 @@ export async function GET(
             status: 'ACTIVE',
             description: '從工作記錄自動創建',
           },
-          include: {
-            Contact: true,
-            manager: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              }
-            },
-            users: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              }
-            }
-          },
-        })
+          include: projectInclude,
+        }) as ProjectWithRelations
       } else {
         return new NextResponse('Project not found', { status: 404 })
       }
     }
 
-    return NextResponse.json(project)
+    // 轉換回應格式
+    const { userAssignments, ...projectData } = project
+    const users: UserInfo[] = (userAssignments as any[]).map(assignment => ({
+      id: assignment.user.id,
+      name: assignment.user.name,
+      email: assignment.user.email,
+    }))
+    const response: ProjectResponse = {
+      ...projectData,
+      users,
+    }
+
+    return NextResponse.json(response)
   } catch (error) {
     console.error('Error fetching project:', error)
     return new NextResponse('Internal Error', { status: 500 })
