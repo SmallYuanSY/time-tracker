@@ -8,6 +8,8 @@
     "start": "next start",
     "start:https": "node scripts/start-https.js",
     "generate:ssl": "node scripts/generate-ssl.js",
+    "package": "node scripts/package.js",
+    "deploy:check": "node scripts/deploy-check.js",
     "lint": "next lint",
     "backup-db": "ts-node scripts/pg-backup.ts backup",
     "restore-db": "ts-node scripts/pg-backup.ts restore",
