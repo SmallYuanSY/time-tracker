@@ -347,21 +347,20 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
       </div>
 
       {/* 編輯/複製/新增工作紀錄彈窗 */}
-      {showModal && (
-        <WorkLogModal
-          initialMode={editingLog || copyingLog ? "full" : "quick"}
-          onClose={handleCloseModal}
-          onSave={handleSave}
-          onNext={async () => {
-            // 「儲存並新增」時也要刷新資料
-            await fetchWorkLogs()
-            if (onRefresh) onRefresh()
-          }}
-          editData={editingLog}
-          copyData={copyingLog}
-          showNext={!!copyingLog || (!editingLog && !copyingLog)} // 複製模式或新增模式下顯示「儲存並新增」
-        />
-      )}
+      <WorkLogModal
+        open={showModal}
+        initialMode={editingLog || copyingLog ? "full" : "quick"}
+        onClose={handleCloseModal}
+        onSave={handleSave}
+        onNext={async () => {
+          // 「儲存並新增」時也要刷新資料
+          await fetchWorkLogs()
+          if (onRefresh) onRefresh()
+        }}
+        editData={editingLog}
+        copyData={copyingLog}
+        showNext={!!copyingLog || (!editingLog && !copyingLog)} // 複製模式或新增模式下顯示「儲存並新增」
+      />
     </>
   )
 } 

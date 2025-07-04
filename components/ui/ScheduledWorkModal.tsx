@@ -483,45 +483,48 @@ export default function ScheduledWorkModal({
           </div>
 
           {/* 其他工作側邊欄 */}
-          <div className="relative bg-white/10 backdrop-blur-lg border border-white/20 ring-1 ring-white/10 rounded-3xl shadow-xl p-6 w-64 flex-shrink-0">
-            <div className="text-white font-bold text-lg mb-4 text-center">其他工作</div>
-            <div className="space-y-3">
-              {extraTasks.map(task => (
-                <label key={task.projectCode} className="flex items-center gap-3 text-white/90 hover:text-white transition-colors cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={selectedExtraTasks.includes(task.projectCode)}
-                    onChange={() => {
-                      if (selectedExtraTasks.includes(task.projectCode)) {
-                        setSelectedExtraTasks(prev => prev.filter(code => code !== task.projectCode))
-                      } else {
-                        setSelectedExtraTasks(prev => [...prev, task.projectCode])
-                        // 當選中額外工作時,自動填入相關資訊
-                        setFormData(prev => ({
-                          ...prev,
-                          projectCode: task.projectCode,
-                          projectName: task.projectName,
-                          category: task.category || prev.category
-                        }))
-                      }
-                    }}
-                    className="w-4 h-4 rounded border-white/30 bg-white/20 text-blue-500 focus:ring-blue-500/50"
-                  />
-                  <div className="flex-1 group-hover:translate-x-1 transition-transform">
-                    <div className="font-medium text-sm">{task.projectCode}</div>
-                    <div className="text-xs text-white/70">{task.projectName}</div>
-                  </div>
-                </label>
-              ))}
+          <div className="relative bg-white/10 backdrop-blur-lg border border-white/20 rounded-lg shadow-xl w-64 flex-shrink-0 flex flex-col max-h-full">
+            <div className="p-6 pb-4 flex-shrink-0">
+              <div className="text-white font-bold text-lg mb-4 text-center">其他工作</div>
             </div>
             
-            <div className="mt-6 p-3 rounded-xl bg-white/5 border border-white/10">
-              <div className="text-white/80 text-xs text-center">
-                💡 選擇適用的其他工作類型
+            <div className="flex-1 overflow-y-auto px-6 pb-4 workmodal-scroll">
+              <div className="space-y-3">
+                {extraTasks.map(task => (
+                  <label key={task.projectCode} className="flex items-center gap-3 text-white/90 hover:text-white transition-colors cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={selectedExtraTasks.includes(task.projectCode)}
+                      onChange={() => {
+                        if (selectedExtraTasks.includes(task.projectCode)) {
+                          setSelectedExtraTasks(prev => prev.filter(code => code !== task.projectCode))
+                        } else {
+                          setSelectedExtraTasks(prev => [...prev, task.projectCode])
+                          // 當選中額外工作時,自動填入相關資訊
+                          setFormData(prev => ({
+                            ...prev,
+                            projectCode: task.projectCode,
+                            projectName: task.projectName,
+                            category: task.category || prev.category
+                          }))
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-white/30 bg-white/20 text-blue-500 focus:ring-blue-500/50"
+                    />
+                    <div className="flex-1 group-hover:translate-x-1 transition-transform">
+                      <div className="font-medium text-sm">{task.projectCode}</div>
+                      <div className="text-xs text-white/70">{task.projectName}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              
+              <div className="mt-6 p-3 rounded-xl bg-white/5 border border-white/10">
+                <div className="text-white/80 text-xs text-center">
+                  💡 選擇適用的其他工作類型
+                </div>
               </div>
             </div>
-
-            <div className="absolute inset-0 rounded-3xl pointer-events-none ring-1 ring-white/10 border border-white/10" />
           </div>
         </div>
       </DialogContent>

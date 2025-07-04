@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
         code: p.projectCode,
         name: p.projectName,
         category: p.category,
+        status: 'ACTIVE', // 從工作記錄來的案件預設為進行中
         Contact: null,
       }))
 

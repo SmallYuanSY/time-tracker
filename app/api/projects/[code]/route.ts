@@ -113,4 +113,56 @@ export async function GET(
     console.error('Error fetching project:', error)
     return new NextResponse('Internal Error', { status: 500 })
   }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ code: string }> }
+) {
+  try {
+    const body = await request.json()
+    const { managerId } = body
+
+    // 驗證管理者是否存在
+    const manager = await prisma.user.findUnique({
+      where: { id: managerId }
+    })
+
+    if (!manager) {
+      return NextResponse.json(
+        { error: '找不到指定的管理者' },
+        { status: 404 }
+      )
+    }
+
+    const { code } = await params
+
+    // 更新專案管理者
+    const updatedProject = await prisma.project.update({
+      where: { code },
+      data: { managerId },
+      include: projectInclude
+    }) as ProjectWithRelations
+
+    // 轉換回應格式
+    const { userAssignments, ...projectData } = updatedProject
+    const users: UserInfo[] = (userAssignments as any[]).map(assignment => ({
+      id: assignment.user.id,
+      name: assignment.user.name,
+      email: assignment.user.email,
+    }))
+
+    const response: ProjectResponse = {
+      ...projectData,
+      users,
+    }
+
+    return NextResponse.json(response)
+  } catch (error) {
+    console.error('Error updating project:', error)
+    return NextResponse.json(
+      { error: '更新專案失敗' },
+      { status: 500 }
+    )
+  }
 } 

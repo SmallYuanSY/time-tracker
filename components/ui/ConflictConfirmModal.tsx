@@ -1,6 +1,6 @@
 "use client"
 
-import { Portal } from '@/components/ui/portal'
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 
 interface ConflictInfo {
   id: string
@@ -17,24 +17,25 @@ interface ConflictConfirmModalProps {
   conflicts: ConflictInfo[]
   onConfirm: () => void
   onCancel: () => void
+  open: boolean
 }
 
-export default function ConflictConfirmModal({ conflicts, onConfirm, onCancel }: ConflictConfirmModalProps) {
+export default function ConflictConfirmModal({ conflicts, onConfirm, onCancel, open }: ConflictConfirmModalProps) {
   return (
-    <Portal>
-      <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/60 backdrop-blur-md">
-        <div className="bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-lg border border-white/20 rounded-2xl p-6 w-full max-w-2xl shadow-2xl max-h-[80vh] overflow-hidden">
-          <h2 className="text-lg font-semibold mb-4 text-white flex items-center gap-2">
+    <Dialog open={open} onOpenChange={onCancel}>
+      <DialogContent className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-4xl max-h-[90vh] !m-0">
+        <div className="bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-lg border border-white/20 rounded-2xl p-6 w-full overflow-hidden shadow-2xl">
+          <DialogTitle className="text-lg font-semibold mb-4 text-white flex items-center gap-2">
             ⚠️ 檢測到時間衝突
-          </h2>
+          </DialogTitle>
           
-          <p className="text-amber-200 mb-4 text-sm">
+          <DialogDescription className="text-amber-200 mb-4 text-sm">
             新增的工作時間與以下 {conflicts.length} 個現有記錄有衝突，系統將自動調整這些記錄：
-          </p>
+          </DialogDescription>
 
-          <div className="bg-amber-900/20 border border-amber-600/30 rounded-lg p-4 mb-4 max-h-60 overflow-y-auto">
+          <div className="bg-amber-900/20 border border-amber-600/30 rounded-lg p-4 mb-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 300px)' }}>
             {conflicts.map((conflict, index) => (
-              <div key={conflict.id} className="mb-4 last:mb-0 bg-white/5 rounded-lg p-3">
+              <div key={conflict.id} className="mb-4 last:mb-0 bg-white/5 rounded-lg p-3 hover:bg-white/10 transition-colors">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
                     <div className="font-medium text-sm text-white flex items-center gap-2">
@@ -52,7 +53,7 @@ export default function ConflictConfirmModal({ conflicts, onConfirm, onCancel }:
                   </div>
                 </div>
                 
-                <div className="mt-2 p-2 bg-orange-900/30 border border-orange-600/40 rounded">
+                <div className="mt-2 p-2 bg-orange-900/30 border border-orange-400/40 rounded">
                   <div className="text-xs text-orange-200 font-medium">
                     📝 處理方式：{conflict.action}
                   </div>
@@ -67,22 +68,22 @@ export default function ConflictConfirmModal({ conflicts, onConfirm, onCancel }:
             </div>
           </div>
 
-          <div className="flex justify-end gap-3">
+          <div className="flex justify-end gap-3 mt-6">
             <button
               onClick={onCancel}
-              className="px-4 py-2 text-sm rounded-xl bg-white/10 text-white border border-white/30 hover:bg-white/20 transition"
+              className="px-4 py-2 text-sm rounded-xl bg-white/10 text-white border border-white/30 hover:bg-white/20 transition-colors"
             >
               取消
             </button>
             <button
               onClick={onConfirm}
-              className="px-4 py-2 text-sm rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold shadow-md transition"
+              className="px-4 py-2 text-sm rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold shadow-md transition-colors"
             >
               確認並處理衝突
             </button>
           </div>
         </div>
-      </div>
-    </Portal>
+      </DialogContent>
+    </Dialog>
   )
 } 

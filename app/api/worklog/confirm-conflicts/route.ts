@@ -79,57 +79,59 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // 處理衝突的記錄
-    for (const conflictLog of conflictingLogs) {
-      if (!conflictLog.endTime) {
-        // 進行中的記錄：設定結束時間為新記錄的開始時間
-        await prisma.workLog.update({
-          where: { id: conflictLog.id },
-          data: { endTime: startDate },
-        })
-      } else {
-        // 已完成的記錄：調整時間或分割
-        if (conflictLog.startTime < startDate && conflictLog.endTime > endDate) {
-          // 現有記錄完全包含新記錄：分割為兩段
-          await prisma.workLog.update({
-            where: { id: conflictLog.id },
-            data: { endTime: startDate },
-          })
-          // 建立後半段
-          await prisma.workLog.create({
-            data: {
-              userId: conflictLog.userId,
-              projectCode: conflictLog.projectCode,
-              projectName: conflictLog.projectName,
-              category: conflictLog.category,
-              content: conflictLog.content,
-              startTime: endDate,
-              endTime: conflictLog.endTime,
-            },
-          })
-        } else if (conflictLog.startTime < startDate) {
-          // 現有記錄跨越新記錄開始：縮短結束時間
-          await prisma.workLog.update({
-            where: { id: conflictLog.id },
-            data: { endTime: startDate },
-          })
-        } else if (conflictLog.endTime > endDate) {
-          // 現有記錄跨越新記錄結束：調整開始時間
-          await prisma.workLog.update({
-            where: { id: conflictLog.id },
-            data: { startTime: endDate },
-          })
+    // 使用事務來確保所有操作的一致性
+    const result = await prisma.$transaction(async (tx) => {
+      // 處理衝突的記錄
+      for (const conflictLog of conflictingLogs) {
+        if (!conflictLog.endTime) {
+          // 進行中的記錄：不自動設定結束時間，而是跳過處理
+          if (conflictLog.startTime >= startDate && conflictLog.startTime < endDate) {
+            // 如果進行中的記錄開始於新記錄的時間範圍內，拒絕操作
+            throw new Error('無法在進行中的工作記錄時間範圍內新增其他記錄')
+          }
+          // 其他情況下，保持進行中的記錄不變
+          continue
         } else {
-          // 現有記錄完全在新記錄範圍內：刪除
-          await prisma.workLog.delete({
-            where: { id: conflictLog.id },
-          })
+          // 已完成的記錄：調整時間或分割
+          if (conflictLog.startTime < startDate && conflictLog.endTime > endDate) {
+            // 現有記錄完全包含新記錄：分割為兩段
+            await tx.workLog.update({
+              where: { id: conflictLog.id },
+              data: { endTime: startDate },
+            })
+            // 建立後半段
+            await tx.workLog.create({
+              data: {
+                userId: conflictLog.userId,
+                projectCode: conflictLog.projectCode,
+                projectName: conflictLog.projectName,
+                category: conflictLog.category,
+                content: conflictLog.content,
+                startTime: endDate,
+                endTime: conflictLog.endTime,
+              },
+            })
+          } else if (conflictLog.startTime < startDate) {
+            // 現有記錄跨越新記錄開始：縮短結束時間
+            await tx.workLog.update({
+              where: { id: conflictLog.id },
+              data: { endTime: startDate },
+            })
+          } else if (conflictLog.endTime > endDate) {
+            // 現有記錄跨越新記錄結束：調整開始時間
+            await tx.workLog.update({
+              where: { id: conflictLog.id },
+              data: { startTime: endDate },
+            })
+          } else {
+            // 現有記錄完全在新記錄範圍內：刪除
+            await tx.workLog.delete({
+              where: { id: conflictLog.id },
+            })
+          }
         }
       }
-    }
 
-    // 使用事務來確保工作記錄和打卡記錄的同步更新
-    const result = await prisma.$transaction(async (tx) => {
       // 建立新的工作記錄
       const workLogResult = await tx.workLog.create({
         data: {
@@ -178,10 +180,6 @@ export async function POST(req: NextRequest) {
               originalTimestamp: recentClockIn.isEdited ? recentClockIn.originalTimestamp : recentClockIn.timestamp,
             },
           })
-
-          if (process.env.NODE_ENV !== 'production') {
-            //console.log('[POST /api/worklog/confirm-conflicts] 同步更新打卡記錄:', recentClockIn.id)
-          }
         }
       }
 

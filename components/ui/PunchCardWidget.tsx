@@ -314,20 +314,19 @@ export default function PunchCardWidget({ onWorkLogSaved, holidayInfo }: PunchCa
       </Card>
 
       {/* 上班打卡 - 顯示工作紀錄表單（只需要開始時間） */}
-      {showWorkLogModal && (
-        <WorkLogModal 
-          initialMode="start"
-          onClose={() => {
-            setShowWorkLogModal(false)
-            // 取消時不執行打卡
-          }}
-          onSave={(clockEditReason) => {
-            confirmClockIn(clockEditReason) // 傳遞修改原因給打卡函數
-            // 通知主頁刷新今日工作摘要
-            if (onWorkLogSaved) onWorkLogSaved()
-          }}
-        />
-      )}
+      <WorkLogModal 
+        open={showWorkLogModal}
+        initialMode="start"
+        onClose={() => {
+          setShowWorkLogModal(false)
+          // 取消時不執行打卡
+        }}
+        onSave={(clockEditReason) => {
+          confirmClockIn(clockEditReason) // 傳遞修改原因給打卡函數
+          // 通知主頁刷新今日工作摘要
+          if (onWorkLogSaved) onWorkLogSaved()
+        }}
+      />
 
       {/* 下班打卡 - 顯示結束確認 */}
       {showEndOfDayModal && (

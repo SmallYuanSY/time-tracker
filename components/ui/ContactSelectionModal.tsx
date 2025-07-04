@@ -53,10 +53,10 @@ export default function ContactSelectionModal({
   useEffect(() => {
     // 搜尋邏輯
     if (!searchTerm.trim()) {
-      setFilteredContacts(contacts)
+      setFilteredContacts(contacts || [])
     } else {
       const term = searchTerm.toLowerCase()
-      const filtered = contacts.filter(contact =>
+      const filtered = (contacts || []).filter(contact =>
         contact.companyName.toLowerCase().includes(term) ||
         contact.contactName.toLowerCase().includes(term) ||
         contact.phone.includes(term) ||
@@ -72,11 +72,14 @@ export default function ContactSelectionModal({
       setLoading(true)
       const response = await fetch('/api/contacts')
       if (response.ok) {
-        const data = await response.json()
-        setContacts(data)
+        const { data } = await response.json()
+        setContacts(Array.isArray(data) ? data : [])
+        setFilteredContacts(Array.isArray(data) ? data : [])
       }
     } catch (error) {
       console.error('載入聯絡人失敗:', error)
+      setContacts([])
+      setFilteredContacts([])
     } finally {
       setLoading(false)
     }
@@ -104,7 +107,7 @@ export default function ContactSelectionModal({
     setSelectedIds([])
   }
 
-  const selectedContacts = contacts.filter(contact => selectedIds.includes(contact.id))
+  const selectedContacts = (contacts || []).filter(contact => selectedIds.includes(contact.id))
 
   return (
     <Dialog open={open} onOpenChange={onClose}>

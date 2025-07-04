@@ -19,7 +19,7 @@ export default function ProjectDetailPage() {
       }
     }
 
-    fetchProject()
+      fetchProject()
   }, [params.code])
 
   if (!project) {

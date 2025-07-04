@@ -1,228 +1,258 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { format, parseISO } from "date-fns"
-import { useSession } from "next-auth/react"
+import { format } from 'date-fns'
+import { User } from 'lucide-react'
+import { useSession } from 'next-auth/react'
+import { useEffect, useState } from 'react'
+import { workLogCacheManager } from '@/lib/cache/worklog'
+import { WorkLog } from '@/lib/types/worklog'
 
-interface WorkLog {
-  id: string
-  projectCode: string
-  projectName: string
-  category: string
-  content: string
-  startTime: string // ISO string
-  endTime: string | null
-  isOvertime: boolean // 新增加班標記
+interface WorkLogGroup {
+  user: {
+    id: string
+    name: string | null
+    email: string
+    role: string
+  }
+  logs: WorkLog[]
 }
 
 interface WorkLogListProps {
-  onRefresh?: (refreshFn: () => Promise<void>) => void
+  onRefresh?: () => void
   onEdit?: (log: WorkLog) => void
   onLogsLoaded?: (logs: WorkLog[]) => void
+  mode?: 'all' | 'today' | 'date'
+  date?: string
+  projectCode?: string
+  category?: string
+  from?: string
+  to?: string
+  userId?: string
 }
 
-export default function WorkLogList({ onRefresh, onEdit, onLogsLoaded }: WorkLogListProps) {
+export default function WorkLogList({
+  onRefresh,
+  onEdit,
+  onLogsLoaded,
+  mode = 'all',
+  date,
+  projectCode,
+  category,
+  from,
+  to,
+  userId
+}: WorkLogListProps) {
   const { data: session } = useSession()
-  const [logs, setLogs] = useState<WorkLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-  const [today, setToday] = useState<string>("")
-  const [isClient, setIsClient] = useState(false)
+  const [logs, setLogs] = useState<WorkLog[]>([])
 
-  // 確保在客戶端才初始化日期
-  useEffect(() => {
-    setIsClient(true)
-    setToday(new Date().toISOString().split("T")[0])
-  }, [])
-
-  const loadWorkLogs = useCallback(async () => {
-    if (!session?.user || !today) return
-
+  const loadWorkLogs = async (useCache = true) => {
     try {
       setLoading(true)
       setError(null)
 
-      const userId = (session.user as any).id
-      const response = await fetch(`/api/worklog?userId=${userId}&date=${today}`)
-
-      if (!response.ok) {
-        throw new Error('獲取工作記錄失敗')
+      // 如果允許使用快取且有快取資料，先使用快取
+      if (useCache && !projectCode) { // 專案視圖不使用快取
+        const cache = workLogCacheManager.getCache()
+        if (cache) {
+          let filteredLogs = cache.logs
+          if (projectCode) {
+            filteredLogs = filteredLogs.filter(log => log.projectCode === projectCode)
+          }
+          if (category) {
+            filteredLogs = filteredLogs.filter(log => log.category === category)
+          }
+          if (userId) {
+            filteredLogs = filteredLogs.filter(log => log.userId === userId)
+          }
+          if (from && to) {
+            filteredLogs = filteredLogs.filter(log => {
+              const logDate = new Date(log.startTime)
+              return logDate >= new Date(from) && logDate <= new Date(to)
+            })
+          }
+          setLogs(filteredLogs)
+          setLoading(false)
+          
+          // 通知父元件
+          if (onLogsLoaded) {
+            onLogsLoaded(filteredLogs)
+          }
+        }
       }
 
-      const data = await response.json()
-      setLogs(data)
+      // 構建 API 請求 URL
+      let url = '/api/worklog'
+      const params = new URLSearchParams()
+      
+      // 只有在沒有專案代碼時才加入使用者 ID
+      if (!projectCode && session?.user) {
+        params.append('userId', (session.user as any).id)
+      }
+
+      if (projectCode) {
+        params.append('projectCode', projectCode)
+      }
+
+      if (category) {
+        params.append('category', category)
+      }
+
+      if (userId) {
+        params.append('userId', userId)
+      }
+
+      if (from) {
+        params.append('from', from)
+      }
+
+      if (to) {
+        params.append('to', to)
+      }
+
+      if (mode === 'today') {
+        params.append('date', new Date().toISOString().split('T')[0])
+      } else if (mode === 'date' && date) {
+        params.append('date', date)
+      }
+
+      url = `${url}?${params.toString()}`
+
+      // 發送 API 請求
+      const response = await fetch(url)
+      if (!response.ok) {
+        throw new Error('載入工作紀錄失敗')
+      }
+
+      const data: WorkLogGroup[] = await response.json()
+      
+      // 將分組資料轉換為單一陣列
+      const flattenedLogs = data.flatMap(group => 
+        group.logs.map(log => ({
+          ...log,
+          user: group.user
+        }))
+      )
+
+      // 只有在非專案視圖時才更新快取
+      if (!projectCode && flattenedLogs.length > 0) {
+        const cache = {
+          lastUpdated: new Date().toISOString(),
+          logs: flattenedLogs
+        }
+        workLogCacheManager.setCache(cache)
+      }
+
+      // 更新狀態
+      setLogs(flattenedLogs)
+      setLoading(false)
+
+      // 通知父元件
       if (onLogsLoaded) {
-        onLogsLoaded(data)
+        onLogsLoaded(flattenedLogs)
       }
     } catch (error) {
-      console.error('獲取工作記錄失敗:', error)
-      setError(error instanceof Error ? error.message : '獲取工作記錄失敗')
-      setLogs([])
-    } finally {
+      console.error('載入工作紀錄失敗:', error)
+      setError('載入工作紀錄失敗')
       setLoading(false)
     }
-  }, [session, today, onLogsLoaded])
+  }
 
+  // 初始載入
   useEffect(() => {
-    if (!session?.user || !isClient || !today) {
-      setLoading(false)
-      return
-    }
-
     loadWorkLogs()
-  }, [session, today, isClient])
+  }, [session, mode, date, projectCode, category, from, to, userId])
 
-  // 將 loadWorkLogs 函數傳遞給父元件
-  useEffect(() => {
-    if (onRefresh) {
-      onRefresh(loadWorkLogs)
-    }
-  }, [onRefresh, loadWorkLogs])
-
-  const isOvertime = (startTime: string) => {
-    const t = parseISO(startTime)
-    return t.getHours() >= 18 || t.getHours() < 6
-  }
-
-
-  const handleCopy = (log: WorkLog) => {
-    // 複製工作記錄的內容到剪貼板
-    const copyText = `案件編號: ${log.projectCode}
-案件名稱: ${log.projectName}
-分類: ${log.category}
-工作內容: ${log.content}
-開始時間: ${format(parseISO(log.startTime), "HH:mm")}
-結束時間: ${log.endTime ? format(parseISO(log.endTime), "HH:mm") : "現在"}`
-
-    navigator.clipboard.writeText(copyText).then(() => {
-      setMessage('工作記錄已複製到剪貼板')
-      setTimeout(() => setMessage(null), 3000) // 3秒後清除訊息
-    }).catch(err => {
-      console.error('複製失敗:', err)
-      setError('複製失敗')
-      setTimeout(() => setError(null), 3000)
-    })
-  }
-
+  // 處理編輯
   const handleEdit = (log: WorkLog) => {
     if (onEdit) {
       onEdit(log)
     }
   }
 
-  const sortedLogs = [...logs].sort((a, b) => b.startTime.localeCompare(a.startTime))
+  // 處理重新整理
+  const handleRefresh = () => {
+    loadWorkLogs(false) // 強制重新載入，不使用快取
+    if (onRefresh) {
+      onRefresh()
+    }
+  }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-white/60">載入中...</div>
-      </div>
-    )
+    return <div className="text-center py-8">載入中...</div>
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-red-400">錯誤：{error}</div>
+      <div className="text-center py-8 text-red-500">
+        {error}
+        <button
+          onClick={handleRefresh}
+          className="ml-2 text-blue-500 hover:underline"
+        >
+          重試
+        </button>
       </div>
     )
   }
 
-  if (logs.length === 0) {
+  if (!logs.length) {
     return (
-      <div className="space-y-4">
-        {message && (
-          <div className="bg-green-500/20 border border-green-400/30 rounded-xl p-3 text-green-100 text-center">
-            {message}
-          </div>
-        )}
-        <div className="flex items-center justify-center py-8">
-          <div className="text-white/60">今日尚無工作記錄</div>
-        </div>
+      <div className="text-center py-8 text-gray-500">
+        尚無工作紀錄
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
-      {/* 顏色圖例說明 */}
-      <div className="bg-white/5 backdrop-blur rounded-xl p-3 border border-white/10">
-        <div className="flex items-center justify-center gap-6 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">🔵</span>
-            <span className="text-white/70">進行中</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-lg">🟢</span>
-            <span className="text-white/70">一般工作</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-lg">🟠</span>
-            <span className="text-white/70">加班工作</span>
-          </div>
-        </div>
-      </div>
-      
-      {message && (
-        <div className="bg-green-500/20 border border-green-400/30 rounded-xl p-3 text-green-100 text-center">
-          {message}
-        </div>
-      )}
-      {sortedLogs.map((log) => {
-        const start = format(parseISO(log.startTime), "HH:mm")
-        const end = log.endTime ? format(parseISO(log.endTime), "HH:mm") : "現在"
-        
-        // 決定工作狀態和顏色
-        let bgColor = ""
-        let statusIcon = ""
-        
-        if (!log.endTime) {
-          // 進行中的工作：藍色
-          bgColor = "bg-blue-100/10 border-blue-300/20"
-          statusIcon = "🔵"
-        } else if (log.isOvertime) {
-          // 已完成的加班工作：橘色
-          bgColor = "bg-orange-100/10 border-orange-300/20"
-          statusIcon = "🟠"
-        } else {
-          // 已完成的一般工作：綠色
-          bgColor = "bg-emerald-100/10 border-emerald-300/20"
-          statusIcon = "🟢"
-        }
-
-        return (
-          <Card key={log.id} className={`flex items-center gap-2 px-4 py-3 rounded-xl border ${bgColor}`}>
-            <div className="flex items-center gap-2 text-lg">
-              {statusIcon}
+      {logs.map(log => (
+        <div
+          key={log.id}
+          className="p-4 bg-card rounded-lg border shadow-sm hover:shadow-md transition-shadow"
+        >
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="font-medium text-lg text-foreground">
+                {log.projectName} ({log.projectCode})
+              </h3>
+              <p className="text-muted-foreground mt-1">{log.content}</p>
+              <div className="mt-2 text-sm text-muted-foreground space-y-1">
+                <div>
+                  <span className="font-medium">
+                    {format(new Date(log.startTime), 'M月d日')}
+                  </span>
+                  <span className="mx-2">
+                    {format(new Date(log.startTime), 'HH:mm')}
+                    {log.endTime && (
+                      <>
+                        <span> - </span>
+                        <span>{format(new Date(log.endTime), 'HH:mm')}</span>
+                      </>
+                    )}
+                  </span>
+                  <span className="text-muted-foreground/70">{log.category}</span>
+                </div>
+                {projectCode && log.user && (
+                  <div className="flex items-center gap-2 text-muted-foreground/70">
+                    <User className="w-4 h-4" />
+                    <span>{log.user.name || log.user.email}</span>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="flex-1 grid grid-cols-4 gap-2">
-              <div className="px-2 py-1 rounded bg-white/20 text-white text-center">{log.projectCode}</div>
-              <div className="px-2 py-1 rounded bg-white/20 text-white text-center">{log.projectName}</div>
-              <div className="px-2 py-1 rounded bg-white/20 text-white text-center">{log.category}</div>
-              <div className="px-2 py-1 rounded bg-white/20 text-white text-center">{start} - {end}</div>
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                variant="secondary" 
-                className="bg-yellow-100 text-black px-3 py-1 text-sm rounded hover:bg-yellow-200"
-                onClick={() => handleCopy(log)}
-              >
-                📋 複製
-              </Button>
-              <Button 
-                variant="destructive" 
-                className="px-3 py-1 text-sm rounded bg-blue-500 hover:bg-blue-600 text-white"
+            {(!projectCode || (session?.user as any)?.id === log.userId) && (
+              <button
                 onClick={() => handleEdit(log)}
+                className="text-primary hover:text-primary/80"
               >
-                ✏️ 編輯
-              </Button>
-            </div>
-          </Card>
-        )
-      })}
+                編輯
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   )
 } 

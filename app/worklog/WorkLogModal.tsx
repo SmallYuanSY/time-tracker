@@ -3,11 +3,15 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { SimpleTimePicker } from '@/components/ui/simple-time-picker'
-import { Portal } from '@/components/ui/portal'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Calendar, Target, FileText, Clock, Briefcase } from 'lucide-react'
 import ConflictConfirmModal from '@/components/ui/ConflictConfirmModal'
 import CategorySelector from '@/components/ui/CategorySelector'
+import ProjectSelector from '@/components/ui/ProjectSelector'
 import { WorkCategory } from '@/lib/data/workCategories'
 import { extraTasks } from '@/lib/data/extraTasks'
+import { Project } from '@/lib/hooks/useProjectSelection'
 
 interface WorkLog {
   id: string
@@ -19,13 +23,8 @@ interface WorkLog {
   endTime: string | null
 }
 
-interface Project {
-  projectCode: string
-  projectName: string
-  category: string
-}
-
 interface WorkLogModalProps {
+  open: boolean
   onClose: () => void
   onSave?: (clockEditReason?: string) => void
   onNext?: () => void
@@ -34,9 +33,21 @@ interface WorkLogModalProps {
   editData?: WorkLog | null
   copyData?: WorkLog | null // 複製模式，只複製基本資訊，不複製時間
   isOvertimeMode?: boolean // 是否為加班模式
+  defaultProjectCode?: string // 預設專案代碼
 }
 
-export default function WorkLogModal({ onClose, onSave, onNext, showNext = false, initialMode = 'full', editData, copyData, isOvertimeMode = false }: WorkLogModalProps) {
+export default function WorkLogModal({ 
+  open, 
+  onClose, 
+  onSave, 
+  onNext, 
+  showNext = false, 
+  initialMode = 'full', 
+  editData, 
+  copyData, 
+  isOvertimeMode = false,
+  defaultProjectCode
+}: WorkLogModalProps) {
   const { data: session } = useSession()
   const [useFullTimeMode, setUseFullTimeMode] = useState(false) // 完整時間模式切換
   
@@ -67,8 +78,8 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
   }
   
   const [formData, setFormData] = useState({
-    projectCode: editData?.projectCode || '',
-    projectName: editData?.projectName || '',
+    projectCode: editData?.projectCode || copyData?.projectCode || defaultProjectCode || '',
+    projectName: editData?.projectName || copyData?.projectName || '',
     category: editData?.category || copyData?.category || '', // 保留分類
     content: editData?.content || copyData?.content || '', // 在複製模式下也保留工作內容
     startTime: editData
@@ -92,9 +103,6 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
   
   // 案件選擇相關狀態
   const [projects, setProjects] = useState<Project[]>([])
-  const [filteredProjects, setFilteredProjects] = useState<Project[]>([])
-  const [showProjectDropdown, setShowProjectDropdown] = useState(false)
-  const [isNewProject, setIsNewProject] = useState(false)
   const [selectedProjects, setSelectedProjects] = useState<Project[]>(
     editData
       ? [{ projectCode: editData.projectCode, projectName: editData.projectName, category: editData.category }]
@@ -102,6 +110,7 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
         ? [{ projectCode: copyData.projectCode, projectName: copyData.projectName, category: copyData.category }]
         : []
   )
+  const [selectedExtraTasks, setSelectedExtraTasks] = useState<string[]>([])
 
   // 載入系統中所有案件列表
   useEffect(() => {
@@ -133,107 +142,144 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
     loadProjects()
   }, [session])
 
+  // 初始化選中的專案
+  useEffect(() => {
+    if (editData) {
+      setSelectedProjects([{
+        projectCode: editData.projectCode,
+        projectName: editData.projectName,
+        category: editData.category,
+      }])
+    } else if (copyData) {
+      setSelectedProjects([{
+        projectCode: copyData.projectCode,
+        projectName: copyData.projectName,
+        category: copyData.category,
+      }])
+    } else {
+      setSelectedProjects([])
+    }
+  }, [editData, copyData, open])
+
+  // 重設表單
+  const resetForm = () => {
+    setFormData({
+      projectCode: '',
+      projectName: '',
+      category: '',
+      content: '',
+      startTime: initialMode === 'quick' ? '' : initialMode === 'start' ? originalStartTime : '09:00',
+      endTime: '',
+      editReason: '',
+    })
+    setSelectedProjects([])
+    setSelectedExtraTasks([])
+    setErrors([])
+  }
+
+  // 編輯模式初始化
+  useEffect(() => {
+    if (editData) {
+      setFormData({
+        projectCode: editData.projectCode,
+        projectName: editData.projectName,
+        category: editData.category,
+        content: editData.content,
+        startTime: new Date(editData.startTime).toTimeString().slice(0, 5),
+        endTime: editData.endTime ? new Date(editData.endTime).toTimeString().slice(0, 5) : '',
+        editReason: '',
+      })
+    } else if (copyData) {
+      setFormData({
+        projectCode: copyData.projectCode,
+        projectName: copyData.projectName,
+        category: copyData.category,
+        content: copyData.content,
+        startTime: initialMode === 'quick' ? '' : initialMode === 'start' ? originalStartTime : '09:00',
+        endTime: '',
+        editReason: '',
+      })
+    } else {
+      resetForm()
+    }
+  }, [editData, copyData, open])
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
-  // 處理案件編號輸入
-  const handleProjectCodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const code = e.target.value
-    setFormData({ ...formData, projectCode: code })
-
-    // 當輸入兩位數或更多時，嘗試搜尋案件
-    if (code.length >= 2) {
-      
-      // 確保 projects 已經載入
-      if (!projects || projects.length === 0) {
-        console.log('案件列表尚未載入完成')
-        return
-      }
-      
-      // 搜尋現有案件（精確匹配開頭）
-      const matchingProjects = projects.filter(p => 
-        p.projectCode?.toLowerCase().startsWith(code.toLowerCase())
-      )
-      
-      console.log('輸入的編號:', code, '已載入案件數量:', projects.length, '匹配案件:', matchingProjects)
-      
-      setFilteredProjects(matchingProjects)
-      
-      if (matchingProjects.length > 0) {
-        // 如果有完全匹配的案件，自動帶入案件名稱
-        const exactMatch = matchingProjects.find(p =>
-          p.projectCode?.toLowerCase() === code.toLowerCase()
-        )
-        if (exactMatch) {
-          // 完全匹配，自動帶入案件名稱
-          setFormData({
-            ...formData,
-            projectCode: exactMatch.projectCode,
-            projectName: exactMatch.projectName
-          })
-          setShowProjectDropdown(false)
-          setIsNewProject(false)
-        } else {
-          // 部分匹配，顯示下拉選單讓用戶選擇（即使只有一個匹配也要顯示）
-          setShowProjectDropdown(true)
-          setIsNewProject(false)
-        }
-      } else if (code.length >= 2) {
-        // 沒有找到現有案件，顯示新建案件模式
-        setIsNewProject(true)
-        setShowProjectDropdown(false)
-        setFormData({
-          ...formData,
-          projectCode: code,
-          projectName: ''
-        })
+  // 處理專案選擇
+  const handleProjectSelect = (project: Project) => {
+    // 檢查是否已經選擇了這個專案
+    const isAlreadySelected = selectedProjects.some(p => p.projectCode === project.projectCode)
+    
+    if (!isAlreadySelected) {
+      // 如果是編輯模式，只允許選擇一個專案
+      if (editData) {
+        setSelectedProjects([project])
       } else {
-        // 輸入長度不足，清空所有狀態
-        setIsNewProject(false)
-        setShowProjectDropdown(false)
-      }
-      
-    } else {
-      setShowProjectDropdown(false)
-      setIsNewProject(false)
-      
-      // 清空案件名稱（如果不是編輯模式）
-      if (!editData) {
-        setFormData({
-          ...formData,
-          projectCode: code,
-          projectName: ''
-        })
+        // 否則添加到現有選擇中
+        setSelectedProjects(prev => [...prev, project])
       }
     }
+
+    // 更新表單數據
+    setFormData(prev => ({
+      ...prev,
+      projectCode: project.projectCode,
+      projectName: project.projectName,
+      category: project.category || prev.category,
+    }))
   }
 
-  // 選擇現有案件
-  const selectProject = (project: Project) => {
-    setSelectedProjects(prev => {
-      if (prev.find(p => p.projectCode === project.projectCode)) return prev
-      return [...prev, project]
-    })
-    // 清空表單中的案件輸入欄位，因為已經加入到已選擇列表
-    setFormData({ ...formData, projectCode: '', projectName: '' })
-    setShowProjectDropdown(false)
-    setIsNewProject(false)
-  }
-
-  const removeProject = (code: string) => {
+  // 處理專案移除
+  const handleProjectRemove = (code: string) => {
     setSelectedProjects(prev => prev.filter(p => p.projectCode !== code))
-  }
-
-  const toggleExtraTask = (task: Project) => {
-    if (selectedProjects.find(p => p.projectCode === task.projectCode)) {
-      removeProject(task.projectCode)
-    } else {
-      setSelectedProjects(prev => [...prev, task])
+    
+    // 如果移除後沒有選中的專案，清空相關欄位
+    if (selectedProjects.length <= 1) {
+      setFormData(prev => ({
+        ...prev,
+        projectCode: '',
+        projectName: '',
+        category: '',
+      }))
     }
   }
 
-  // 處理衝突確認
+  // 處理新專案
+  const handleNewProject = (code: string, name: string) => {
+    const newProject: Project = {
+      projectCode: code,
+      projectName: name,
+      category: formData.category,
+    }
+    setSelectedProjects([newProject])
+    setFormData(prev => ({
+      ...prev,
+      projectCode: code,
+      projectName: name,
+    }))
+  }
+
+  // 處理分類選擇
+  const handleCategorySelect = (category: WorkCategory) => {
+    setFormData(prev => ({
+      ...prev,
+      category: category.content,
+    }))
+  }
+
+  // 處理額外工作選擇
+  const toggleExtraTask = (task: Project) => {
+    if (selectedExtraTasks.includes(task.projectCode)) {
+      setSelectedExtraTasks(prev => prev.filter(code => code !== task.projectCode))
+    } else {
+      setSelectedExtraTasks(prev => [...prev, task.projectCode])
+      handleProjectSelect(task)
+    }
+  }
+
   const handleConfirmConflicts = async () => {
     if (!pendingSubmissionData || !session?.user) return
 
@@ -348,100 +394,40 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
     setIsSubmitting(false)
   }
 
-  // 確認新增案件為選項
-  const handleConfirmNewProject = () => {
-    if (!formData.projectCode || !formData.projectName) return
-
-    // 檢查是否已經存在相同的案件
-    const existingProject = projects.find(p => 
-      p.projectCode?.toLowerCase() === formData.projectCode.toLowerCase()
-    )
-
-    if (existingProject) {
-      // 如果找到現有案件，使用現有案件資料
-      const project: Project = {
-        projectCode: existingProject.projectCode,
-        projectName: existingProject.projectName,
-        category: existingProject.category || '',
-      }
-      selectProject(project)
-      return
-    }
-
-    const newProject: Project = {
-      projectCode: formData.projectCode,
-      projectName: formData.projectName,
-      category: '', // 分類不屬於案件，保持為空
-    }
-
-    // 加入到已選擇的案件列表
-    setSelectedProjects(prev => {
-      if (prev.find(p => p.projectCode === newProject.projectCode)) return prev
-      return [...prev, newProject]
-    })
-
-    // 重設案件欄位，保留分類
-    setFormData({
-      ...formData,
-      projectCode: '',
-      projectName: '',
-    })
-
-    // 重設新案件狀態
-    setIsNewProject(false)
-  }
-
-  // 點擊外部關閉下拉選單
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element
-      if (!target.closest('.project-dropdown-container')) {
-        setShowProjectDropdown(false)
-      }
-    }
-
-    if (showProjectDropdown) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showProjectDropdown])
-
+  // 表單驗證
   const validateForm = () => {
     const newErrors: string[] = []
 
-    if (selectedProjects.length === 0) newErrors.push('請至少選擇一個案件')
-    if (!formData.category.trim()) newErrors.push('工作分類為必填欄位')
-    if (!formData.content.trim()) newErrors.push('工作內容為必填欄位')
-    
-    // 編輯模式下，編輯原因為必填
-    if (editData && !formData.editReason.trim()) newErrors.push('編輯原因為必填欄位')
-    
-    // 檢查打卡模式下是否修改了時間
-    const isClockMode = initialMode === 'start'
-    if (isClockMode && formData.startTime !== originalStartTime) {
-      setTimeModified(true)
-      // 只有超過5分鐘的修改才需要填寫原因
-      if (needsEditReason() && !formData.editReason.trim()) {
-        newErrors.push('修改打卡時間超過5分鐘需要填寫修改原因')
-      }
-    } else if (isClockMode) {
-      setTimeModified(false)
+    // 檢查是否至少選擇了一個專案
+    if (selectedProjects.length === 0) {
+      newErrors.push('請至少選擇一個專案')
     }
-    
-    // 根據時間模式決定是否需要時間驗證
-    const needTimeValidation = !(initialMode === 'quick' || copyData) || useFullTimeMode
-    
-    if (needTimeValidation && !formData.startTime) newErrors.push('開始時間為必填欄位')
-    if (needTimeValidation && (initialMode === 'full' || initialMode === 'end' || useFullTimeMode)) {
-      if (!formData.endTime) newErrors.push('結束時間為必填欄位')
 
-      if (formData.startTime && formData.endTime) {
-        const start = new Date(`2000-01-01T${formData.startTime}:00`)
-        const end = new Date(`2000-01-01T${formData.endTime}:00`)
-        if (end <= start) {
-          newErrors.push('結束時間必須晚於開始時間')
-        }
+    if (!formData.category.trim()) {
+      newErrors.push('請選擇工作分類')
+    }
+    if (!formData.content.trim()) {
+      newErrors.push('請輸入工作內容')
+    }
+    if (!useFullTimeMode && (initialMode === 'quick' || copyData)) {
+      // 快速模式不需要驗證時間
+    } else {
+      if (!formData.startTime) {
+        newErrors.push('請輸入開始時間')
       }
+      if ((initialMode === 'full' || initialMode === 'end' || editData) && !formData.endTime) {
+        newErrors.push('請輸入結束時間')
+      }
+    }
+
+    // 編輯模式需要填寫編輯原因
+    if (editData && !formData.editReason.trim()) {
+      newErrors.push('請填寫編輯原因')
+    }
+
+    // 打卡模式修改時間超過5分鐘需要填寫原因
+    if (needsEditReason() && !formData.editReason.trim()) {
+      newErrors.push('修改時間超過5分鐘，請填寫修改原因')
     }
 
     setErrors(newErrors)
@@ -595,308 +581,274 @@ export default function WorkLogModal({ onClose, onSave, onNext, showNext = false
     }
   }
 
+  if (!open) return null
+
   return (
-    <Portal>
-      <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/40 backdrop-blur-sm p-4 animate-in fade-in-0 duration-300">
-        <div className="flex items-start gap-4 w-full max-w-6xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
-          {/* 左側空白區域（保持平衡） */}
-          <div className="w-64 flex-shrink-0"></div>
-          
-          {/* 主要工作紀錄表單 */}
-          <div className="relative bg-white/10 backdrop-blur-lg border border-white/20 ring-1 ring-white/10 rounded-3xl shadow-xl p-8 flex-1 max-w-2xl mx-auto animate-in zoom-in-95 slide-in-from-bottom-6 duration-500 delay-100">
-            <h2 className="text-white text-xl font-bold mb-4">
+    <>
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="max-w-[1200px] w-[1200px] h-[90vh] max-h-[90vh] bg-gray-900/95 backdrop-blur-lg border border-white/20 text-white flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="text-xl font-semibold text-white flex items-center gap-2">
+              <Briefcase className="h-5 w-5" />
               {editData ? '編輯工作紀錄' : copyData ? '複製並新增工作紀錄' : isOvertimeMode ? '⏱ 新增加班紀錄' : '新增工作紀錄'}
-            </h2>
+            </DialogTitle>
+            <DialogDescription>
+              請填寫以下表單來{editData ? '編輯' : '新增'}工作紀錄的詳細資訊
+            </DialogDescription>
+          </DialogHeader>
 
-            {isOvertimeMode && (
-              <div className="mb-4 p-3 bg-orange-500/20 border border-orange-400/30 rounded-xl">
-                <div className="text-orange-100 text-sm text-center">
-                  🔥 加班模式：此記錄將標記為加班工作
+          <div className="flex gap-4 flex-1 min-h-0">
+            {/* 主要表單區域 */}
+            <div className="flex-1 space-y-6 py-4 overflow-y-auto workmodal-scroll">
+              {/* 錯誤訊息 */}
+              {errors.length > 0 && (
+                <div className="bg-red-500/20 border border-red-400/30 rounded-lg p-3">
+                  <ul className="text-red-100 text-sm space-y-1">
+                    {errors.map((error, index) => (
+                      <li key={index}>• {error}</li>
+                    ))}
+                  </ul>
                 </div>
-              </div>
-            )}
+              )}
 
-            {errors.length > 0 && (
-              <div className="mb-4 p-3 rounded-xl bg-red-500/20 text-red-100 border border-red-400/30">
-                <ul className="text-sm space-y-1">
-                  {errors.map((error, index) => (
-                    <li key={index}>• {error}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="space-y-3">
-            {/* 智能案件選擇 */}
-            <div className="relative project-dropdown-container">
-              <input 
-                name="projectCode" 
-                placeholder="案件編號 (輸入2位數自動搜尋)" 
-                value={formData.projectCode} 
-                onChange={handleProjectCodeChange}
-                className="w-full rounded-xl bg-white/20 border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none"
-              />
-
-              
-              {/* 案件下拉選單 */}
-              {showProjectDropdown && filteredProjects.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white/95 backdrop-blur border border-white/30 rounded-xl max-h-40 overflow-y-auto z-10 shadow-lg">
-                  <div className="px-4 py-2 bg-blue-500/20 text-blue-800 text-xs font-medium border-b border-white/20">
-                    找到 {filteredProjects.length} 個相關案件
+              {/* 加班模式指示器 */}
+              {isOvertimeMode && (
+                <div className="bg-orange-500/20 border border-orange-400/30 rounded-lg p-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-orange-400"></div>
+                    <span className="text-sm font-medium text-white">
+                      🔥 加班模式
+                    </span>
+                    <span className="text-xs text-white/60 ml-auto">
+                      此記錄將標記為加班工作
+                    </span>
                   </div>
-                  {filteredProjects.map((project, index) => (
-                    <div
-                      key={index}
-                      onClick={() => selectProject(project)}
-                      className="px-4 py-3 hover:bg-blue-500/20 cursor-pointer border-b border-white/20 last:border-b-0 transition-colors"
-                    >
-                      <div className="text-gray-800 font-bold text-sm">{project.projectCode}</div>
-                      <div className="text-gray-700 text-sm font-medium">{project.projectName}</div>
-                      <div className="text-gray-500 text-xs mt-1 bg-gray-100 px-2 py-1 rounded inline-block">{project.category}</div>
-                    </div>
-                  ))}
                 </div>
               )}
-            </div>
 
-            {/* 案件名稱 */}
-            <div className="relative">
-              <input
-                name="projectName"
-                placeholder={isNewProject ? "案件名稱" : "請先輸入案件編號"}
-                value={formData.projectName}
-                onChange={handleChange}
-                disabled={!isNewProject && !formData.projectCode}
-                className={`w-full rounded-xl border px-4 py-2 text-white placeholder:text-white/60 focus:outline-none ${
-                  !isNewProject && !formData.projectCode 
-                    ? 'bg-white/10 border-white/20 cursor-not-allowed text-white/50' 
-                    : 'bg-white/20 border-white/30'
-                }`}
+              {/* 專案選擇器 */}
+              <ProjectSelector
+                selectedProjects={selectedProjects}
+                onProjectSelect={handleProjectSelect}
+                onProjectRemove={handleProjectRemove}
+                onNewProject={handleNewProject}
+                projectCode={formData.projectCode}
+                projectName={formData.projectName}
+                onProjectCodeInputChange={(code) => setFormData(prev => ({ ...prev, projectCode: code }))}
+                onProjectNameChange={(name) => setFormData(prev => ({ ...prev, projectName: name }))}
+                onProjectCodeChange={(code, project) => {
+                  if (project) {
+                    handleProjectSelect(project)
+                  }
+                }}
+                showRecentProjects={true}
+                showExtraTasks={true}
+                disabled={isSubmitting}
+                className="bg-white/5 rounded-lg p-4 border border-white/20"
               />
-            </div>
 
-            {/* 現有案件確認按鈕 */}
-            {!isNewProject && formData.projectCode && formData.projectName && (
-              <div className="bg-green-500/20 border border-green-400/30 rounded-xl p-3 text-green-100 text-sm">
-                <div className="flex items-center justify-between">
-                  <span>✅ 找到現有案件，點擊加入到工作記錄</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const project: Project = {
-                        projectCode: formData.projectCode,
-                        projectName: formData.projectName,
-                        category: ''
-                      }
-                      selectProject(project)
-                    }}
-                    className="ml-3 px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded-lg transition-colors font-medium"
-                  >
-                    ✓ 加入案件
-                  </button>
-                </div>
-              </div>
-            )}
+              {/* 工作分類選擇器 */}
+              <CategorySelector
+                value={formData.category}
+                onChange={handleCategorySelect}
+                required={true}
+                className="bg-white/5 rounded-lg p-4 border border-white/20"
+              />
 
-             {/* 新案件提示與確認按鈕 */}
-             {isNewProject && (
-              <div className="bg-blue-500/20 border border-blue-400/30 rounded-xl p-3 text-blue-100 text-sm">
-                <div className="flex items-center justify-between">
-                  <span>💡 這是新案件，請填寫案件名稱</span>
-                  {formData.projectCode && formData.projectName && (
-                    <button
-                      type="button"
-                      onClick={handleConfirmNewProject}
-                      className="ml-3 px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded-lg transition-colors font-medium"
-                    >
-                      ✓ 確認新增
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {selectedProjects.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {selectedProjects.map(p => (
-                  <span key={p.projectCode} className="bg-blue-500/20 text-white text-sm px-2 py-1 rounded-full flex items-center gap-1">
-                    {p.projectCode} {p.projectName}
-                    <button type="button" onClick={() => removeProject(p.projectCode)} className="ml-1">✕</button>
-                  </span>
-                ))}
-              </div>
-            )}
-            
-            {/* 工作分類 */}
-            <CategorySelector
-              value={formData.category}
-              onChange={(category: WorkCategory) => {
-                setFormData({ ...formData, category: category.content })
-              }}
-              required={true}
-            />
-            
-           
-            <textarea name="content" placeholder="工作內容" rows={3} value={formData.content} onChange={handleChange}
-              className="w-full rounded-xl bg-white/20 border border-white/30 px-4 py-2 text-white placeholder:text-white/60 focus:outline-none" />
-            
-            {/* 編輯原因（僅在編輯模式下顯示） */}
-            {editData && (
+              {/* 工作內容 */}
               <div className="space-y-2">
-                <label className="text-sm text-white font-medium block">
-                  編輯原因 <span className="text-red-400">*</span>
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  工作內容 <span className="text-red-500">*</span>
                 </label>
-                <textarea 
-                  name="editReason" 
-                  placeholder="請說明編輯此工作記錄的原因..." 
-                  rows={2} 
-                  value={formData.editReason} 
+                <textarea
+                  name="content"
+                  value={formData.content}
                   onChange={handleChange}
-                  className="w-full rounded-xl bg-orange-500/20 border border-orange-400/50 px-4 py-2 text-white placeholder:text-orange-200/60 focus:outline-none focus:border-orange-400" 
+                  placeholder="請詳細描述工作內容..."
+                  className="w-full p-3 border border-gray-300 rounded-md resize-vertical min-h-[100px] bg-white/10 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={4}
                 />
-                <p className="text-xs text-orange-200/80">
-                  ⚠️ 編輯原因將記錄您的IP地址，供管理員審核使用
-                </p>
               </div>
-            )}
-            
-            {/* 快速記錄模式的時間切換撥桿 */}
-            {(initialMode === 'quick' || copyData) && (
-              <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300 group">
-                <span className={`text-sm transition-all duration-300 ${useFullTimeMode ? 'text-blue-300 font-medium' : 'text-white/80'} group-hover:text-white`}>
-                  完整時間模式
-                </span>
-                <label className="relative inline-flex items-center cursor-pointer group-hover:scale-105 transition-transform duration-200">
-                  <input
-                    type="checkbox"
-                    checked={useFullTimeMode}
-                    onChange={(e) => setUseFullTimeMode(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className={`w-11 h-6 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-400/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all after:duration-300 after:shadow-sm peer-checked:after:shadow-md transition-all duration-300 ${useFullTimeMode ? 'bg-blue-600 shadow-md shadow-blue-500/30' : 'bg-white/20 hover:bg-white/30'}`}></div>
-                </label>
-              </div>
-            )}
 
-            <div className="relative overflow-hidden">
-              {(initialMode === 'quick' || copyData) && !useFullTimeMode ? (
-                <div 
-                  key="auto-fill-message"
-                  className="text-white/60 text-sm animate-in fade-in-0 slide-in-from-top-2 duration-300"
-                >
-                  開始與結束時間將自動填入
-                </div>
-              ) : (
-                <div 
-                  key="time-pickers"
-                  className="grid grid-cols-2 gap-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
-                >
-                  <SimpleTimePicker label="開始時間" value={formData.startTime} onChange={(time: string) => setFormData({ ...formData, startTime: time })} />
-                  {(initialMode === 'full' || initialMode === 'end' || editData || ((initialMode === 'quick' || copyData) && useFullTimeMode)) && (
-                    <div className="animate-in fade-in-0 slide-in-from-right-2 duration-500 delay-150">
-                      <SimpleTimePicker label="結束時間" value={formData.endTime} onChange={(time: string) => setFormData({ ...formData, endTime: time })} />
-                    </div>
-                  )}
+              {/* 編輯原因（僅在編輯模式下顯示） */}
+              {editData && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    編輯原因 <span className="text-red-500">*</span>
+                  </label>
+                  <textarea 
+                    name="editReason" 
+                    placeholder="請說明編輯此工作記錄的原因..." 
+                    rows={2} 
+                    value={formData.editReason} 
+                    onChange={handleChange}
+                    className="w-full p-3 border border-gray-300 rounded-md bg-orange-500/10 text-white placeholder-orange-200/60 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" 
+                  />
+                  <p className="text-xs text-orange-200/80">
+                    ⚠️ 編輯原因將記錄您的IP地址，供管理員審核使用
+                  </p>
                 </div>
               )}
-            </div>
-            
-            {/* 打卡時間修改原因（僅在打卡模式且修改時間超過5分鐘時顯示） */}
-            {needsEditReason() && (
-              <div className="space-y-2">
-                <label className="text-sm text-white font-medium block">
-                  時間修改原因 <span className="text-red-400">*</span>
-                </label>
-                <textarea 
-                  name="editReason" 
-                  placeholder="請說明修改打卡時間的原因..." 
-                  rows={2} 
-                  value={formData.editReason} 
-                  onChange={handleChange}
-                  className="w-full rounded-xl bg-yellow-500/20 border border-yellow-400/50 px-4 py-2 text-white placeholder:text-yellow-200/60 focus:outline-none focus:border-yellow-400" 
-                />
-                <p className="text-xs text-yellow-200/80">
-                  ⚠️ 修改時間超過5分鐘需要說明原因，將記錄到打卡記錄中供管理員審核
-                </p>
-              </div>
-            )}
 
-            {/* 時間修改提示（5分鐘內的小幅修改） */}
-            {initialMode === 'start' && formData.startTime !== originalStartTime && !needsEditReason() && (
-              <div className="bg-green-500/20 border border-green-400/30 rounded-xl p-3 text-green-100 text-sm">
-                <div className="flex items-center gap-2">
-                  <span>✅ 時間修改在5分鐘內，無需填寫原因</span>
+              {/* 快速記錄模式的時間切換撥桿 */}
+              {(initialMode === 'quick' || copyData) && (
+                <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300 group">
+                  <span className={`text-sm transition-all duration-300 ${useFullTimeMode ? 'text-blue-300 font-medium' : 'text-white/80'} group-hover:text-white`}>
+                    完整時間模式
+                  </span>
+                  <label className="relative inline-flex items-center cursor-pointer group-hover:scale-105 transition-transform duration-200">
+                    <input
+                      type="checkbox"
+                      checked={useFullTimeMode}
+                      onChange={(e) => setUseFullTimeMode(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className={`w-11 h-6 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-400/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all after:duration-300 after:shadow-sm peer-checked:after:shadow-md transition-all duration-300 ${useFullTimeMode ? 'bg-blue-600 shadow-md shadow-blue-500/30' : 'bg-white/20 hover:bg-white/30'}`}></div>
+                  </label>
                 </div>
-              </div>
-            )}
-            </div>
+              )}
 
-            <div className="mt-6 flex justify-between gap-2">
-              <button onClick={onClose}
-                className="px-4 py-2 text-sm rounded-xl bg-white/10 text-white border border-white/30 hover:bg-white/20 transition">
-                取消
-              </button>
-              <div className="flex gap-2">
+              {/* 時間選擇器 */}
+              <div className="space-y-4">
+                {(initialMode === 'quick' || copyData) && !useFullTimeMode ? (
+                  <div className="text-white/60 text-sm p-3 bg-white/5 rounded-lg border border-white/10">
+                    開始與結束時間將自動填入
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        開始時間 <span className="text-red-500">*</span>
+                      </label>
+                      <SimpleTimePicker 
+                        label="" 
+                        value={formData.startTime} 
+                        onChange={(time: string) => setFormData({ ...formData, startTime: time })} 
+                      />
+                    </div>
+                    {(initialMode === 'full' || initialMode === 'end' || editData || ((initialMode === 'quick' || copyData) && useFullTimeMode)) && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          結束時間
+                        </label>
+                        <SimpleTimePicker 
+                          label="" 
+                          value={formData.endTime} 
+                          onChange={(time: string) => setFormData({ ...formData, endTime: time })} 
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* 打卡時間修改原因（僅在打卡模式且修改時間超過5分鐘時顯示） */}
+              {needsEditReason() && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    時間修改原因 <span className="text-red-500">*</span>
+                  </label>
+                  <textarea 
+                    name="editReason" 
+                    placeholder="請說明修改打卡時間的原因..." 
+                    rows={2} 
+                    value={formData.editReason} 
+                    onChange={handleChange}
+                    className="w-full p-3 border border-gray-300 rounded-md bg-yellow-500/10 text-white placeholder-yellow-200/60 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent" 
+                  />
+                  <p className="text-xs text-yellow-200/80">
+                    ⚠️ 修改時間超過5分鐘需要說明原因，將記錄到打卡記錄中供管理員審核
+                  </p>
+                </div>
+              )}
+
+              {/* 時間修改提示（5分鐘內的小幅修改） */}
+              {initialMode === 'start' && formData.startTime !== originalStartTime && !needsEditReason() && (
+                <div className="bg-green-500/20 border border-green-400/30 rounded-lg p-3 text-green-100 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span>✅ 時間修改在5分鐘內，無需填寫原因</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 按鈕區域 */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-white/20">
+                <Button 
+                  variant="outline" 
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                  className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+                >
+                  取消
+                </Button>
                 {showNext && (
-                  <button 
+                  <Button 
                     onClick={() => handleSubmit(true)}
                     disabled={isSubmitting}
-                    className="px-4 py-2 text-sm rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-semibold shadow-md hover:scale-105 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    className="bg-blue-500 hover:bg-blue-600 text-white font-semibold"
                   >
                     {isSubmitting ? '處理中...' : '儲存並新增'}
-                  </button>
+                  </Button>
                 )}
-                <button 
+                <Button 
                   onClick={() => handleSubmit(false)}
                   disabled={isSubmitting}
-                  className="px-4 py-2 text-sm rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 text-white font-semibold shadow-md hover:scale-105 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold min-w-[100px]"
                 >
                   {isSubmitting ? '處理中...' : (editData ? '儲存修改' : '完成新增')}
-                </button>
+                </Button>
               </div>
             </div>
 
-            <div className="absolute inset-0 rounded-3xl pointer-events-none ring-1 ring-white/10 border border-white/10" />
-          </div>
-
-          {/* 其他工作側邊欄 */}
-          <div className="relative bg-white/10 backdrop-blur-lg border border-white/20 ring-1 ring-white/10 rounded-3xl shadow-xl p-6 w-64 flex-shrink-0 animate-in zoom-in-95 slide-in-from-right-4 duration-500 delay-200">
-            <div className="text-white font-bold text-lg mb-4 text-center">其他工作</div>
-            <div className="space-y-3">
-              {extraTasks.map(task => (
-                <label key={task.projectCode} className="flex items-center gap-3 text-white/90 hover:text-white transition-colors cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={!!selectedProjects.find(p => p.projectCode === task.projectCode)}
-                    onChange={() => toggleExtraTask(task)}
-                    className="w-4 h-4 rounded border-white/30 bg-white/20 text-blue-500 focus:ring-blue-500/50"
-                  />
-                  <div className="flex-1 group-hover:translate-x-1 transition-transform">
-                    <div className="font-medium text-sm">{task.projectCode}</div>
-                    <div className="text-xs text-white/70">{task.projectName}</div>
+            {/* 其他工作側邊欄 */}
+            <div className="relative bg-white/10 backdrop-blur-lg border border-white/20 rounded-lg shadow-xl w-64 flex-shrink-0 flex flex-col max-h-full">
+              <div className="p-6 pb-4 flex-shrink-0">
+                <div className="text-white font-bold text-lg mb-4 text-center">其他工作</div>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto px-6 pb-4 workmodal-scroll">
+                <div className="space-y-3">
+                  {extraTasks.map(task => (
+                    <label key={task.projectCode} className="flex items-center gap-3 text-white/90 hover:text-white transition-colors cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={selectedExtraTasks.includes(task.projectCode)}
+                        onChange={() => toggleExtraTask(task)}
+                        className="w-4 h-4 rounded border-white/30 bg-white/20 text-blue-500 focus:ring-blue-500/50"
+                      />
+                      <div className="flex-1 group-hover:translate-x-1 transition-transform">
+                        <div className="font-medium text-sm">{task.projectCode}</div>
+                        <div className="text-xs text-white/70">{task.projectName}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="p-6 pt-4 flex-shrink-0 border-t border-white/10">
+                <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                  <div className="text-white/80 text-xs text-center">
+                    💡 選擇適用的其他工作類型
                   </div>
-                </label>
-              ))}
-            </div>
-            
-            <div className="mt-6 p-3 rounded-xl bg-white/5 border border-white/10">
-              <div className="text-white/80 text-xs text-center">
-                💡 選擇適用的其他工作類型
+                </div>
               </div>
             </div>
-
-            <div className="absolute inset-0 rounded-3xl pointer-events-none ring-1 ring-white/10 border border-white/10" />
           </div>
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
 
-      {showConflictModal && conflictData && (
-        <ConflictConfirmModal
-          conflicts={conflictData}
-          onConfirm={handleConfirmConflicts}
-          onCancel={handleCancelConflicts}
-        />
-      )}
-    </Portal>
+      {/* 衝突確認對話框 */}
+      <ConflictConfirmModal
+        conflicts={conflictData || []}
+        onConfirm={handleConfirmConflicts}
+        onCancel={handleCancelConflicts}
+        open={showConflictModal}
+      />
+    </>
   )
 }

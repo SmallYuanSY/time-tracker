@@ -192,7 +192,7 @@ export default function HomePage() {
   // 渲染工作內容區域
   const renderWorkContent = () => {
     if (useClassicLayout) {
-      return (
+  return (
         <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl overflow-hidden">
           {/* 切換標籤 */}
           <div className="relative flex bg-white/5 p-1 rounded-t-2xl">
@@ -512,23 +512,22 @@ export default function HomePage() {
       />
 
       {/* 工作記錄模態框 */}
-      {showWorkLogModal && (
-        <WorkLogModal
-          onClose={handleWorkLogModalClose}
-          onSave={handleWorkLogSave}
-          initialMode={isOvertimeMode ? "start" : "start"}
-          isOvertimeMode={isOvertimeMode}
-          copyData={workLogFromScheduled ? {
-            id: '',
-            projectCode: workLogFromScheduled.projectCode,
-            projectName: workLogFromScheduled.projectName,
-            category: workLogFromScheduled.category,
-            content: workLogFromScheduled.content,
-            startTime: new Date().toISOString(),
-            endTime: null,
-          } : undefined}
-        />
-      )}
+      <WorkLogModal
+        open={showWorkLogModal}
+        onClose={handleWorkLogModalClose}
+        onSave={handleWorkLogSave}
+        initialMode={isOvertimeMode ? "start" : "start"}
+        isOvertimeMode={isOvertimeMode}
+        copyData={workLogFromScheduled ? {
+          id: '',
+          projectCode: workLogFromScheduled.projectCode,
+          projectName: workLogFromScheduled.projectName,
+          category: workLogFromScheduled.category,
+          content: workLogFromScheduled.content,
+          startTime: new Date().toISOString(),
+          endTime: null,
+        } : undefined}
+      />
     </DashboardLayout>
   )
 }

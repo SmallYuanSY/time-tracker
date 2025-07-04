@@ -12,6 +12,7 @@ import { Copy, FileText, Download, Calendar, Clock, ListTodo, Edit3 } from 'luci
 import ClockRecordList from '@/components/worklog/ClockRecordList'
 import ScheduledWorkList from '@/components/worklog/ScheduledWorkList'
 import WorkLogModal from '@/app/worklog/WorkLogModal'
+import MergeConfirmModal from '@/components/ui/MergeConfirmModal'
 
 interface WorkLog {
   id: string
@@ -42,10 +43,16 @@ export default function JournalPage() {
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [scheduledWorkMode, setScheduledWorkMode] = useState<'week' | 'all'>('week')
   const [clockTimeRange, setClockTimeRange] = useState<'week' | 'month'>('week')
+  const [merging, setMerging] = useState(false)
   
   // 工作記錄編輯相關狀態
   const [editingWorkLog, setEditingWorkLog] = useState<WorkLog | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
+
+  // 合併預覽相關狀態
+  const [showMergeModal, setShowMergeModal] = useState(false)
+  const [mergePreview, setMergePreview] = useState<any[]>([])
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
 
   // 身份驗證檢查
   useEffect(() => {
@@ -268,6 +275,127 @@ export default function JournalPage() {
     } catch (error) {
       console.error('複製失敗:', error)
       alert('複製失敗，請重試')
+    }
+  }
+
+  // 合併重疊時間記錄
+  const handleMergeOverlaps = async (date: Date) => {
+    if (!session?.user) return
+    
+    try {
+      setMerging(true)
+      const response = await fetch('/api/worklog/merge-overlaps', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          date: date.toISOString(),
+        }),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        if (result.mergedCount > 0) {
+          // 重新載入工作記錄
+          const userId = (session.user as any).id
+          const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 })
+          const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 })
+          const startISO = weekStart.toISOString()
+          const endISO = weekEnd.toISOString()
+          
+          const logsResponse = await fetch(`/api/worklog?userId=${userId}&from=${startISO}&to=${endISO}`)
+          if (logsResponse.ok) {
+            const data = await logsResponse.json()
+            const sortedLogs = data.sort((a: WorkLog, b: WorkLog) => {
+              return new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+            })
+            setWeeklyLogs(sortedLogs)
+          }
+          alert(`已合併 ${result.mergedCount} 組重疊的工作記錄`)
+        } else {
+          alert('沒有找到需要合併的工作記錄')
+        }
+      }
+    } catch (error) {
+      console.error('合併工作記錄失敗:', error)
+      alert('合併工作記錄時發生錯誤')
+    } finally {
+      setMerging(false)
+    }
+  }
+
+  // 處理合併預覽
+  const handleMergePreview = async (date: Date) => {
+    if (!session?.user) return
+    
+    try {
+      setMerging(true)
+      setSelectedDate(date)
+      
+      const response = await fetch('/api/worklog/merge-overlaps/preview', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          date: date.toISOString(),
+        }),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setMergePreview(result.preview)
+        setShowMergeModal(true)
+      }
+    } catch (error) {
+      console.error('獲取合併預覽失敗:', error)
+      alert('獲取合併預覽時發生錯誤')
+    } finally {
+      setMerging(false)
+    }
+  }
+
+  // 處理確認合併
+  const handleConfirmMerge = async () => {
+    if (!selectedDate || !session?.user) return
+    
+    try {
+      setMerging(true)
+      const response = await fetch('/api/worklog/merge-overlaps', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          date: selectedDate.toISOString(),
+        }),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        // 重新載入工作記錄
+        const userId = (session.user as any).id
+        const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 })
+        const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 })
+        const startISO = weekStart.toISOString()
+        const endISO = weekEnd.toISOString()
+        
+        const logsResponse = await fetch(`/api/worklog?userId=${userId}&from=${startISO}&to=${endISO}`)
+        if (logsResponse.ok) {
+          const data = await logsResponse.json()
+          const sortedLogs = data.sort((a: WorkLog, b: WorkLog) => {
+            return new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+          })
+          setWeeklyLogs(sortedLogs)
+        }
+        setShowMergeModal(false)
+      }
+    } catch (error) {
+      console.error('合併工作記錄失敗:', error)
+      alert('合併工作記錄時發生錯誤')
+    } finally {
+      setMerging(false)
     }
   }
 
@@ -580,15 +708,25 @@ export default function JournalPage() {
                                       {dayLogs.length} 項工作
                                     </span>
                                   </div>
-                                  <Button
-                                    onClick={() => handleDayCopy(day, dayLogs)}
-                                    variant="outline"
-                                    size="sm"
-                                    className="border-white/20 text-white hover:bg-white/10 text-xs"
-                                  >
-                                    <Copy className="h-3 w-3 mr-1" />
-                                    複製當日
-                                  </Button>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleDayCopy(day, dayLogs)}
+                                      className="border-white/20 text-white hover:bg-white/10 text-xs"
+                                    >
+                                      複製當日
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleMergePreview(day)}
+                                      disabled={merging}
+                                      className="text-orange-600 border-orange-600 hover:bg-orange-600/10"
+                                    >
+                                      {merging ? '處理中...' : '合併重疊記錄'}
+                                    </Button>
+                                  </div>
                                 </div>
 
                                 {dayLogs.length === 0 ? (
@@ -797,13 +935,24 @@ export default function JournalPage() {
       </div>
 
       {/* 編輯工作記錄彈窗 */}
-      {showEditModal && editingWorkLog && (
-        <WorkLogModal
-          initialMode="full"
-          onClose={handleCloseEditModal}
-          onSave={handleSaveEdit}
-          showNext={false}
-          editData={editingWorkLog}
+      <WorkLogModal
+        open={showEditModal && !!editingWorkLog}
+        initialMode="full"
+        onClose={handleCloseEditModal}
+        onSave={handleSaveEdit}
+        showNext={false}
+        editData={editingWorkLog}
+      />
+
+      {/* 添加合併確認對話框 */}
+      {showMergeModal && selectedDate && (
+        <MergeConfirmModal
+          open={showMergeModal}
+          onClose={() => setShowMergeModal(false)}
+          onConfirm={handleConfirmMerge}
+          date={selectedDate}
+          mergePreview={mergePreview}
+          isLoading={merging}
         />
       )}
     </DashboardLayout>

@@ -2,7 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig = {
   /* config options here */
-  swcMinify: true,
   reactStrictMode: true,
   typescript: {
     ignoreBuildErrors: true,
@@ -15,6 +14,15 @@ const nextConfig = {
       bodySizeLimit: '10mb',
       allowedOrigins: ['*']
     }
+  },
+  turbopack: {
+    loaders: {
+      // 配置特定文件類型的加載器
+      '.svg': ['@svgr/webpack'],
+    },
+    rules: {
+      // 配置構建規則
+    },
   },
   async headers() {
     return [

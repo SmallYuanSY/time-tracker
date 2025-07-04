@@ -96,10 +96,21 @@ export async function PUT(
           },
           // 現有記錄跨越新記錄開始時間（進行中的記錄）
           {
-            startTime: {
-              lt: endDate,
-            },
-            endTime: null,
+            AND: [
+              {
+                startTime: {
+                  lt: endDate,
+                },
+              },
+              {
+                startTime: {
+                  lt: startDate,
+                },
+              },
+              {
+                endTime: null,
+              },
+            ],
           },
         ],
       },

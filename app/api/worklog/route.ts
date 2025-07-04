@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // app/api/worklog/route.ts
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
@@ -110,10 +113,21 @@ export async function POST(req: NextRequest) {
             },
             // 現有記錄跨越新記錄開始時間（進行中的記錄）
             {
-              startTime: {
-                lt: endDate,
-              },
-              endTime: null,
+              AND: [
+                {
+                  startTime: {
+                    lt: endDate,
+                  },
+                },
+                {
+                  startTime: {
+                    lt: startDate,
+                  },
+                },
+                {
+                  endTime: null,
+                },
+              ],
             },
           ],
         },
@@ -282,14 +296,28 @@ export async function GET(req: NextRequest) {
     const toStr = searchParams.get('to') // ISO 字串
     const ongoingOnly = searchParams.get('ongoing') === 'true'
     const overtimeOnly = searchParams.get('overtime') === 'true'
-
-    if (!userId) {
-      return new NextResponse('缺少 userId', { status: 400 })
-    }
+    const projectCode = searchParams.get('projectCode')
+    const category = searchParams.get('category')
 
     // 建立查詢條件
-    const whereConditions: any = {
-      userId,
+    const whereConditions: any = {}
+
+    // 如果指定了專案代碼，加入專案代碼條件
+    if (projectCode) {
+      whereConditions.projectCode = projectCode
+    }
+
+    // 如果指定了使用者 ID，一定要加入條件
+    if (userId) {
+      whereConditions.userId = userId
+    } else if (!projectCode) {
+      // 如果沒有指定專案代碼且沒有使用者 ID，則返回錯誤
+      return new NextResponse('缺少 userId 或 projectCode', { status: 400 })
+    }
+
+    // 如果指定了分類，加入分類條件
+    if (category) {
+      whereConditions.category = category
     }
 
     // 如果不是只查詢進行中記錄，需要時間範圍
@@ -309,7 +337,15 @@ export async function GET(req: NextRequest) {
         startDate = start
         endDate = end
       } else {
-        return new NextResponse('缺少 date 或 from/to 參數', { status: 400 })
+        // 如果是專案查詢，預設顯示最近一個月的記錄
+        if (projectCode) {
+          const now = new Date()
+          endDate = now
+          startDate = new Date(now)
+          startDate.setMonth(startDate.getMonth() - 1)
+        } else {
+          return new NextResponse('缺少 date 或 from/to 參數', { status: 400 })
+        }
       }
 
       // 添加時間範圍條件
@@ -329,18 +365,50 @@ export async function GET(req: NextRequest) {
       whereConditions.isOvertime = true
     }
 
+    // 查詢工作記錄
     const results = await prisma.workLog.findMany({
       where: whereConditions,
       orderBy: {
         startTime: 'desc',
       },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true
+          }
+        }
+      }
     })
 
-    return NextResponse.json(results)
+    // 按使用者分組
+    const groupedResults = results.reduce((groups: any, log) => {
+      const userId = log.user.id
+      if (!groups[userId]) {
+        groups[userId] = {
+          user: {
+            id: log.user.id,
+            name: log.user.name,
+            email: log.user.email,
+            role: log.user.role
+          },
+          logs: []
+        }
+      }
+      // 移除重複的使用者資訊
+      const { user, ...logWithoutUser } = log
+      groups[userId].logs.push(logWithoutUser)
+      return groups
+    }, {})
+
+    // 轉換為陣列格式
+    const finalResults = Object.values(groupedResults)
+
+    return NextResponse.json(finalResults)
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('[GET /api/worklog]', error)
-    }
+    console.error('[GET /api/worklog]', error)
     return new NextResponse('伺服器內部錯誤', { status: 500 })
   }
 }

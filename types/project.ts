@@ -1,3 +1,5 @@
+import { ContactType } from '@prisma/client'
+
 export interface User {
   id: string
   name: string | null
@@ -10,6 +12,10 @@ export interface Contact {
   contactName: string
   phone: string
   address: string
+  type: ContactType
+  notes?: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface Project {
