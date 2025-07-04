@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import DashboardLayout from "@/components/layouts/DashboardLayout"
 import { Button } from "@/components/ui/button"
 import { SettingKey } from '@prisma/client'
-import { Layout, Bell, Moon, Minimize, Clock } from 'lucide-react'
+import { Layout, Bell, Moon, Minimize, Clock, Mail, Lock } from 'lucide-react'
 
 interface Setting {
   id: string
@@ -244,6 +244,52 @@ export default function SettingsPage() {
                   </div>
                 )
               })}
+            </div>
+          </div>
+
+          {/* 帳號設定區塊 */}
+          <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl overflow-hidden">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-white mb-4">👤 帳號設定</h2>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 border border-white/10 rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2 rounded-lg bg-white/5 border border-white/10">
+                      <Mail className="w-5 h-5 text-white/80" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-medium text-white">修改信箱</h3>
+                      <p className="text-sm text-white/60">更新您的登入信箱地址</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="border-white/20 text-white/80 hover:text-white hover:bg-white/10"
+                    onClick={() => router.push('/settings/email')}
+                  >
+                    修改
+                  </Button>
+                </div>
+
+                <div className="flex items-center justify-between p-4 border border-white/10 rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2 rounded-lg bg-white/5 border border-white/10">
+                      <Lock className="w-5 h-5 text-white/80" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-medium text-white">修改密碼</h3>
+                      <p className="text-sm text-white/60">更新您的登入密碼</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="border-white/20 text-white/80 hover:text-white hover:bg-white/10"
+                    onClick={() => router.push('/settings/password')}
+                  >
+                    修改
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
