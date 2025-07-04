@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig = {
-  /* config options here */
   reactStrictMode: true,
   typescript: {
     ignoreBuildErrors: true,
@@ -15,44 +14,49 @@ const nextConfig = {
       allowedOrigins: ['*']
     }
   },
-  turbopack: {
-    loaders: {
-      // 配置特定文件類型的加載器
-      '.svg': ['@svgr/webpack'],
-    },
-    rules: {
-      // 配置構建規則
-    },
-  },
+  // 生產環境安全標頭
   async headers() {
     return [
       {
         source: '/(.*)',
         headers: [
           {
-            key: 'Content-Security-Policy',
-            value: "default-src 'self'; connect-src 'self' https://*.prisma.io https://*.novu.co https://*.vercel.app https://vercel.live wss://*.novu.co; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.vercel.live https://vercel.live; script-src-elem 'self' 'unsafe-inline' https://*.vercel.live https://vercel.live; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-src 'self' https://*.vercel.live https://vercel.live;"
-          },
-          {
             key: 'X-Frame-Options',
-            value: 'SAMEORIGIN'
+            value: 'DENY',
           },
           {
             key: 'X-Content-Type-Options',
-            value: 'nosniff'
+            value: 'nosniff',
           },
           {
             key: 'Referrer-Policy',
-            value: 'origin-when-cross-origin'
+            value: 'origin-when-cross-origin',
           },
           {
-            key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()'
-          }
-        ]
-      }
-    ]
-  }
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains',
+          },
+        ],
+      },
+    ];
+  },
+  // HTTPS 重定向（如果使用反向代理）
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'header',
+            key: 'x-forwarded-proto',
+            value: 'http',
+          },
+        ],
+        destination: 'https://:host/:path*',
+        permanent: true,
+      },
+    ];
+  },
 } satisfies NextConfig;
 
 export default nextConfig;
