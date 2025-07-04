@@ -151,8 +151,14 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
   const isFutureDate = selectedDate > today
 
   const isOvertime = (startTime: string) => {
-    const t = parseISO(startTime)
-    return t.getHours() >= 18 || t.getHours() < 6
+    if (!startTime) return false
+    try {
+      const t = parseISO(startTime)
+      return t.getHours() >= 18 || t.getHours() < 6
+    } catch (error) {
+      console.warn('無效的時間格式:', startTime)
+      return false
+    }
   }
 
   // 只在初始載入且沒有日期切換動畫時顯示載入畫面
@@ -273,6 +279,12 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
             dateAnimation !== 'none' ? 'opacity-0 transform scale-95' : 'opacity-100 transform scale-100'
           }`}>
             {logs.slice(-6).reverse().map((log) => {
+              // 加入空值檢查
+              if (!log.startTime) {
+                console.warn('發現無效的工作記錄:', log)
+                return null
+              }
+
               const start = format(parseISO(log.startTime), "HH:mm")
               const end = log.endTime ? format(parseISO(log.endTime), "HH:mm") : "進行中"
               

@@ -113,7 +113,7 @@ export default function ProjectDetailPage() {
               {project.users && project.users.length > 0 ? (
                 <div className="mt-2 space-y-2">
                   {project.users.map(user => (
-                    <div key={user.id} className="p-2 bg-gray-50 rounded">
+                    <div key={user.id} className="p-2 bg-gray-800 rounded text-white-100">
                       {user.name || user.email}
                     </div>
                   ))}
