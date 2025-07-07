@@ -40,7 +40,9 @@ export default function OvertimeWidget({ onStatusChange, onOpenWorkLogModal, hol
       const res = await fetch(`/api/worklog?userId=${userId}&ongoing=true&overtime=true`)
       if (res.ok) {
         const data = await res.json()
-        const ongoingOvertime = data.find((log: any) => !log.endTime && log.isOvertime)
+        // API 返回按用戶分組的數據，需要提取工作記錄
+        const flattenedLogs = data.flatMap((group: any) => group.logs || [])
+        const ongoingOvertime = flattenedLogs.find((log: any) => !log.endTime && log.isOvertime)
         
         if (ongoingOvertime) {
           setIsInOvertime(true)

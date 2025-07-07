@@ -60,7 +60,9 @@ export default function TodayStatsCard() {
     const completedTasks = logs.filter(log => log.endTime).length
 
     logs.forEach(log => {
-      if (log.endTime) {
+      if (log.endTime && log.startTime && 
+          !isNaN(new Date(log.startTime).getTime()) && 
+          !isNaN(new Date(log.endTime).getTime())) {
         const start = parseISO(log.startTime)
         const end = parseISO(log.endTime)
         let duration = differenceInMinutes(end, start)

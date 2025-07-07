@@ -119,11 +119,19 @@ export default function JournalPage() {
 
   // 計算工作時數
   const calculateDuration = (startTime: string, endTime: string | null) => {
-    if (!endTime) return '進行中'
+    if (!endTime || !startTime) return '進行中'
+    
+    // 檢查時間格式是否有效
+    if (isNaN(new Date(startTime).getTime()) || isNaN(new Date(endTime).getTime())) {
+      return '時間無效'
+    }
     
     const start = new Date(startTime)
     const end = new Date(endTime)
     const diffMs = end.getTime() - start.getTime()
+    
+    if (diffMs < 0) return '時間錯誤'
+    
     const diffHours = diffMs / (1000 * 60 * 60)
     
     if (diffHours < 1) {
@@ -139,11 +147,14 @@ export default function JournalPage() {
     const grouped: { [key: string]: WorkLog[] } = {}
     
     weeklyLogs.forEach(log => {
-      const date = format(parseISO(log.startTime), 'yyyy-MM-dd')
-      if (!grouped[date]) {
-        grouped[date] = []
+      // 檢查 startTime 是否有效
+      if (log.startTime && !isNaN(new Date(log.startTime).getTime())) {
+        const date = format(parseISO(log.startTime), 'yyyy-MM-dd')
+        if (!grouped[date]) {
+          grouped[date] = []
+        }
+        grouped[date].push(log)
       }
-      grouped[date].push(log)
     })
     
     // 對每日的記錄按時間降序排序 (最新的在最下面)
@@ -736,7 +747,10 @@ export default function JournalPage() {
                                 ) : (
                                   <div className="space-y-2 ml-8">
                                     {dayLogs.map(log => {
-                                      const startTime = format(parseISO(log.startTime), 'HH:mm')
+                                      // 安全的時間格式化
+                                      const startTime = log.startTime && !isNaN(new Date(log.startTime).getTime())
+                                        ? format(parseISO(log.startTime), 'HH:mm')
+                                        : '--:--'
                                       const duration = calculateDuration(log.startTime, log.endTime)
                                       
                                       // 決定工作記錄的顏色和狀態
@@ -758,7 +772,7 @@ export default function JournalPage() {
                                                   {log.projectName}
                                                 </span>
                                                 <span className="text-white/80 font-mono text-sm bg-white/10 px-2 py-1 rounded">
-                                                  {startTime} ~ {log.endTime ? format(parseISO(log.endTime), 'HH:mm') : '進行中'}
+                                                  {startTime} ~ {log.endTime && !isNaN(new Date(log.endTime).getTime()) ? format(parseISO(log.endTime), 'HH:mm') : '進行中'}
                                                 </span>
                                                 {log.isOvertime && (
                                                   <span className="text-orange-400 text-xs bg-orange-500/20 px-2 py-1 rounded-full">
@@ -781,7 +795,7 @@ export default function JournalPage() {
                                                 <div className="text-white/60 text-xs">
                                                   工作時數: {duration}
                                                 </div>
-                                                {log.editedAt && (
+                                                {log.editedAt && !isNaN(new Date(log.editedAt).getTime()) && (
                                                   <div className="text-orange-300/60 text-xs">
                                                     修改於: {format(parseISO(log.editedAt), 'MM/dd HH:mm')}
                                                   </div>

@@ -8,7 +8,7 @@ interface OngoingWorkLog {
   projectCode: string
   projectName: string
   category: string
-  startTime: Date
+  startTime: string | Date
 }
 
 interface ScheduledWork {
@@ -56,7 +56,9 @@ export function EndOfDayModal({
         const ongoingResponse = await fetch(`/api/worklog?userId=${userId}&ongoing=true`)
         if (ongoingResponse.ok) {
           const ongoingData = await ongoingResponse.json()
-          setOngoingWorkLogs(ongoingData)
+          // API 返回的是按用戶分組的數據，需要提取工作記錄
+          const flattenedLogs = ongoingData.flatMap((group: any) => group.logs || [])
+          setOngoingWorkLogs(flattenedLogs)
         }
 
         // 2. 獲取今天的預定工作
@@ -217,7 +219,7 @@ export function EndOfDayModal({
                             {log.projectCode} - {log.projectName}
                           </div>
                           <div className="text-xs text-amber-200/80">
-                            {log.category} | 開始時間：{format(new Date(log.startTime), "HH:mm")}
+                            {log.category} | 開始時間：{log.startTime && !isNaN(new Date(log.startTime).getTime()) ? format(new Date(log.startTime), "HH:mm") : '時間無效'}
                           </div>
                         </div>
                         <div className="text-xs text-red-400 font-medium bg-red-900/30 px-2 py-1 rounded-full">
@@ -297,7 +299,7 @@ export function EndOfDayModal({
                     )}
                     {workTimeInfo.firstClockIn && (
                       <div className="text-xs text-red-200/70 mt-2">
-                        今日首次上班：{format(workTimeInfo.firstClockIn, 'HH:mm')}
+                        今日首次上班：{workTimeInfo.firstClockIn ? format(workTimeInfo.firstClockIn, 'HH:mm') : '無記錄'}
                         <br />
                         計算已扣除1小時午休時間
                       </div>

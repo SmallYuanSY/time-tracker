@@ -296,8 +296,13 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
                 return null
               }
 
-              const start = format(parseISO(log.startTime), "HH:mm")
-              const end = log.endTime ? format(parseISO(log.endTime), "HH:mm") : "進行中"
+              // 安全的時間格式化
+              const start = log.startTime && !isNaN(new Date(log.startTime).getTime()) 
+                ? format(parseISO(log.startTime), "HH:mm") 
+                : "--:--"
+              const end = log.endTime && !isNaN(new Date(log.endTime).getTime())
+                ? format(parseISO(log.endTime), "HH:mm") 
+                : "進行中"
               
               // 根據工作狀態決定卡片顏色
               let bgColor = ""

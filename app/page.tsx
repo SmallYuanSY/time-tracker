@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { useMobileSSR } from "@/lib/hooks/useMobile";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import SmartPunchWidget from "@/components/ui/SmartPunchWidget";
 import NovuInbox from "@/app/components/ui/inbox/NovuInbox";
@@ -39,6 +40,8 @@ interface Setting {
   updatedAt: string
 }
 
+
+
 export default function HomePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -46,6 +49,7 @@ export default function HomePage() {
   const [punchWidgetKey, setPunchWidgetKey] = useState(0); // 用於觸發 SmartPunchWidget 刷新
   const [activeTab, setActiveTab] = useState<'today' | 'scheduled'>('today');
   const [useClassicLayout, setUseClassicLayout] = useState(false);
+  const isMobile = useMobileSSR();
   
   // 預定工作相關狀態
   const [showScheduledWorkModal, setShowScheduledWorkModal] = useState(false);
@@ -460,6 +464,21 @@ export default function HomePage() {
       );
     }
   };
+
+  // 如果是手機版，重定向到專門的手機版頁面
+  if (isMobile) {
+    router.push('/mobile')
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center">
+        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-3xl p-8">
+          <div className="text-white text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-white/30 border-t-white mx-auto mb-4"></div>
+            <div>重定向到手機版...</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <DashboardLayout>

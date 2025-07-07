@@ -156,9 +156,9 @@ export default function ProjectSelector({
             <div className="px-4 py-2 bg-blue-500/20 text-blue-800 text-xs font-medium border-b border-white/20">
               找到 {filteredProjects.length} 個相關專案
             </div>
-            {filteredProjects.map((project, index) => (
+            {filteredProjects.map((project) => (
               <div
-                key={index}
+                key={`${project.projectCode}-${project.projectName}`}
                 onClick={() => handleSelectProject(project)}
                 className="px-4 py-3 hover:bg-blue-500/20 cursor-pointer border-b border-white/20 last:border-b-0 transition-colors"
               >

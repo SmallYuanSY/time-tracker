@@ -76,8 +76,9 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
         
         setClockedIn(clockData.clockedIn)
         
-        // 檢查是否有進行中的加班記錄
-        const hasOngoingOvertime = overtimeData.some((log: any) => !log.endTime && log.isOvertime)
+        // API 返回按用戶分組的數據，需要提取工作記錄
+        const flattenedOvertimeLogs = overtimeData.flatMap((group: any) => group.logs || [])
+        const hasOngoingOvertime = flattenedOvertimeLogs.some((log: any) => !log.endTime && log.isOvertime)
         
         // 決定顯示模式的邏輯：
         let newShouldShowOvertime = false

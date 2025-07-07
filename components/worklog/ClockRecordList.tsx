@@ -307,7 +307,9 @@ export default function ClockRecordList({ userId, currentWeek, timeRange = 'week
     const grouped: { [key: string]: ClockRecord[] } = {}
     
     clockRecords.forEach(record => {
-      const date = format(parseISO(record.timestamp), 'yyyy-MM-dd')
+      const date = record.timestamp && !isNaN(new Date(record.timestamp).getTime())
+        ? format(parseISO(record.timestamp), 'yyyy-MM-dd')
+        : 'invalid-date'
       if (!grouped[date]) {
         grouped[date] = []
       }
@@ -767,10 +769,16 @@ export default function ClockRecordList({ userId, currentWeek, timeRange = 'week
                                 )}
                               </div>
                               <div className="text-white/70 text-sm">
-                                {format(parseISO(record.timestamp), 'HH:mm:ss')}
+                                {record.timestamp && !isNaN(new Date(record.timestamp).getTime())
+                                ? format(parseISO(record.timestamp), 'HH:mm:ss')
+                                : '--:--:--'
+                              }
                                 {record.editedAt && (
                                   <span className="text-orange-300/60 ml-2">
-                                    (修改於 {format(parseISO(record.editedAt), 'MM/dd HH:mm')})
+                                    (修改於 {record.editedAt && !isNaN(new Date(record.editedAt).getTime())
+                                      ? format(parseISO(record.editedAt), 'MM/dd HH:mm')
+                                      : '時間無效'
+                                    })
                                   </span>
                                 )}
                               </div>

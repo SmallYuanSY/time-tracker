@@ -97,6 +97,18 @@ export class NotificationService {
   }
 
   public static getInstance(): NotificationService {
+    // 確保只在客戶端建立實例
+    if (typeof window === 'undefined') {
+      // 在伺服器端返回一個模擬的實例
+      return {
+        requestPermission: async () => false,
+        sendNotification: async () => {},
+        sendPushNotification: async () => {},
+        scheduleNotification: async () => {},
+        schedulePushNotification: async () => {},
+      } as unknown as NotificationService;
+    }
+    
     if (!NotificationService.instance) {
       NotificationService.instance = new NotificationService();
     }
@@ -357,4 +369,32 @@ export class NotificationService {
 }
 
 // 導出單例實例
-export const notificationService = NotificationService.getInstance();
+// 創建一個獲取 notificationService 的函數，而不是在模組載入時立即創建
+export const getNotificationService = () => NotificationService.getInstance();
+
+// 為了保持向後兼容，也導出一個懶惰初始化的實例
+export const notificationService = {
+  get instance() {
+    return NotificationService.getInstance();
+  },
+  
+  async sendPushNotification(...args: Parameters<NotificationService['sendPushNotification']>) {
+    return this.instance.sendPushNotification(...args);
+  },
+  
+  async requestPermission() {
+    return this.instance.requestPermission();
+  },
+  
+  async sendNotification(...args: Parameters<NotificationService['sendNotification']>) {
+    return this.instance.sendNotification(...args);
+  },
+  
+  async scheduleNotification(...args: Parameters<NotificationService['scheduleNotification']>) {
+    return this.instance.scheduleNotification(...args);
+  },
+  
+  async schedulePushNotification(...args: Parameters<NotificationService['schedulePushNotification']>) {
+    return this.instance.schedulePushNotification(...args);
+  }
+};

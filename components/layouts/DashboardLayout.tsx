@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import { useEffect, useState } from 'react'
 import { notificationService } from '@/lib/notification'
+import { useMobileSSR } from '@/lib/hooks/useMobile'
 
 const sidebarItems = [
   { name: "總覽", icon: <LayoutDashboard className="w-4 h-4 mr-2" />, href: "/" },
@@ -46,6 +47,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [userRole, setUserRole] = React.useState<string | null>(null)
   const [hasNotified, setHasNotified] = useState(false)
   const [hasCheckedClockIn, setHasCheckedClockIn] = useState(false)
+  const isMobile = useMobileSSR()
 
   // 獲取用戶角色
   React.useEffect(() => {
@@ -175,6 +177,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       // 如果當前頁面和目標頁面不同，才進行導航
       router.push(href)
     }
+  }
+
+  if (isMobile) {
+    // 手機版重定向到專門的手機版頁面
+    router.push('/mobile')
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center">
+        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-3xl p-8">
+          <div className="text-white text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-white/30 border-t-white mx-auto mb-4"></div>
+            <div>重定向到手機版...</div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

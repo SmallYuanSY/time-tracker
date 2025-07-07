@@ -119,6 +119,30 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* 手機版觸控優化 */
+  @media (max-width: 768px) {
+    button, a, [role="button"] {
+      min-height: 44px; /* Apple 建議的最小觸控目標 */
+      min-width: 44px;
+    }
+    
+    /* 防止雙擊縮放 */
+    * {
+      touch-action: manipulation;
+    }
+    
+    /* 滾動優化 */
+    body {
+      -webkit-overflow-scrolling: touch;
+      overflow-x: hidden;
+    }
+    
+    /* 輸入框在 iOS 上的優化 */
+    input, textarea, select {
+      font-size: 16px; /* 防止 iOS Safari 自動縮放 */
+    }
+  }
 }
 
 /* 打卡翻轉動畫 */
