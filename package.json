@@ -17,7 +17,14 @@
     "backup-db": "ts-node scripts/pg-backup.ts backup",
     "restore-db": "ts-node scripts/pg-backup.ts restore",
     "migrate-timezone": "node scripts/migrate-timezone.js",
-    "prisma:seed": "ts-node prisma/seed.ts"
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "db:status": "node scripts/db-manager.js status",
+    "db:postgres": "node scripts/db-manager.js postgres",
+    "db:sqlite": "node scripts/db-manager.js sqlite",
+    "db:migrate": "node scripts/db-manager.js migrate",
+    "db:seed": "node scripts/db-manager.js seed",
+    "db:reset": "node scripts/db-manager.js reset",
+    "db:backup": "node scripts/db-manager.js backup"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
