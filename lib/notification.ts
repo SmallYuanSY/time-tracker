@@ -34,22 +34,66 @@ export class NotificationService {
 
         // 在開發環境中，支援 localhost 和本地 IP 地址
         if (process.env.NODE_ENV === 'development') {
-          const allowedHosts = ['localhost', '127.0.0.1', '192.168.0.203'];
-          if (!allowedHosts.includes(window.location.hostname)) {
-            console.log('開發環境中支援的主機名:', allowedHosts.join(', '));
+          const allowedHosts = ['localhost', '127.0.0.1'];
+          const currentHost = window.location.hostname;
+          
+          // 允許本地 IP 地址（192.168.x.x, 10.x.x.x, 172.16-31.x.x）
+          const isLocalIP = /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(currentHost);
+          
+          if (!allowedHosts.includes(currentHost) && !isLocalIP) {
+            console.log('開發環境中支援的主機名:', [...allowedHosts, '本地 IP 地址'].join(', '));
             return;
           }
         }
 
-        this.swRegistration = await navigator.serviceWorker.register('/sw.js', {
-          scope: '/'
-        });
+        // 嘗試註冊 Service Worker，使用重試機制
+        await this.registerServiceWorkerWithRetry();
         
         console.log('Service Worker 註冊成功');
       } catch (error) {
-        console.error('Service Worker 註冊失敗:', error);
+        console.error('Service Worker 註冊失敗:', error instanceof Error ? error.message : String(error));
+        console.log('推送通知功能將不可用，但應用程式會繼續正常運行');
+        this.swRegistration = null;
       }
     }
+  }
+
+  private async registerServiceWorkerWithRetry(maxRetries: number = 3): Promise<void> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        this.swRegistration = await navigator.serviceWorker.register('/sw.js', {
+          scope: '/',
+          // 在開發環境中使用更寬鬆的更新檢查
+          updateViaCache: process.env.NODE_ENV === 'development' ? 'none' : 'imports'
+        });
+        
+        // 等待 Service Worker 準備就緒
+        if (this.swRegistration.installing) {
+          await new Promise((resolve) => {
+            this.swRegistration!.installing!.addEventListener('statechange', () => {
+              if (this.swRegistration!.installing!.state === 'installed') {
+                resolve(void 0);
+              }
+            });
+          });
+        }
+        
+        return; // 成功註冊，退出重試循環
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.log(`Service Worker 註冊嘗試 ${attempt}/${maxRetries} 失敗:`, lastError.message);
+        
+        if (attempt < maxRetries) {
+          // 等待一段時間後重試
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+      }
+    }
+    
+    // 所有重試都失敗了
+    throw lastError || new Error('Service Worker 註冊失敗');
   }
 
   public static getInstance(): NotificationService {
@@ -87,7 +131,7 @@ export class NotificationService {
 
   private async subscribeToPushNotifications(): Promise<PushSubscription | null> {
     if (!this.swRegistration) {
-      console.warn('Service Worker 未註冊');
+      console.warn('Service Worker 未註冊，無法訂閱推送通知');
       return null;
     }
 
@@ -114,7 +158,7 @@ export class NotificationService {
 
       return subscription;
     } catch (error) {
-      console.error('訂閱推送服務失敗:', error);
+      console.error('訂閱推送服務失敗:', error instanceof Error ? error.message : String(error));
       return null;
     }
   }

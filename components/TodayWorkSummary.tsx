@@ -65,7 +65,18 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
       
       if (response.ok) {
         const data = await response.json()
-        setLogs(data)
+        
+        // API 回應是分組格式，需要提取 logs
+        if (Array.isArray(data) && data.length > 0 && data[0].logs) {
+          // 找到當前用戶的記錄
+          const userGroup = data.find((group: any) => group.user.id === userId)
+          setLogs(userGroup ? userGroup.logs : [])
+        } else if (Array.isArray(data)) {
+          // 如果是直接的記錄陣列（向後兼容）
+          setLogs(data)
+        } else {
+          setLogs([])
+        }
       }
     } catch (error) {
       console.error('獲取工作記錄失敗:', error)
