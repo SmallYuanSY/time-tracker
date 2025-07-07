@@ -24,7 +24,10 @@
     "db:migrate": "node scripts/db-manager.js migrate",
     "db:seed": "node scripts/db-manager.js seed",
     "db:reset": "node scripts/db-manager.js reset",
-    "db:backup": "node scripts/db-manager.js backup"
+    "db:backup": "node scripts/db-manager.js backup",
+    "migrate:sqlite-to-postgres": "node scripts/migrate-sqlite-to-postgres.js full",
+    "migrate:verify": "node scripts/migrate-sqlite-to-postgres.js verify",
+    "configure:domain": "node scripts/configure-domain.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
