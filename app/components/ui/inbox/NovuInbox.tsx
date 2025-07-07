@@ -101,7 +101,9 @@ export default function NovuInbox() {
   const isSecureContext = typeof window !== 'undefined' && (
     window.isSecureContext || 
     window.location.protocol === 'https:' ||
-    window.location.hostname === 'localhost'
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.match(/^192\.168\./)
   );
 
   if (!isSecureContext && process.env.NODE_ENV === 'development') {
@@ -109,7 +111,7 @@ export default function NovuInbox() {
       <div className="flex items-center justify-center p-8">
         <div className="text-yellow-400 text-sm text-center">
           <div>通知功能需要 HTTPS 環境</div>
-          <div className="text-xs mt-1">開發環境請使用 localhost</div>
+          <div className="text-xs mt-1">開發環境請使用 localhost 或本地 IP</div>
         </div>
       </div>
     );

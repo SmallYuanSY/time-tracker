@@ -3,6 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 
+// 支援自定義主機和端口
+const customHost = process.argv[2] || '0.0.0.0';
+const customPort = process.argv[3] || '3000';
+
 // 檢查憑證是否存在
 const sslDir = path.join(__dirname, '..', 'ssl');
 const certPath = path.join(sslDir, 'localhost.crt');
@@ -10,6 +14,7 @@ const keyPath = path.join(sslDir, 'localhost.key');
 
 if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
   console.log('❌ SSL 憑證不存在，請先執行: npm run generate:ssl');
+  console.log('或為特定 IP 生成: npm run generate:ssl:ip');
   process.exit(1);
 }
 
@@ -21,7 +26,11 @@ const options = {
 
 console.log('🚀 啟動 HTTPS 伺服器...');
 console.log('📝 注意：使用自簽名憑證，瀏覽器會顯示安全警告');
-console.log('🔗 訪問: https://localhost:3000');
+console.log(`🔗 監聽地址: ${customHost}:${customPort}`);
+console.log(`🔗 本地訪問: https://localhost:${customPort}`);
+if (customHost === '0.0.0.0') {
+  console.log(`🔗 網路訪問: https://192.168.0.203:${customPort}`);
+}
 
 // 啟動 Next.js 伺服器在 HTTP 端口
 const nextServer = spawn('npx', [
@@ -55,8 +64,13 @@ setTimeout(() => {
     req.pipe(proxyReq);
   });
 
-  httpsServer.listen(3000, () => {
-    console.log('✅ HTTPS 伺服器已啟動在 https://localhost:3000');
+  httpsServer.listen(parseInt(customPort), customHost, () => {
+    console.log(`✅ HTTPS 伺服器已啟動！`);
+    console.log(`📍 監聽地址: ${customHost}:${customPort}`);
+    console.log(`🌐 本地訪問: https://localhost:${customPort}`);
+    if (customHost === '0.0.0.0') {
+      console.log(`🌐 網路訪問: https://192.168.0.203:${customPort}`);
+    }
   });
 
   httpsServer.on('error', (error) => {

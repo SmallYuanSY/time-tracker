@@ -20,10 +20,25 @@ export class NotificationService {
   private async initializeServiceWorker() {
     if ('serviceWorker' in navigator && 'PushManager' in window) {
       try {
-        // 在開發環境中，只在 localhost 上註冊 Service Worker
-        if (process.env.NODE_ENV === 'development' && window.location.hostname !== 'localhost') {
-          console.log('開發環境中只支援在 localhost 上註冊 Service Worker');
+        // 檢查是否為安全上下文（HTTPS 或 localhost）
+        const isSecureContext = window.isSecureContext || 
+                               window.location.protocol === 'https:' ||
+                               window.location.hostname === 'localhost' ||
+                               window.location.hostname === '127.0.0.1' ||
+                               window.location.hostname.match(/^192\.168\./);
+
+        if (!isSecureContext) {
+          console.log('Service Worker 需要安全上下文 (HTTPS 或 localhost)');
           return;
+        }
+
+        // 在開發環境中，支援 localhost 和本地 IP 地址
+        if (process.env.NODE_ENV === 'development') {
+          const allowedHosts = ['localhost', '127.0.0.1', '192.168.0.203'];
+          if (!allowedHosts.includes(window.location.hostname)) {
+            console.log('開發環境中支援的主機名:', allowedHosts.join(', '));
+            return;
+          }
         }
 
         this.swRegistration = await navigator.serviceWorker.register('/sw.js', {
