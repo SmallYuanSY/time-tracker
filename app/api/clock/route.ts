@@ -173,13 +173,13 @@ export async function GET(req: NextRequest) {
     let lastClockIn = null
     let lastClockOut = null
 
-    // 先從今日記錄中找最後的上班和下班
+    // 先從今日記錄中找最後的上班和下班（記錄已按時間倒序排列）
     for (const clock of todayClocks) {
       if (clock.type === 'IN' && !lastClockIn) {
-        lastClockIn = clock
+        lastClockIn = clock  // 因為是倒序，第一個就是最後一次
       }
       if (clock.type === 'OUT' && !lastClockOut) {
-        lastClockOut = clock
+        lastClockOut = clock  // 因為是倒序，第一個就是最後一次
       }
     }
 

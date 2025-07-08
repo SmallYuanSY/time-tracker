@@ -5,11 +5,14 @@ import { format, parseISO, startOfWeek, endOfWeek, eachDayOfInterval, isWithinIn
 import { zhTW } from 'date-fns/locale'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Clock, LogIn, LogOut, Calendar, Edit3, Plane } from 'lucide-react'
+import { Clock, LogIn, LogOut, Calendar, Edit3, Plane, CalendarIcon } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import DeviceInfoDisplay from '@/components/ui/DeviceInfoDisplay'
 import { Portal } from '@/components/ui/portal'
 import WorkTimeStatsCard from '@/components/ui/WorkTimeStatsCard'
+import { Calendar as CalendarComponent } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { TimePicker } from '@/components/ui/time-picker'
 
 interface ClockRecord {
   id: string
@@ -42,37 +45,119 @@ interface ClockRecordListProps {
   timeRange?: 'week' | 'month'
 }
 
-interface EditClockModalProps {
-  record: ClockRecord | null
+interface ClockModalProps {
+  record?: ClockRecord | null
   onClose: () => void
   onSave: () => void
+  userId: string
+  mode: 'add' | 'edit'
 }
 
-function EditClockModal({ record, onClose, onSave }: EditClockModalProps) {
+function ClockModal({ record, onClose, onSave, userId, mode }: ClockModalProps) {
   const { data: session } = useSession()
   const [formData, setFormData] = useState({
-    timestamp: '',
-    editReason: '',
+    type: 'IN' as 'IN' | 'OUT',
+    date: null as Date | null,
+    time: '',
+    reason: '',
   })
   const [errors, setErrors] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // Portal 容器
+  const [portalContainer, setPortalContainer] = useState<Element | null>(null)
+  
+  // 日期選擇器位置設定
+  const [datePickerPosition, setDatePickerPosition] = useState({
+    side: 'bottom' as 'top' | 'bottom' | 'left' | 'right',
+    align: 'start' as 'start' | 'center' | 'end',
+  })
+  
+  // 追蹤是否已經手動設定過位置
+  const [manuallySetPosition, setManuallySetPosition] = useState(false)
+
+  // 初始化 portal 容器
+  useEffect(() => {
+    let container = document.getElementById('portal-root')
+    if (!container) {
+      container = document.createElement('div')
+      container.id = 'portal-root'
+      container.style.position = 'relative'
+      container.style.zIndex = '9999'
+      document.body.appendChild(container)
+    }
+    setPortalContainer(container)
+  }, [])
+
+  // 智能檢測最佳位置的函數
+  const detectBestPosition = (buttonElement: HTMLElement) => {
+    const rect = buttonElement.getBoundingClientRect()
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
+    
+    // 檢測水平空間
+    const leftSpace = rect.left
+    const rightSpace = viewportWidth - rect.right
+    
+    // 檢測垂直空間
+    const topSpace = rect.top
+    const bottomSpace = viewportHeight - rect.bottom
+    
+    // 決定水平對齊
+    let align: 'start' | 'center' | 'end' = 'start'
+    if (leftSpace < 300) {
+      align = rightSpace > 300 ? 'end' : 'center'
+    }
+    
+    // 決定垂直位置
+    const side: 'top' | 'bottom' = bottomSpace > 350 ? 'bottom' : 'top'
+    
+    return { side, align }
+  }
+
+  // 手動切換位置的函數
+  const toggleDatePickerPosition = (event?: React.MouseEvent) => {
+    if (event) {
+      event.preventDefault()
+      event.stopPropagation()
+    }
+    
+    // 標記為手動設定
+    setManuallySetPosition(true)
+    
+    setDatePickerPosition(prev => {
+      const newAlign = prev.align === 'start' ? 'center' : 
+                      prev.align === 'center' ? 'end' : 'start'
+      return { ...prev, align: newAlign }
+    })
+  }
 
   useEffect(() => {
-    if (record) {
+    if (mode === 'edit' && record) {
       const date = new Date(record.timestamp)
       const timeString = format(date, 'HH:mm')
       setFormData({
-        timestamp: timeString,
-        editReason: '',
+        type: record.type,
+        date: date,
+        time: timeString,
+        reason: '',
+      })
+    } else if (mode === 'add') {
+      setFormData({
+        type: 'IN',
+        date: new Date(),
+        time: format(new Date(), 'HH:mm'),
+        reason: '',
       })
     }
-  }, [record])
+  }, [record, mode])
 
   const handleSubmit = async () => {
     const newErrors: string[] = []
     
-    if (!formData.timestamp) newErrors.push('打卡時間為必填欄位')
-    if (!formData.editReason.trim()) newErrors.push('編輯原因為必填欄位')
+    if (!formData.date) newErrors.push('打卡日期為必填欄位')
+    if (!formData.time) newErrors.push('打卡時間為必填欄位')
+    if (!formData.reason.trim()) newErrors.push(`${mode === 'edit' ? '編輯' : '新增'}原因為必填欄位`)
     
     if (newErrors.length > 0) {
       setErrors(newErrors)
@@ -89,8 +174,7 @@ function EditClockModal({ record, onClose, onSave }: EditClockModalProps) {
 
     try {
       // 構建完整的時間戳
-      const originalDate = new Date(record!.timestamp)
-      const timeParts = formData.timestamp.split(':')
+      const timeParts = formData.time.split(':')
       if (timeParts.length !== 2) {
         throw new Error('時間格式錯誤')
       }
@@ -102,41 +186,84 @@ function EditClockModal({ record, onClose, onSave }: EditClockModalProps) {
         throw new Error('時間數值錯誤')
       }
       
-      const newDate = new Date(originalDate)
-      newDate.setHours(hours, minutes, 0, 0)
+      const timestamp = new Date(formData.date!)
+      timestamp.setHours(hours, minutes, 0, 0)
 
-      const response = await fetch(`/api/clock/${record!.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: (session.user as any).id,
-          timestamp: newDate.toISOString(),
-          editReason: formData.editReason,
-        }),
-      })
+      if (mode === 'edit' && record) {
+        // 編輯現有記錄
+        const response = await fetch(`/api/clock/${record.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: (session.user as any).id,
+            type: formData.type,
+            timestamp: timestamp.toISOString(),
+            editReason: formData.reason,
+          }),
+        })
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(errorText || '編輯失敗')
+        if (!response.ok) {
+          const errorText = await response.text()
+          throw new Error(errorText || '編輯失敗')
+        }
+      } else {
+        // 新增記錄
+        const response = await fetch('/api/clock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            type: formData.type,
+            timestamp: timestamp.toISOString(),
+            deviceInfo: {
+              source: '手動新增',
+              reason: formData.reason
+            },
+            editReason: `手動新增打卡記錄：${formData.reason}`,
+          }),
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          throw new Error(errorText || '新增失敗')
+        }
+
+        const clockRecord = await response.json()
+
+        // 然後更新該記錄為已編輯狀態
+        const updateResponse = await fetch(`/api/clock/${clockRecord.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            type: formData.type,
+            timestamp: timestamp.toISOString(),
+            editReason: `手動新增打卡記錄：${formData.reason}`,
+          }),
+        })
+
+        if (!updateResponse.ok) {
+          console.warn('更新編輯狀態失敗，但打卡記錄已創建')
+        }
       }
 
       onSave()
       onClose()
     } catch (error) {
-      setErrors([error instanceof Error ? error.message : '編輯失敗，請稍後再試'])
+      setErrors([error instanceof Error ? error.message : `${mode === 'edit' ? '編輯' : '新增'}失敗，請稍後再試`])
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  if (!record) return null
+  if (mode === 'edit' && !record) return null
 
   return (
     <Portal>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md">
         <div className="bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-lg border border-white/20 rounded-2xl p-6 w-full max-w-md shadow-2xl">
           <h2 className="text-lg font-semibold mb-4 text-white">
-            編輯打卡記錄
+            {mode === 'edit' ? '編輯打卡記錄' : '新增打卡記錄'}
           </h2>
 
           {errors.length > 0 && (
@@ -150,68 +277,167 @@ function EditClockModal({ record, onClose, onSave }: EditClockModalProps) {
           )}
 
           <div className="space-y-4">
-            {/* 打卡類型顯示 */}
+            {/* 打卡類型選擇 */}
             <div className="bg-white/10 rounded-lg p-3">
               <div className="text-sm text-white/60 mb-1">打卡類型</div>
-              <div className={`font-medium ${record.type === 'IN' ? 'text-green-400' : 'text-red-400'}`}>
-                {record.type === 'IN' ? '🟢 上班打卡' : '🔴 下班打卡'}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, type: 'IN' }))}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                    formData.type === 'IN' 
+                      ? 'bg-green-500/30 text-green-400 border border-green-500/50' 
+                      : 'bg-white/10 text-white/60 hover:bg-white/20'
+                  }`}
+                >
+                  <LogIn className="w-4 h-4" />
+                  上班打卡
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, type: 'OUT' }))}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                    formData.type === 'OUT' 
+                      ? 'bg-red-500/30 text-red-400 border border-red-500/50' 
+                      : 'bg-white/10 text-white/60 hover:bg-white/20'
+                  }`}
+                >
+                  <LogOut className="w-4 h-4" />
+                  下班打卡
+                </button>
               </div>
             </div>
 
-            {/* 原始時間顯示 */}
-            <div className="bg-white/10 rounded-lg p-3">
-              <div className="text-sm text-white/60 mb-1">原始時間</div>
-              <div className="text-white font-mono">
-                {format(new Date(record.timestamp), 'yyyy/MM/dd HH:mm:ss')}
+            {/* 原始時間顯示 (僅編輯模式) */}
+            {mode === 'edit' && record && (
+              <div className="bg-white/10 rounded-lg p-3">
+                <div className="text-sm text-white/60 mb-1">原始時間</div>
+                <div className="text-white font-mono">
+                  {format(new Date(record.timestamp), 'yyyy/MM/dd HH:mm:ss')}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* 新時間輸入 */}
+            {/* 修改時間 */}
             <div className="space-y-2">
-              <label className="text-sm text-white font-medium block">
-                修改時間 <span className="text-red-400">*</span>
+              <label className="text-sm text-white font-medium flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4" />
+                {mode === 'edit' ? '修改時間' : '打卡時間'} <span className="text-red-400">*</span>
               </label>
-              <input
-                type="time"
-                value={formData.timestamp}
-                onChange={(e) => setFormData(prev => ({ ...prev, timestamp: e.target.value }))}
-                className="w-full rounded-xl bg-white/20 border border-white/30 px-4 py-2 text-white focus:outline-none focus:border-blue-400"
-              />
+              <div className="grid grid-cols-2 gap-2">
+                {/* 日期選擇 */}
+                <div className="relative">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white focus:ring-2 focus:ring-blue-400"
+                        onClick={(e) => {
+                          // 只有在未手動設定時才進行智能檢測
+                          if (!manuallySetPosition) {
+                            const bestPosition = detectBestPosition(e.currentTarget)
+                            setDatePickerPosition({
+                              side: bestPosition.side,
+                              align: bestPosition.align
+                            })
+                          }
+                        }}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formData.date ? format(formData.date, 'MM/dd', { locale: zhTW }) : '日期'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent 
+                      className="w-auto p-0 bg-white/10 backdrop-blur border border-white/20 rounded-xl max-w-none !z-[10002]" 
+                      align={datePickerPosition.align}
+                      side={datePickerPosition.side}
+                      avoidCollisions={false}
+                      collisionPadding={16}
+                      sideOffset={8}
+                      container={portalContainer}
+                    >
+                      <CalendarComponent
+                        mode="single"
+                        locale={zhTW}
+                        selected={formData.date || undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            const newDate = new Date(date)
+                            if (formData.time) {
+                              const [hours, minutes] = formData.time.split(':')
+                              newDate.setHours(parseInt(hours), parseInt(minutes))
+                            }
+                            setFormData(prev => ({ ...prev, date: newDate }))
+                          }
+                        }}
+                        initialFocus
+                        className="bg-transparent text-white [&_.rdp-button]:text-white [&_.rdp-button]:hover:bg-white/20 [&_.rdp-button[data-selected=true]]:bg-blue-500 [&_.rdp-button[data-selected=true]]:text-white w-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {/* 位置切換按鈕 */}
+                  <button
+                    type="button"
+                    onClick={(e) => toggleDatePickerPosition(e)}
+                    className="absolute -top-1 -right-1 w-6 h-6 bg-blue-500 text-white text-xs rounded-full hover:bg-blue-600 flex items-center justify-center z-10 shadow-md"
+                    title="切換日期選擇器位置"
+                  >
+                    📍
+                  </button>
+                </div>
+                
+                {/* 時間選擇 */}
+                <TimePicker
+                  value={formData.time}
+                  onChange={(time) => {
+                    setFormData(prev => ({ ...prev, time }))
+                    // 如果已選擇日期，同步更新日期時間
+                    if (formData.date && time) {
+                      const [hours, minutes] = time.split(':')
+                      const newDate = new Date(formData.date)
+                      newDate.setHours(parseInt(hours), parseInt(minutes))
+                      setFormData(prev => ({ ...prev, date: newDate }))
+                    }
+                  }}
+                  container={portalContainer}
+                />
+              </div>
             </div>
 
-            {/* 編輯原因 */}
+            {/* 原因說明 */}
             <div className="space-y-2">
               <label className="text-sm text-white font-medium block">
-                編輯原因 <span className="text-red-400">*</span>
+                {mode === 'edit' ? '編輯原因' : '新增原因'} <span className="text-red-400">*</span>
               </label>
               <textarea
                 rows={3}
-                value={formData.editReason}
-                onChange={(e) => setFormData(prev => ({ ...prev, editReason: e.target.value }))}
-                placeholder="請說明編輯此打卡記錄的原因..."
+                value={formData.reason}
+                onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}
+                placeholder={mode === 'edit' ? '請說明編輯此打卡記錄的原因...' : '請說明為什麼需要手動新增這筆打卡記錄...'}
                 className="w-full rounded-xl bg-orange-500/20 border border-orange-400/50 px-4 py-2 text-white placeholder:text-orange-200/60 focus:outline-none focus:border-orange-400"
               />
               <p className="text-xs text-orange-200/80">
-                ⚠️ 編輯原因將記錄您的IP地址，供管理員審核使用
+                ⚠️ {mode === 'edit' ? '編輯原因' : '手動新增的打卡記錄'}將記錄您的IP地址，供管理員審核使用
               </p>
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 mt-6">
+          <div className="flex gap-3 mt-6">
             <Button
-              variant="ghost"
+              type="button"
+              variant="outline"
               onClick={onClose}
-              disabled={isSubmitting}
-              className="text-white/80 hover:text-white hover:bg-white/10 border-white/20"
+              className="flex-1 bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white"
             >
               取消
             </Button>
             <Button
+              type="button"
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
             >
-              {isSubmitting ? '保存中...' : '保存'}
+              {isSubmitting ? `${mode === 'edit' ? '編輯' : '新增'}中...` : `${mode === 'edit' ? '編輯' : '新增'}`}
             </Button>
           </div>
         </div>
@@ -225,6 +451,7 @@ export default function ClockRecordList({ userId, currentWeek, timeRange = 'week
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [editingRecord, setEditingRecord] = useState<ClockRecord | null>(null)
+  const [showAddModal, setShowAddModal] = useState(false)
 
   const fetchClockRecords = async () => {
     try {
@@ -303,6 +530,14 @@ export default function ClockRecordList({ userId, currentWeek, timeRange = 'week
     fetchClockRecords()
   }
 
+  const handleAddRecord = () => {
+    setShowAddModal(true)
+  }
+
+  const handleSaveAdd = () => {
+    fetchClockRecords()
+  }
+
   const groupRecordsByDate = () => {
     const grouped: { [key: string]: ClockRecord[] } = {}
     
@@ -330,8 +565,6 @@ export default function ClockRecordList({ userId, currentWeek, timeRange = 'week
       
       // 檢查日期字符串是否在請假期間內
       const isWithin = checkDateStr >= leaveStartStr && checkDateStr <= leaveEndStr
-      
-
       
       return isWithin
     })
@@ -460,13 +693,24 @@ export default function ClockRecordList({ userId, currentWeek, timeRange = 'week
 
   return (
     <div className="space-y-4">
-      {/* 週期標題 */}
-      <div className="text-center text-white/90 font-medium">
-        <Calendar className="w-5 h-5 inline-block mr-2" />
-        {timeRange === 'month' 
-          ? format(currentWeek, 'yyyy年MM月')
-          : `${format(rangeStart, 'yyyy/MM/dd')} - ${format(rangeEnd, 'yyyy/MM/dd')}`
-        }
+      {/* 新增按鈕和週期標題 */}
+      <div className="flex items-center justify-between">
+        <div className="text-center text-white/90 font-medium">
+          <Calendar className="w-5 h-5 inline-block mr-2" />
+          {timeRange === 'month' 
+            ? format(currentWeek, 'yyyy年MM月')
+            : `${format(rangeStart, 'yyyy/MM/dd')} - ${format(rangeEnd, 'yyyy/MM/dd')}`
+          }
+        </div>
+        
+        <Button
+          onClick={handleAddRecord}
+          className="bg-blue-600 hover:bg-blue-700 text-white"
+          size="sm"
+        >
+          <Clock className="w-4 h-4 mr-2" />
+          新增打卡記錄
+        </Button>
       </div>
 
       {/* 每日打卡記錄 */}
@@ -826,10 +1070,22 @@ export default function ClockRecordList({ userId, currentWeek, timeRange = 'week
 
       {/* 編輯彈窗 */}
       {editingRecord && (
-        <EditClockModal
+        <ClockModal
           record={editingRecord}
           onClose={() => setEditingRecord(null)}
           onSave={handleSaveEdit}
+          userId={userId}
+          mode="edit"
+        />
+      )}
+
+      {/* 新增彈窗 */}
+      {showAddModal && (
+        <ClockModal
+          onClose={() => setShowAddModal(false)}
+          onSave={handleSaveAdd}
+          userId={userId}
+          mode="add"
         />
       )}
     </div>

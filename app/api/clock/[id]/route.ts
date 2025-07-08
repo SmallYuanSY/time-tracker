@@ -11,6 +11,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
     const {
       userId,
       timestamp,
+      type,
       editReason,
     } = await req.json()
 
@@ -61,6 +62,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
       where: { id },
       data: {
         timestamp: new Date(timestamp),
+        type: type || existingRecord.type, // 如果提供了 type 則更新，否則保持原值
         // 編輯追蹤資訊
         isEdited: true,
         editReason: editReason.trim(),

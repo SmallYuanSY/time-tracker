@@ -40,6 +40,33 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
     return hour >= 18 || hour < 8
   }
 
+  // 分析打卡記錄，判斷是否已完成正常工作（有正確配對的上下班記錄）
+  const analyzeClockStatus = (clockRecords: any[]) => {
+    if (!clockRecords || clockRecords.length === 0) {
+      return false // 沒有打卡記錄，未完成正常工作
+    }
+
+    // 按時間排序打卡記錄
+    const sortedRecords = [...clockRecords].sort((a, b) => 
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    )
+
+    // 找第一次上班打卡
+    const firstIn = sortedRecords.find(r => r.type === 'IN')
+    if (!firstIn) {
+      return false // 沒有上班記錄，未完成正常工作
+    }
+
+    // 找第一次下班打卡（在第一次上班之後）
+    const firstInTime = new Date(firstIn.timestamp)
+    const firstOut = sortedRecords.find(r => 
+      r.type === 'OUT' && new Date(r.timestamp) > firstInTime
+    )
+
+    // 只有找到配對的第一次下班記錄，才算完成正常工作
+    return !!firstOut
+  }
+
   // 載入假日資訊
   const loadHolidayInfo = async () => {
     try {
@@ -83,6 +110,14 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
         // 決定顯示模式的邏輯：
         let newShouldShowOvertime = false
         
+        // 調試輸出
+        console.log('SmartPunchWidget Debug:', {
+          clockedIn,
+          hasOngoingOvertime,
+          flattenedOvertimeLogs: flattenedOvertimeLogs.length,
+          overtimeData: overtimeData
+        })
+        
         if (hasOngoingOvertime) {
           // 如果有進行中的加班記錄，顯示加班模組
           newShouldShowOvertime = true
@@ -94,6 +129,9 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
           const overtimePeriod = isOvertimePeriod()
           const isHoliday = holidayInfo?.isHoliday || false
           
+          // 正確分析今日打卡記錄，判斷是否已完成正常下班
+          const hasCompletedNormalWork = analyzeClockStatus(clockData.todayClocks || [])
+          
           if (isHoliday || overtimePeriod) {
             // 在假日或加班時段 (18:00-次日8:00)，顯示加班模組
             const now = new Date()
@@ -104,24 +142,24 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
               newShouldShowOvertime = true
             } else if (hour < 8) {
               // 隔天早上 8:00 之前，檢查是否應該顯示加班模組
-              if (clockData.lastClockOut || !clockData.lastClockIn) {
-                // 有下班記錄或沒有任何打卡記錄，顯示加班模組
+              if (hasCompletedNormalWork) {
+                // 已完成正常工作，顯示加班模組
                 newShouldShowOvertime = true
               } else {
-                // 沒有下班記錄但有上班記錄，可能是昨天忘記下班
+                // 尚未完成正常工作，顯示正常打卡
                 newShouldShowOvertime = false
               }
+            } else {
+              // 隔天早上 8:00 之後，回到初始狀態（顯示正常打卡模組）
+              newShouldShowOvertime = false
             }
           } else {
             // 在正常上班時段 (8:00-18:00)
-            if (clockData.lastClockOut && clockData.lastClockIn) {
-              // 有完整的上下班記錄，表示今天已經下班，可以加班
+            if (hasCompletedNormalWork) {
+              // 已完成正常下班，可以開始加班
               newShouldShowOvertime = true
-            } else if (!clockData.lastClockIn && !clockData.lastClockOut) {
-              // 今天還沒有任何打卡記錄，顯示正常打卡
-              newShouldShowOvertime = false
             } else {
-              // 其他情況（例如只有上班記錄沒有下班記錄），顯示正常打卡
+              // 尚未完成正常下班，顯示正常打卡模組
               newShouldShowOvertime = false
             }
           }

@@ -82,8 +82,10 @@ export default function JournalPage() {
         
         if (response.ok) {
           const data = await response.json()
+          // API 返回按用戶分組的數據，需要提取工作記錄
+          const flattenedLogs = data.flatMap((group: any) => group.logs || [])
           // 按日期和時間排序 (最新的在前)
-          const sortedLogs = data.sort((a: WorkLog, b: WorkLog) => {
+          const sortedLogs = flattenedLogs.sort((a: WorkLog, b: WorkLog) => {
             return new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
           })
           setWeeklyLogs(sortedLogs)
@@ -318,7 +320,8 @@ export default function JournalPage() {
           const logsResponse = await fetch(`/api/worklog?userId=${userId}&from=${startISO}&to=${endISO}`)
           if (logsResponse.ok) {
             const data = await logsResponse.json()
-            const sortedLogs = data.sort((a: WorkLog, b: WorkLog) => {
+            const flattenedLogs = data.flatMap((group: any) => group.logs || [])
+            const sortedLogs = flattenedLogs.sort((a: WorkLog, b: WorkLog) => {
               return new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
             })
             setWeeklyLogs(sortedLogs)
@@ -395,7 +398,8 @@ export default function JournalPage() {
         const logsResponse = await fetch(`/api/worklog?userId=${userId}&from=${startISO}&to=${endISO}`)
         if (logsResponse.ok) {
           const data = await logsResponse.json()
-          const sortedLogs = data.sort((a: WorkLog, b: WorkLog) => {
+          const flattenedLogs = data.flatMap((group: any) => group.logs || [])
+          const sortedLogs = flattenedLogs.sort((a: WorkLog, b: WorkLog) => {
             return new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
           })
           setWeeklyLogs(sortedLogs)
@@ -467,8 +471,10 @@ export default function JournalPage() {
           
           if (response.ok) {
             const data = await response.json()
+            // API 返回按用戶分組的數據，需要提取工作記錄
+            const flattenedLogs = data.flatMap((group: any) => group.logs || [])
             // 按日期和時間排序 (最新的在前)
-            const sortedLogs = data.sort((a: WorkLog, b: WorkLog) => {
+            const sortedLogs = flattenedLogs.sort((a: WorkLog, b: WorkLog) => {
               return new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
             })
             setWeeklyLogs(sortedLogs)

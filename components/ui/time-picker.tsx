@@ -8,6 +8,7 @@ interface TimePickerProps {
   value?: string
   onChange?: (value: string) => void
   label?: string
+  container?: Element | null
 }
 
 const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, "0"))
@@ -18,7 +19,7 @@ function currentTime() {
   return `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`
 }
 
-export function TimePicker({ value = "09:00", onChange, label }: TimePickerProps) {
+export function TimePicker({ value = "09:00", onChange, label, container }: TimePickerProps) {
   const [open, setOpen] = React.useState(false)
   const [internalValue, setInternalValue] = React.useState(value)
   
@@ -64,7 +65,7 @@ export function TimePicker({ value = "09:00", onChange, label }: TimePickerProps
           </Button>
         </PopoverTrigger>
         <PopoverContent 
-          className="w-auto p-3 bg-white/10 backdrop-blur border border-white/20 rounded-xl"
+          className="w-auto p-3 bg-white/10 backdrop-blur border border-white/20 rounded-xl !z-[10003]"
           sideOffset={8}
           align="start"
           side="bottom"
@@ -72,6 +73,7 @@ export function TimePicker({ value = "09:00", onChange, label }: TimePickerProps
           aria-label="時間選擇器"
           avoidCollisions={true}
           sticky="always"
+          container={container}
         >
           <div className="flex space-x-2">
             {/* 小時選擇器 */}
