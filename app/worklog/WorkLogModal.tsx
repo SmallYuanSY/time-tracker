@@ -5,13 +5,17 @@ import { useSession } from 'next-auth/react'
 import { SimpleTimePicker } from '@/components/ui/simple-time-picker'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { Calendar, Target, FileText, Clock, Briefcase } from 'lucide-react'
+import { Calendar, Target, FileText, Clock, Briefcase, CalendarIcon } from 'lucide-react'
 import ConflictConfirmModal from '@/components/ui/ConflictConfirmModal'
 import CategorySelector from '@/components/ui/CategorySelector'
 import ProjectSelector from '@/components/ui/ProjectSelector'
 import { WorkCategory } from '@/lib/data/workCategories'
 import { extraTasks } from '@/lib/data/extraTasks'
 import { Project } from '@/lib/hooks/useProjectSelection'
+import { Calendar as CalendarComponent } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { format } from 'date-fns'
+import { zhTW } from 'date-fns/locale'
 
 interface WorkLog {
   id: string
@@ -82,6 +86,9 @@ export default function WorkLogModal({
     projectName: editData?.projectName || copyData?.projectName || '',
     category: editData?.category || copyData?.category || '', // 保留分類
     content: editData?.content || copyData?.content || '', // 在複製模式下也保留工作內容
+    date: editData
+      ? new Date(editData.startTime).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0], // 編輯模式使用原始日期，新增模式使用今天
     startTime: editData
       ? new Date(editData.startTime).toTimeString().slice(0, 5)
       : initialMode === 'quick'
@@ -168,6 +175,7 @@ export default function WorkLogModal({
       projectName: '',
       category: '',
       content: '',
+      date: new Date().toISOString().split('T')[0],
       startTime: initialMode === 'quick' ? '' : initialMode === 'start' ? originalStartTime : '09:00',
       endTime: '',
       editReason: '',
@@ -185,6 +193,7 @@ export default function WorkLogModal({
         projectName: editData.projectName,
         category: editData.category,
         content: editData.content,
+        date: new Date(editData.startTime).toISOString().split('T')[0],
         startTime: new Date(editData.startTime).toTimeString().slice(0, 5),
         endTime: editData.endTime ? new Date(editData.endTime).toTimeString().slice(0, 5) : '',
         editReason: '',
@@ -195,6 +204,7 @@ export default function WorkLogModal({
         projectName: copyData.projectName,
         category: copyData.category,
         content: copyData.content,
+        date: new Date().toISOString().split('T')[0],
         startTime: initialMode === 'quick' ? '' : initialMode === 'start' ? originalStartTime : '09:00',
         endTime: '',
         editReason: '',
@@ -305,15 +315,15 @@ export default function WorkLogModal({
             confirmConflicts: true
           }
         } else {
-          const today = new Date().toISOString().split('T')[0]
+          const targetDate = formData.date || new Date().toISOString().split('T')[0]
           const startTime = formData.startTime || '09:00'
-          const fullStart = `${today}T${startTime}:00`
+          const fullStart = `${targetDate}T${startTime}:00`
           
           let fullEnd = null as string | null
           if (initialMode === 'full' || initialMode === 'end' || editData || ((initialMode === 'quick' || copyData) && !useQuickApi)) {
             const endTime = formData.endTime
             if (endTime) {
-              fullEnd = `${today}T${endTime}:00`
+              fullEnd = `${targetDate}T${endTime}:00`
             }
           }
 
@@ -324,7 +334,7 @@ export default function WorkLogModal({
             category: formData.category,
             content: formData.content,
             startTime: fullStart,
-            date: new Date().toISOString().split('T')[0],
+            date: targetDate,
             ...(fullEnd && { endTime: fullEnd }),
             ...(editData && { editReason: formData.editReason }),
             confirmConflicts: true
@@ -367,6 +377,7 @@ export default function WorkLogModal({
           projectName: '',
           category: '',
           content: '',
+          date: new Date().toISOString().split('T')[0],
           startTime: useQuickApi ? '' : formData.endTime || '17:00',
           endTime: '',
           editReason: '',
@@ -467,15 +478,15 @@ export default function WorkLogModal({
             content: formData.content,
           }
         } else {
-          const today = new Date().toISOString().split('T')[0]
+          const targetDate = formData.date || new Date().toISOString().split('T')[0]
           const startTime = formData.startTime || '09:00'
-          const fullStart = `${today}T${startTime}:00`
+          const fullStart = `${targetDate}T${startTime}:00`
 
           let fullEnd = null as string | null
           if (initialMode === 'full' || initialMode === 'end' || editData || ((initialMode === 'quick' || copyData) && !useQuickApi)) {
             const endTime = formData.endTime
             if (endTime) {
-              fullEnd = `${today}T${endTime}:00`
+              fullEnd = `${targetDate}T${endTime}:00`
             }
           }
 
@@ -486,7 +497,7 @@ export default function WorkLogModal({
             category: formData.category,
             content: formData.content,
             startTime: fullStart,
-            date: new Date().toISOString().split('T')[0],
+            date: targetDate,
             ...(fullEnd && { endTime: fullEnd }),
             ...(editData && { editReason: formData.editReason }),
           }
@@ -559,6 +570,7 @@ export default function WorkLogModal({
           projectName: '',
           category: '',
           content: '',
+          date: new Date().toISOString().split('T')[0],
           startTime: useQuickApi ? '' : formData.endTime || '17:00',
           endTime: '',
           editReason: '',
@@ -710,8 +722,50 @@ export default function WorkLogModal({
                 </div>
               )}
 
-              {/* 時間選擇器 */}
+              {/* 日期與時間選擇器 */}
               <div className="space-y-4">
+                {/* 日期選擇器（僅在編輯模式下顯示） */}
+                {editData && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <CalendarIcon className="h-4 w-4" />
+                      工作日期 <span className="text-red-500">*</span>
+                    </label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white focus:ring-2 focus:ring-blue-400"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {formData.date ? format(new Date(formData.date), 'yyyy年MM月dd日', { locale: zhTW }) : '選擇日期'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent 
+                        className="w-auto p-0 bg-white/10 backdrop-blur border border-white/20 rounded-xl"
+                        align="start"
+                      >
+                        <CalendarComponent
+                          mode="single"
+                          locale={zhTW}
+                          selected={formData.date ? new Date(formData.date) : undefined}
+                          onSelect={(date) => {
+                            if (date) {
+                              setFormData({ ...formData, date: date.toISOString().split('T')[0] })
+                            }
+                          }}
+                          initialFocus
+                          className="bg-transparent text-white [&_.rdp-button]:text-white [&_.rdp-button]:hover:bg-white/20 [&_.rdp-button[data-selected=true]]:bg-blue-500 [&_.rdp-button[data-selected=true]]:text-white"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <p className="text-xs text-white/60">
+                      💡 編輯工作記錄時可以修改日期，請謹慎操作
+                    </p>
+                  </div>
+                )}
+
+                {/* 時間選擇器 */}
                 {(initialMode === 'quick' || copyData) && !useFullTimeMode ? (
                   <div className="text-white/60 text-sm p-3 bg-white/5 rounded-lg border border-white/10">
                     開始與結束時間將自動填入
