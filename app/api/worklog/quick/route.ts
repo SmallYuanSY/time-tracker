@@ -38,15 +38,69 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const result = await prisma.workLog.create({
-      data: {
-        userId,
-        projectCode,
-        projectName,
-        category,
-        content,
-        startTime: now,
-      },
+    // 使用事務來確保專案成員加入和工作記錄創建的一致性
+    const result = await prisma.$transaction(async (tx) => {
+      // 檢查或創建專案
+      let project = await tx.project.findUnique({
+        where: { code: projectCode },
+      })
+
+      if (!project) {
+        try {
+          project = await tx.project.create({
+            data: {
+              code: projectCode,
+              name: projectName,
+              category: category || '',
+              description: `從快速工作記錄自動創建 - ${content}`,
+              managerId: userId,
+              status: 'ACTIVE',
+            },
+          })
+        } catch (error) {
+          // 如果創建失敗，重新查詢
+          project = await tx.project.findUnique({
+            where: { code: projectCode },
+          })
+          
+          if (!project) {
+            throw error
+          }
+        }
+      }
+
+      // 自動將使用者加入專案成員（如果尚未加入）
+      try {
+        await tx.$executeRaw`
+          INSERT INTO ProjectToUser (projectId, userId, assignedAt)
+          VALUES (${project.id}, ${userId}, datetime('now'))
+          ON CONFLICT(projectId, userId) DO NOTHING
+        `
+        
+        if (process.env.NODE_ENV !== 'production') {
+          //console.log('[快速新增] 自動將使用者加入專案成員:', userId, 'to project:', project.code)
+        }
+      } catch (memberError) {
+        // 如果加入成員失敗（可能已經是成員），不影響工作記錄創建
+        if (process.env.NODE_ENV !== 'production') {
+          //console.log('[快速新增] 使用者可能已是專案成員:', memberError)
+        }
+      }
+
+      // 創建工作記錄
+      const workLogResult = await tx.workLog.create({
+        data: {
+          userId,
+          projectCode,
+          projectName,
+          category,
+          content,
+          startTime: now,
+          projectId: project.id,
+        },
+      })
+
+      return workLogResult
     })
 
     return NextResponse.json(result)

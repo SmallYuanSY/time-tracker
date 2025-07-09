@@ -80,6 +80,10 @@ export default function CalendarPage() {
         name: member.name || '未命名成員'
       }))
       setUsers(members)
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('載入的專案成員:', members.length, '位')
+      }
     } catch (error) {
       toast({
         title: '錯誤',

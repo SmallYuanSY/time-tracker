@@ -50,21 +50,25 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
   })
 
   // 載入工作時間設定
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const response = await fetch('/api/admin/work-time-settings')
-        if (response.ok) {
-          const data = await response.json()
-          setWorkTimeSettings(data)
-        }
-      } catch (error) {
-        console.error('載入工作時間設定失敗:', error)
-      }
+  const loadWorkTimeSettings = async () => {
+    try {
+      const response = await fetch('/api/work-time-settings')
+      if (!response.ok) throw new Error('無法載入工作時間設定')
+      const data = await response.json()
+      setWorkTimeSettings(data)
+    } catch (error) {
+      console.error('載入工作時間設定失敗:', error)
+      // 使用預設設定
+      setWorkTimeSettings({
+        normalWorkStart: '09:00',
+        normalWorkEnd: '18:00',
+        lunchBreakStart: '12:30',
+        lunchBreakEnd: '13:30',
+        overtimeStart: '18:00',
+        minimumOvertimeUnit: 30
+      })
     }
-
-    loadSettings()
-  }, [])
+  }
 
   // 計算工作時間
   const calculateTotalTime = useCallback((startTime: string, endTime: string) => {
@@ -261,6 +265,7 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
     if (status === 'authenticated') {
       loadHolidayInfo()
       loadClockStatus()
+      loadWorkTimeSettings() // 載入工作時間設定
     } else if (status === 'unauthenticated') {
       setLoading(false)
     }

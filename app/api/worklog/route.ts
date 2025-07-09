@@ -232,6 +232,24 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // 自動將使用者加入專案成員（如果尚未加入）
+      try {
+        await tx.$executeRaw`
+          INSERT INTO ProjectToUser (projectId, userId, assignedAt)
+          VALUES (${project.id}, ${userId}, datetime('now'))
+          ON CONFLICT(projectId, userId) DO NOTHING
+        `
+        
+        if (process.env.NODE_ENV !== 'production') {
+          //console.log('[POST /api/worklog] 自動將使用者加入專案成員:', userId, 'to project:', project.code)
+        }
+      } catch (memberError) {
+        // 如果加入成員失敗（可能已經是成員），不影響工作記錄創建
+        if (process.env.NODE_ENV !== 'production') {
+          //console.log('[POST /api/worklog] 使用者可能已是專案成員:', memberError)
+        }
+      }
+
       // 創建工作記錄，並關聯到 Project
       const workLogResult = await tx.workLog.create({
         data: {

@@ -84,6 +84,18 @@ export async function POST(req: NextRequest) {
         },
       })
 
+      // 自動將使用者加入OT專案成員（如果尚未加入）
+      try {
+        await tx.$executeRaw`
+          INSERT INTO ProjectToUser (projectId, userId, assignedAt)
+          VALUES (${otProject.id}, ${userId}, datetime('now'))
+          ON CONFLICT(projectId, userId) DO NOTHING
+        `
+      } catch (memberError) {
+        // 如果加入成員失敗（可能已經是成員），不影響加班記錄創建
+        console.log('使用者可能已是OT專案成員')
+      }
+
       // 創建工作記錄
       const workLogRecord = await tx.workLog.create({
         data: {

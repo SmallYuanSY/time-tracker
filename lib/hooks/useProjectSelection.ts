@@ -92,17 +92,22 @@ export const useProjectSelection = (initialProjects: Project[] = []) => {
     }
 
     const searchLower = code.toLowerCase()
-    const filtered = [...extraTasks, ...projects].filter(project => 
+    
+    // 搜尋匹配的專案（包含額外任務和一般專案）
+    const allProjects = [...extraTasks, ...projects]
+    const filtered = allProjects.filter(project => 
       project.projectCode.toLowerCase().startsWith(searchLower)
     )
 
     setFilteredProjects(filtered)
     setShowProjectDropdown(filtered.length > 0)
 
-    // 檢查是否為新專案
-    const exactMatch = filtered.find(
+    // 檢查是否為新專案 - 必須在所有專案中找到完全匹配
+    const exactMatch = allProjects.find(
       project => project.projectCode.toLowerCase() === searchLower
     )
+    
+    // 只有當沒有找到完全匹配的專案時，才標記為新專案
     setIsNewProject(!exactMatch && code.length > 0)
 
     return exactMatch || null
