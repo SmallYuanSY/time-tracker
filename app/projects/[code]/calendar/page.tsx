@@ -1,13 +1,19 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { format, startOfDay, endOfDay, addDays, subDays, parseISO } from 'date-fns'
+import { format, startOfDay, endOfDay, addDays, subDays, parseISO, startOfWeek, endOfWeek } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import { useParams } from 'next/navigation'
 import { useToast } from '@/components/ui/use-toast'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from '@/components/ui/hover-card'
 
 // 定義工作記錄類型
 type WorkLog = {
@@ -56,8 +62,8 @@ export default function CalendarPage() {
 
   // 計算時間範圍
   const timeRange = {
-    start: startOfDay(date),
-    end: view === 'day' ? endOfDay(date) : endOfDay(addDays(date, 6))
+    start: view === 'day' ? startOfDay(date) : startOfWeek(date, { weekStartsOn: 1 }), // 星期一開始
+    end: view === 'day' ? endOfDay(date) : endOfWeek(date, { weekStartsOn: 1 })
   }
 
   // 載入專案成員
@@ -158,7 +164,10 @@ export default function CalendarPage() {
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <span>
-              {format(date, view === 'day' ? 'yyyy/MM/dd' : 'yyyy/MM/dd - MM/dd', { locale: zhTW })}
+              {view === 'day' 
+                ? format(date, 'yyyy/MM/dd', { locale: zhTW })
+                : `${format(timeRange.start, 'yyyy/MM/dd', { locale: zhTW })} - ${format(timeRange.end, 'yyyy/MM/dd', { locale: zhTW })}`
+              }
             </span>
             <Button
               variant="ghost"
@@ -194,8 +203,22 @@ export default function CalendarPage() {
 
   // 時間軸元件
   const Timeline = () => {
-    // 生成時間刻度
-    const hours = Array.from({ length: 24 }, (_, i) => i)
+    // 根據檢視模式生成時間刻度
+    const timeSlots = view === 'day' 
+      ? Array.from({ length: 24 }, (_, i) => ({ hour: i, label: `${i.toString().padStart(2, '0')}:00` }))
+      : Array.from({ length: 10 }, (_, i) => {
+          const dayDate = addDays(date, i)
+          // 每天分成10個時段，從9點到24點（15小時 / 10 = 1.5小時每段）
+          const startHour = 9 + (i % 7) * 1.5 // 每1.5小時一個時段
+          const endHour = startHour + 1.5
+          return { 
+            day: Math.floor(i / 7), // 第幾天
+            slot: i % 7, // 當天第幾個時段
+            label: format(dayDate, 'MM/dd', { locale: zhTW }),
+            fullLabel: format(dayDate, 'MM/dd (EEE)', { locale: zhTW }),
+            timeLabel: `${Math.floor(startHour).toString().padStart(2, '0')}:${((startHour % 1) * 60).toString().padStart(2, '0')}`
+          }
+        })
     
     // 過濾當前時間範圍內的工作記錄
     const filteredLogs = workLogs.filter(log => {
@@ -205,28 +228,60 @@ export default function CalendarPage() {
     })
 
     return (
-      <div className="relative overflow-auto">
+      <div className="relative overflow-auto flex-1 h-full">
         {/* 時間軸標題 */}
         <div className="sticky top-0 z-10 flex bg-gray-800 border-b border-gray-700">
           <div className="w-[120px] shrink-0 p-2 border-r border-gray-700 bg-gray-800">
             <span className="text-gray-300">使用者</span>
           </div>
           <div className="flex-1 flex">
-            {hours.map(hour => (
-              <div
-                key={hour}
-                className="w-[120px] shrink-0 p-2 text-center text-sm text-gray-400 border-r border-gray-700"
-              >
-                {`${hour.toString().padStart(2, '0')}:00`}
-              </div>
-            ))}
+            {view === 'day' ? (
+              // 日檢視：24小時
+              timeSlots.map((slot, index) => (
+                <div
+                  key={index}
+                  className="w-[120px] shrink-0 p-2 text-center text-sm text-gray-400 border-r border-gray-700"
+                >
+                  {slot.label}
+                </div>
+              ))
+            ) : (
+              // 週檢視：7天，每天10個時段
+              Array.from({ length: 7 }, (_, dayIndex) => {
+                const currentDay = addDays(timeRange.start, dayIndex) // 從星期一開始
+                return (
+                  <div key={dayIndex} className="flex flex-col border-r border-gray-700">
+                    {/* 日期標題 */}
+                    <div className="w-[200px] p-1 text-center text-xs text-gray-400 border-b border-gray-700">
+                      {format(currentDay, 'MM/dd (EEE)', { locale: zhTW })}
+                    </div>
+                    {/* 時段標題 */}
+                    <div className="flex">
+                      {Array.from({ length: 12 }, (_, slotIndex) => {
+                        const startHour = slotIndex * 2
+                        const timeLabel = `${startHour.toString().padStart(2, '0')}:00`
+                        return (
+                          <div
+                            key={slotIndex}
+                            className="w-[16px] text-[8px] text-gray-500 text-center"
+                            title={`${timeLabel}-${(startHour + 2).toString().padStart(2, '0')}:00`}
+                          >
+                            {startHour}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })
+            )}
           </div>
         </div>
 
         {/* 使用者列表和工作記錄 */}
-        <div className="relative">
-          {filteredUsers.map(user => (
-            <div key={user.id} className="flex border-b border-gray-700">
+        <div className="relative flex-1 flex flex-col">
+          {filteredUsers.map((user, index) => (
+            <div key={user.id} className={`flex border-b border-gray-700 ${filteredUsers.length > 1 ? 'flex-1' : ''} min-h-[65px]`}>
               {/* 使用者名稱 */}
               <div className="w-[120px] shrink-0 p-1 border-r border-gray-700 bg-gray-800">
                 <div className="text-sm truncate text-gray-300" title={user.name}>
@@ -235,57 +290,130 @@ export default function CalendarPage() {
               </div>
 
               {/* 時間格線 */}
-              <div className="flex-1 flex relative min-h-[65px] bg-gray-900">
-                {hours.map(hour => (
-                  <div
-                    key={hour}
-                    className="w-[120px] shrink-0 border-r border-gray-700"
-                  />
-                ))}
+              <div className="flex-1 flex relative min-h-[65px] h-full bg-gray-900">
+                {view === 'day' ? (
+                  // 日檢視格線
+                  timeSlots.map((slot, index) => (
+                    <div
+                      key={index}
+                      className="w-[120px] shrink-0 border-r border-gray-700"
+                    />
+                  ))
+                ) : (
+                  // 週檢視格線：7天 x 12個時段
+                  Array.from({ length: 7 }, (_, dayIndex) => (
+                    <div key={dayIndex} className="w-[200px] shrink-0 border-r border-gray-700 flex">
+                      {Array.from({ length: 12 }, (_, slotIndex) => (
+                        <div
+                          key={slotIndex}
+                          className="w-[16px] border-r border-gray-600"
+                        />
+                      ))}
+                    </div>
+                  ))
+                )}
 
                 {/* 工作記錄項目 */}
                 {filteredLogs
                   .filter(log => log.userId === user.id)
+                  .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()) // 按開始時間排序
                   .map(log => {
                     const startTime = parseISO(log.startTime)
                     const endTime = log.endTime ? parseISO(log.endTime) : new Date()
-                    const startHour = startTime.getHours() + startTime.getMinutes() / 60
-                    const endHour = endTime.getHours() + endTime.getMinutes() / 60
-                    const duration = endHour - startHour
+                    
+                    let leftPos, width
+                    
+                    if (view === 'day') {
+                      // 日檢視：按小時計算
+                      const startHour = startTime.getHours() + startTime.getMinutes() / 60
+                      const endHour = endTime.getHours() + endTime.getMinutes() / 60
+                      const duration = endHour - startHour
+                      leftPos = `${startHour * 120}px`
+                      width = `${Math.max(duration * 120, 120)}px`
+                    } else {
+                      // 週檢視：可能跨多天的卡片
+                      const startDay = Math.floor((startTime.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60 * 24))
+                      const endDay = Math.floor((endTime.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60 * 24))
+                      
+                      // 計算開始位置
+                      const startHour = startTime.getHours() + startTime.getMinutes() / 60
+                      const endHour = endTime.getHours() + endTime.getMinutes() / 60
+                      
+                      const slotsPerDay = 12
+                      const slotWidth = 200 / slotsPerDay // 每個時段約16.67px
+                      const dayWidth = 200
+                      
+                      // 開始位置：第幾天 + 當天的小時位置
+                      const startSlot = (startHour / 24) * slotsPerDay
+                      leftPos = `${startDay * dayWidth + startSlot * slotWidth}px`
+                      
+                      if (startDay === endDay) {
+                        // 同一天內的工作
+                        const duration = endHour - startHour
+                        const durationSlots = (duration / 24) * slotsPerDay
+                        width = `${Math.max(durationSlots * slotWidth, slotWidth * 0.25)}px`
+                      } else {
+                        // 跨天工作：計算總寬度
+                        const daySpan = endDay - startDay
+                        const endSlot = (endHour / 24) * slotsPerDay
+                        
+                        // 總寬度 = 完整天數 + 第一天剩餘部分 + 最後一天部分
+                        const firstDayRemaining = slotsPerDay - startSlot
+                        const lastDayPortion = endSlot
+                        const middleDays = Math.max(0, daySpan - 1) * slotsPerDay
+                        
+                        const totalSlots = firstDayRemaining + middleDays + lastDayPortion
+                        width = `${totalSlots * slotWidth}px`
+                      }
+                    }
                     
                     const categoryColor = categoryColors[log.category.toLowerCase()] || categoryColors.default
-
+                    
                     return (
-                      <div
-                        key={log.id}
-                        className="absolute rounded-lg p-2 shadow-md transition-all hover:shadow-lg"
-                        style={{
-                          left: `${startHour * 120}px`,
-                          width: `${Math.max(duration * 120, 120)}px`,
-                          backgroundColor: categoryColor.bg,
-                          borderLeft: `3px solid ${categoryColor.border}`,
-                          top: '8px',
-                          height: 'calc(100% - 16px)',
-                        }}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-medium truncate text-gray-200">
-                            {log.projectName}
-                          </span>
-                          <span
-                            className="text-[10px] px-1.5 py-0.5 rounded-full"
+                      <HoverCard key={log.id}>
+                        <HoverCardTrigger asChild>
+                          <div
+                            className="absolute rounded-lg shadow-md transition-all hover:shadow-lg overflow-hidden"
                             style={{
-                              backgroundColor: `${categoryColor.border}22`,
-                              color: categoryColor.text
+                              left: leftPos,
+                              width: width,
+                              backgroundColor: categoryColor.bg,
+                              borderLeft: `4px solid ${categoryColor.border}`,
+                              top: '8px',
+                              height: 'calc(100% - 16px)',
                             }}
                           >
-                            {log.category}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-gray-400 truncate">
-                          {log.content}
-                        </div>
-                      </div>
+                            <div className="text-xs text-gray-300 p-2 flex items-center h-full overflow-hidden">
+                              <span className="truncate">
+                                {log.content}
+                              </span>
+                            </div>
+                          </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-80">
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <div className="font-medium">{log.category}</div>
+                              <div className="text-gray-500">
+                                {view === 'day' 
+                                  ? `${format(startTime, 'HH:mm', { locale: zhTW })} - ${format(endTime, 'HH:mm', { locale: zhTW })}`
+                                  : `${format(startTime, 'MM/dd HH:mm', { locale: zhTW })} - ${format(endTime, 'MM/dd HH:mm', { locale: zhTW })}`
+                                }
+                              </div>
+                            </div>
+                            {log.content && (
+                              <div className="text-sm text-gray-500">
+                                {log.content}
+                              </div>
+                            )}
+                            {log.projectName && (
+                              <div className="text-sm">
+                                專案：{log.projectName}
+                              </div>
+                            )}
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
                     )
                   })}
               </div>
@@ -316,7 +444,7 @@ export default function CalendarPage() {
   return (
     <div className="p-4 -mx-4 min-h-[calc(100vh-8rem)] bg-gray-900">
       <Toolbar />
-      <Card className="overflow-hidden border-0 h-[calc(100vh-12rem)] shadow-sm bg-gray-800 border-gray-700">
+      <Card className="overflow-hidden border-0 h-[calc(100vh-12rem)] shadow-sm bg-gray-800 border-gray-700 flex flex-col">
         <Timeline />
       </Card>
     </div>
