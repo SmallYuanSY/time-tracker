@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { SimpleTimePicker } from '@/components/ui/simple-time-picker'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,7 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { format } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
+import { calculateWorkTime } from '@/lib/utils'
 
 interface WorkLog {
   id: string
@@ -38,6 +39,15 @@ interface WorkLogModalProps {
   copyData?: WorkLog | null // 複製模式，只複製基本資訊，不複製時間
   isOvertimeMode?: boolean // 是否為加班模式
   defaultProjectCode?: string // 預設專案代碼
+}
+
+interface WorkTimeSettings {
+  normalWorkStart: string
+  normalWorkEnd: string
+  lunchBreakStart: string
+  lunchBreakEnd: string
+  overtimeStart: string
+  minimumOvertimeUnit: number
 }
 
 export default function WorkLogModal({ 

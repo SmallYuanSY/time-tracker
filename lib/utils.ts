@@ -127,3 +127,76 @@ function generateDeviceFingerprint(): string {
   const hashStr = Math.abs(hash).toString(16).padStart(12, '0').slice(0, 12)
   return hashStr.match(/.{2}/g)?.join(':') || 'unknown'
 }
+
+interface WorkTimeSettings {
+  normalWorkStart: string
+  normalWorkEnd: string
+  lunchBreakStart: string
+  lunchBreakEnd: string
+  overtimeStart: string
+  minimumOvertimeUnit: number
+}
+
+interface WorkTimeResult {
+  normalMinutes: number
+  overtimeMinutes: number
+}
+
+export function calculateWorkTime(
+  startTime: string,
+  endTime: string,
+  settings: WorkTimeSettings
+): WorkTimeResult {
+  // 將時間字串轉換為分鐘數
+  const toMinutes = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number)
+    return hours * 60 + minutes
+  }
+
+  // 將所有時間轉換為分鐘數
+  const start = toMinutes(startTime)
+  const end = toMinutes(endTime)
+  const normalStart = toMinutes(settings.normalWorkStart)
+  const normalEnd = toMinutes(settings.normalWorkEnd)
+  const lunchStart = toMinutes(settings.lunchBreakStart)
+  const lunchEnd = toMinutes(settings.lunchBreakEnd)
+  const overtimeStart = toMinutes(settings.overtimeStart)
+
+  // 初始化結果
+  let normalMinutes = 0
+  let overtimeMinutes = 0
+
+  // 如果結束時間早於開始時間，表示跨日，加24小時
+  const adjustedEnd = end < start ? end + 24 * 60 : end
+
+  // 計算正常工作時間
+  let workStart = Math.max(start, normalStart)
+  let workEnd = Math.min(adjustedEnd, normalEnd)
+
+  if (workEnd > workStart) {
+    // 扣除午休時間
+    if (workStart < lunchEnd && workEnd > lunchStart) {
+      const lunchMinutes = Math.min(
+        workEnd - workStart,
+        Math.min(workEnd, lunchEnd) - Math.max(workStart, lunchStart)
+      )
+      normalMinutes = workEnd - workStart - lunchMinutes
+    } else {
+      normalMinutes = workEnd - workStart
+    }
+  }
+
+  // 計算加班時間
+  if (adjustedEnd > overtimeStart) {
+    overtimeMinutes = adjustedEnd - Math.max(overtimeStart, start)
+    
+    // 根據最小加班計算單位進行四捨五入
+    const unit = settings.minimumOvertimeUnit
+    overtimeMinutes = Math.round(overtimeMinutes / unit) * unit
+  }
+
+  return {
+    normalMinutes: Math.max(0, normalMinutes),
+    overtimeMinutes: Math.max(0, overtimeMinutes)
+  }
+}

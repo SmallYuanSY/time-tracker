@@ -10,6 +10,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
+import { calculateWorkTime } from '@/lib/utils'
 
 interface WorkLog {
   id: string
@@ -38,8 +39,25 @@ interface WorkLogsPageProps {
   searchTerm: string
 }
 
+interface WorkTimeSettings {
+  normalWorkStart: string
+  normalWorkEnd: string
+  lunchBreakStart: string
+  lunchBreakEnd: string
+  overtimeStart: string
+  minimumOvertimeUnit: number
+}
+
 export default function WorkLogsPage({ selectedUser, currentDate, searchTerm }: WorkLogsPageProps) {
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([])
+  const [workTimeSettings, setWorkTimeSettings] = useState<WorkTimeSettings>({
+    normalWorkStart: '09:00',
+    normalWorkEnd: '18:00',
+    lunchBreakStart: '12:30',
+    lunchBreakEnd: '13:30',
+    overtimeStart: '18:00',
+    minimumOvertimeUnit: 30
+  })
 
   // 載入工作記錄
   const loadWorkLogs = useCallback(async () => {
@@ -58,6 +76,50 @@ export default function WorkLogsPage({ selectedUser, currentDate, searchTerm }: 
       console.error('載入工作記錄失敗:', error)
     }
   }, [currentDate, selectedUser])
+
+  // 載入工作時間設定
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const response = await fetch('/api/admin/work-time-settings')
+        if (response.ok) {
+          const data = await response.json()
+          setWorkTimeSettings(data)
+        }
+      } catch (error) {
+        console.error('載入工作時間設定失敗:', error)
+      }
+    }
+
+    loadSettings()
+  }, [])
+
+  // 計算工作時間
+  const calculateTotalTime = useCallback((startTime: string, endTime: string) => {
+    if (!startTime || !endTime) return { normalMinutes: 0, overtimeMinutes: 0 }
+    
+    return calculateWorkTime(startTime, endTime, workTimeSettings)
+  }, [workTimeSettings])
+
+  // 處理工作日誌資料
+  const processWorkLogs = useCallback((logs: any[]) => {
+    return logs.map(log => {
+      const { normalMinutes, overtimeMinutes } = calculateTotalTime(log.startTime, log.endTime)
+      return {
+        ...log,
+        normalMinutes,
+        overtimeMinutes
+      }
+    })
+  }, [calculateTotalTime])
+
+  // 在載入資料時使用新的計算邏輯
+  useEffect(() => {
+    if (workLogs.length > 0) {
+      const processedLogs = processWorkLogs(workLogs)
+      setWorkLogs(processedLogs)
+    }
+  }, [workTimeSettings]) // 當設定變更時重新計算
 
   useEffect(() => {
     loadWorkLogs()

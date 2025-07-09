@@ -13,6 +13,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
+import { calculateWorkTime } from '@/lib/utils'
 
 interface User {
   id: string
@@ -57,6 +58,15 @@ interface AttendancePageProps {
 
 type AttendanceViewMode = 'list' | 'spreadsheet'
 
+interface WorkTimeSettings {
+  normalWorkStart: string
+  normalWorkEnd: string
+  lunchBreakStart: string
+  lunchBreakEnd: string
+  overtimeStart: string
+  minimumOvertimeUnit: number
+}
+
 export default function AttendancePage({ selectedUser, currentDate: initialDate, searchTerm }: AttendancePageProps) {
   const { data: session } = useSession()
   const [clockRecords, setClockRecords] = useState<ClockRecord[]>([])
@@ -70,6 +80,14 @@ export default function AttendancePage({ selectedUser, currentDate: initialDate,
   const [attendanceViewMode, setAttendanceViewMode] = useState<AttendanceViewMode>('list')
   const [selectedUserData, setSelectedUserData] = useState<User | null>(null)
   const [currentDate, setCurrentDate] = useState<Date>(initialDate)
+  const [workTimeSettings, setWorkTimeSettings] = useState<WorkTimeSettings>({
+    normalWorkStart: '09:00',
+    normalWorkEnd: '18:00',
+    lunchBreakStart: '12:30',
+    lunchBreakEnd: '13:30',
+    overtimeStart: '18:00',
+    minimumOvertimeUnit: 30
+  })
 
   // 載入用戶資料
   const loadUserData = useCallback(async () => {
@@ -124,6 +142,56 @@ export default function AttendancePage({ selectedUser, currentDate: initialDate,
       console.error('載入簽名記錄失敗:', error)
     }
   }, [currentDate, selectedUser])
+
+  // 載入工作時間設定
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const response = await fetch('/api/admin/work-time-settings')
+        if (response.ok) {
+          const data = await response.json()
+          setWorkTimeSettings(data)
+        }
+      } catch (error) {
+        console.error('載入工作時間設定失敗:', error)
+      }
+    }
+
+    loadSettings()
+  }, [])
+
+  // 計算工作時間
+  const calculateTotalTime = useCallback((startTime: string, endTime: string) => {
+    if (!startTime || !endTime) return { normalMinutes: 0, overtimeMinutes: 0 }
+    
+    return calculateWorkTime(startTime, endTime, workTimeSettings)
+  }, [workTimeSettings])
+
+  // 處理考勤資料
+  const processAttendanceData = useCallback((data: any[]) => {
+    return data.map(record => {
+      if (record.startTime && record.endTime) {
+        const { normalMinutes, overtimeMinutes } = calculateTotalTime(
+          record.startTime,
+          record.endTime
+        )
+        return {
+          ...record,
+          normalMinutes,
+          overtimeMinutes
+        }
+      }
+      return record
+    })
+  }, [calculateTotalTime])
+
+  // 在載入資料時使用新的計算邏輯
+  useEffect(() => {
+    if (clockRecords.length > 0) {
+      const processedData = processAttendanceData(clockRecords)
+      setClockRecords(processedData)
+    }
+  }, [workTimeSettings, clockRecords]) // 當設定變更時重新計算
 
   useEffect(() => {
     loadUserData()

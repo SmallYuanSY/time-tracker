@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2 } from "lucide-react"
 import DashboardLayout from '@/components/layouts/DashboardLayout'
+import WorkTimeSettings from './WorkTimeSettings'
 
 interface Holiday {
   id: string
@@ -200,169 +201,172 @@ export default function HolidaysPage() {
 
   return (
     <DashboardLayout>
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <CalendarIcon className="w-6 h-6 text-purple-400" />
-            <h1 className="text-2xl font-semibold text-white">假日管理</h1>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={async () => {
-                try {
-                  setLoading(true)
-                  const response = await fetch('/api/admin/holidays/import-tw', {
-                    method: 'POST'
-                  })
-                  if (response.ok) {
-                    const data = await response.json()
-                    toast({
-                      title: "成功",
-                      description: `已匯入 ${data.count} 筆台灣假日資料`
+      <div className="space-y-6">
+        <WorkTimeSettings />
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <CalendarIcon className="w-6 h-6 text-purple-400" />
+              <h1 className="text-2xl font-semibold text-white">假日管理</h1>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    setLoading(true)
+                    const response = await fetch('/api/admin/holidays/import-tw', {
+                      method: 'POST'
                     })
-                    loadHolidays(currentDate)
-                  } else {
-                    throw new Error('匯入失敗')
+                    if (response.ok) {
+                      const data = await response.json()
+                      toast({
+                        title: "成功",
+                        description: `已匯入 ${data.count} 筆台灣假日資料`
+                      })
+                      loadHolidays(currentDate)
+                    } else {
+                      throw new Error('匯入失敗')
+                    }
+                  } catch (error) {
+                    console.error('匯入台灣假日失敗:', error)
+                    toast({
+                      title: "錯誤",
+                      description: "匯入台灣假日失敗",
+                      variant: "destructive"
+                    })
+                  } finally {
+                    setLoading(false)
                   }
-                } catch (error) {
-                  console.error('匯入台灣假日失敗:', error)
-                  toast({
-                    title: "錯誤",
-                    description: "匯入台灣假日失敗",
-                    variant: "destructive"
-                  })
-                } finally {
-                  setLoading(false)
-                }
-              }}
-              disabled={loading}
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              匯入台灣假日
-            </Button>
-            <Button variant="outline" size="icon" onClick={handlePrevMonth}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="text-lg font-medium min-w-[120px] text-center">
-              {format(currentDate, 'yyyy年M月', { locale: zhTW })}
+                }}
+                disabled={loading}
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                匯入台灣假日
+              </Button>
+              <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="text-lg font-medium min-w-[120px] text-center">
+                {format(currentDate, 'yyyy年M月', { locale: zhTW })}
+              </div>
+              <Button variant="outline" size="icon" onClick={handleNextMonth}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
-            <Button variant="outline" size="icon" onClick={handleNextMonth}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[1fr,300px] gap-6">
-          <div className="space-y-6">
-            <div className="grid grid-cols-7 gap-px bg-white/10 rounded-lg overflow-hidden">
-              {/* 星期標題 */}
-              {WEEKDAYS.map((day, i) => (
-                <div
-                  key={day}
-                  className={`p-2 text-center font-medium bg-white/5 ${
-                    i === 0 || i === 6 ? 'text-red-400' : 'text-white/80'
-                  }`}
-                >
-                  {day}
-                </div>
-              ))}
-              
-              {/* 日期網格 */}
-              {[...prefixDays, ...monthDays, ...suffixDays].map((date, i) => {
-                if (!date) {
-                  return <div key={`empty-${i}`} className="h-32 bg-white/5" />
-                }
-
-                const holiday = holidays.find(h => isSameDay(parseISO(h.date), date))
-
-                return (
+          <div className="grid grid-cols-1 md:grid-cols-[1fr,300px] gap-6">
+            <div className="space-y-6">
+              <div className="grid grid-cols-7 gap-px bg-white/10 rounded-lg overflow-hidden">
+                {/* 星期標題 */}
+                {WEEKDAYS.map((day, i) => (
                   <div
-                    key={date.toISOString()}
-                    className={getDateStyles(date)}
-                    onClick={() => handleDateClick(date)}
+                    key={day}
+                    className={`p-2 text-center font-medium bg-white/5 ${
+                      i === 0 || i === 6 ? 'text-red-400' : 'text-white/80'
+                    }`}
                   >
-                    <div className="flex justify-between items-start">
-                      <span className={`text-sm ${isToday(date) ? 'font-bold text-blue-400' : ''}`}>
-                        {format(date, 'd')}
-                      </span>
-                    </div>
-                    {holiday && (
-                      <div className="mt-2">
-                        <div className="text-sm font-medium">{holiday.name}</div>
-                      </div>
-                    )}
+                    {day}
                   </div>
-                )
-              })}
-            </div>
+                ))}
+                
+                {/* 日期網格 */}
+                {[...prefixDays, ...monthDays, ...suffixDays].map((date, i) => {
+                  if (!date) {
+                    return <div key={`empty-${i}`} className="h-32 bg-white/5" />
+                  }
 
-            <div className="flex items-center gap-6">
-              <div className="text-sm text-white/60">圖例：</div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-purple-500/20" />
-                  <span className="text-sm text-white/80">週末</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-red-500/20" />
-                  <span className="text-sm text-white/80">國定假日</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-yellow-500/20" />
-                  <span className="text-sm text-white/80">補班日</span>
+                  const holiday = holidays.find(h => isSameDay(parseISO(h.date), date))
+
+                  return (
+                    <div
+                      key={date.toISOString()}
+                      className={getDateStyles(date)}
+                      onClick={() => handleDateClick(date)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className={`text-sm ${isToday(date) ? 'font-bold text-blue-400' : ''}`}>
+                          {format(date, 'd')}
+                        </span>
+                      </div>
+                      {holiday && (
+                        <div className="mt-2">
+                          <div className="text-sm font-medium">{holiday.name}</div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="flex items-center gap-6">
+                <div className="text-sm text-white/60">圖例：</div>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-purple-500/20" />
+                    <span className="text-sm text-white/80">週末</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-red-500/20" />
+                    <span className="text-sm text-white/80">國定假日</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded bg-yellow-500/20" />
+                    <span className="text-sm text-white/80">補班日</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* 側邊欄 */}
-          <div className="space-y-4">
-            <div className="rounded-lg bg-white/5 p-4">
-              <h2 className="text-lg font-medium mb-4">本月假日一覽</h2>
-              <div className="space-y-4">
-                {holidays
-                  .sort((a, b) => a.date.localeCompare(b.date))
-                  .map(holiday => (
-                    <div
-                      key={holiday.date}
-                      className="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
-                      onClick={() => {
-                        setEditingHoliday(holiday)
-                        setShowDialog(true)
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm font-medium">{format(parseISO(holiday.date), 'M/d')}</div>
-                        <div className={`text-xs px-2 py-1 rounded ${
-                          holiday.type === 'WEEKEND'
-                            ? 'bg-purple-500/20 text-purple-200'
-                            : holiday.isHoliday
-                            ? 'bg-red-500/20 text-red-200'
-                            : 'bg-yellow-500/20 text-yellow-200'
-                        }`}>
-                          {holiday.type === 'WEEKEND' ? '週末' : holiday.isHoliday ? '假日' : '補班'}
+            {/* 側邊欄 */}
+            <div className="space-y-4">
+              <div className="rounded-lg bg-white/5 p-4">
+                <h2 className="text-lg font-medium mb-4">本月假日一覽</h2>
+                <div className="space-y-4">
+                  {holidays
+                    .sort((a, b) => a.date.localeCompare(b.date))
+                    .map(holiday => (
+                      <div
+                        key={holiday.date}
+                        className="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                        onClick={() => {
+                          setEditingHoliday(holiday)
+                          setShowDialog(true)
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-medium">{format(parseISO(holiday.date), 'M/d')}</div>
+                          <div className={`text-xs px-2 py-1 rounded ${
+                            holiday.type === 'WEEKEND'
+                              ? 'bg-purple-500/20 text-purple-200'
+                              : holiday.isHoliday
+                              ? 'bg-red-500/20 text-red-200'
+                              : 'bg-yellow-500/20 text-yellow-200'
+                          }`}>
+                            {holiday.type === 'WEEKEND' ? '週末' : holiday.isHoliday ? '假日' : '補班'}
+                          </div>
+                        </div>
+                        <div className="mt-2">
+                          <div className="text-sm font-medium">{holiday.name}</div>
+                          {holiday.description && (
+                            <div className="text-xs text-white/60 mt-1">{holiday.description}</div>
+                          )}
                         </div>
                       </div>
-                      <div className="mt-2">
-                        <div className="text-sm font-medium">{holiday.name}</div>
-                        {holiday.description && (
-                          <div className="text-xs text-white/60 mt-1">{holiday.description}</div>
-                        )}
-                      </div>
+                    ))}
+                  {holidays.length === 0 && (
+                    <div className="text-sm text-white/60 text-center py-4">
+                      本月尚無假日資料
                     </div>
-                  ))}
-                {holidays.length === 0 && (
-                  <div className="text-sm text-white/60 text-center py-4">
-                    本月尚無假日資料
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>

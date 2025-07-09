@@ -116,7 +116,7 @@ export default function ProjectSelector({
           <div className="flex gap-2 flex-wrap">
             {recentProjects.map((project) => (
               <button
-                key={project.projectCode}
+                key={`recent-${project.projectCode}`}
                 type="button"
                 onClick={() => handleSelectProject(project)}
                 disabled={disabled}
@@ -158,7 +158,7 @@ export default function ProjectSelector({
             </div>
             {filteredProjects.map((project) => (
               <div
-                key={`${project.projectCode}-${project.projectName}`}
+                key={`search-${project.projectCode}`}
                 onClick={() => handleSelectProject(project)}
                 className="px-4 py-3 hover:bg-blue-500/20 cursor-pointer border-b border-white/20 last:border-b-0 transition-colors"
               >

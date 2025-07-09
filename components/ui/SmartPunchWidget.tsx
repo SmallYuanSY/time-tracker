@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { format } from 'date-fns'
 import PunchCardWidget from '@/components/ui/PunchCardWidget'
 import OvertimeWidget from '@/components/ui/OvertimeWidget'
 import { TrendingUp } from 'lucide-react'
+import { calculateWorkTime } from '@/lib/utils'
 
 interface SmartPunchWidgetProps {
   onWorkLogSaved?: () => void
@@ -22,6 +23,15 @@ interface Holiday {
   description?: string | null
 }
 
+interface WorkTimeSettings {
+  normalWorkStart: string
+  normalWorkEnd: string
+  lunchBreakStart: string
+  lunchBreakEnd: string
+  overtimeStart: string
+  minimumOvertimeUnit: number
+}
+
 export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }: SmartPunchWidgetProps) {
   const { data: session, status } = useSession()
   const [shouldShowOvertime, setShouldShowOvertime] = useState(false)
@@ -30,14 +40,94 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [showingWidget, setShowingWidget] = useState<'punch' | 'overtime'>('punch')
   const [holidayInfo, setHolidayInfo] = useState<Holiday | null>(null)
+  const [workTimeSettings, setWorkTimeSettings] = useState<WorkTimeSettings>({
+    normalWorkStart: '09:00',
+    normalWorkEnd: '18:00',
+    lunchBreakStart: '12:30',
+    lunchBreakEnd: '13:30',
+    overtimeStart: '18:00',
+    minimumOvertimeUnit: 30
+  })
+
+  // 載入工作時間設定
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const response = await fetch('/api/admin/work-time-settings')
+        if (response.ok) {
+          const data = await response.json()
+          setWorkTimeSettings(data)
+        }
+      } catch (error) {
+        console.error('載入工作時間設定失敗:', error)
+      }
+    }
+
+    loadSettings()
+  }, [])
+
+  // 計算工作時間
+  const calculateTotalTime = useCallback((startTime: string, endTime: string) => {
+    const result = calculateWorkTime(startTime, endTime, workTimeSettings)
+    return {
+      normalHours: Math.floor(result.normalMinutes / 60),
+      normalMinutes: result.normalMinutes % 60,
+      overtimeHours: Math.floor(result.overtimeMinutes / 60),
+      overtimeMinutes: result.overtimeMinutes % 60
+    }
+  }, [workTimeSettings])
+
+  // 計算工作時長（扣除午休時間和早於9點的時間）
+  const calculateWorkHours = (clockRecords: any[]) => {
+    if (!clockRecords || clockRecords.length === 0) return 0
+
+    const sortedRecords = [...clockRecords].sort((a, b) => 
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    )
+
+    let totalMinutes = 0
+    let lastInTime: Date | null = null
+
+    for (const record of sortedRecords) {
+      const time = new Date(record.timestamp)
+      
+      if (record.type === 'IN') {
+        // 如果早於9點打卡，則以9點為計算起點
+        const adjustedTime = new Date(time)
+        if (time.getHours() < 9) {
+          adjustedTime.setHours(9, 0, 0, 0)
+        }
+        lastInTime = adjustedTime
+      } else if (record.type === 'OUT' && lastInTime) {
+        const outTime = new Date(record.timestamp)
+        let duration = outTime.getTime() - lastInTime.getTime()
+        
+        // 檢查是否跨越午休時間（12:30-13:30）
+        const lunchStart = new Date(lastInTime)
+        lunchStart.setHours(12, 30, 0)
+        const lunchEnd = new Date(lastInTime)
+        lunchEnd.setHours(13, 30, 0)
+        
+        // 如果工作時段跨越午休時間，扣除午休時間
+        if (lastInTime <= lunchStart && outTime >= lunchEnd) {
+          duration -= 60 * 60 * 1000 // 扣除一小時（毫秒）
+        }
+        
+        totalMinutes += duration / (60 * 1000)
+        lastInTime = null
+      }
+    }
+
+    return totalMinutes / 60 // 轉換為小時
+  }
 
   // 檢查當前時間是否為加班時段
   const isOvertimePeriod = () => {
     const now = new Date()
     const hour = now.getHours()
     
-    // 加班時段：18:00 (下午6點) 到隔天 08:00 (早上8點)
-    return hour >= 18 || hour < 8
+    // 加班時段：18:00後
+    return hour >= 18
   }
 
   // 分析打卡記錄，判斷是否已完成正常工作（有正確配對的上下班記錄）
@@ -119,49 +209,20 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
         })
         
         if (hasOngoingOvertime) {
-          // 如果有進行中的加班記錄，顯示加班模組
+          // 1. 如果有進行中的加班記錄，顯示加班模組
           newShouldShowOvertime = true
         } else if (clockedIn) {
-          // 如果目前是上班狀態且沒有加班記錄，顯示正常打卡模組讓用戶下班
+          // 2. 如果目前是上班狀態，一律顯示正常打卡模組
           newShouldShowOvertime = false
         } else {
-          // 如果目前是下班狀態且沒有進行中的加班
-          const overtimePeriod = isOvertimePeriod()
-          const isHoliday = holidayInfo?.isHoliday || false
-          
-          // 正確分析今日打卡記錄，判斷是否已完成正常下班
+          // 3. 如果目前是下班狀態且沒有進行中的加班
           const hasCompletedNormalWork = analyzeClockStatus(clockData.todayClocks || [])
           
-          if (isHoliday || overtimePeriod) {
-            // 在假日或加班時段 (18:00-次日8:00)，顯示加班模組
-            const now = new Date()
-            const hour = now.getHours()
-            
-            if (hour >= 18 || isHoliday) {
-              // 晚上 18:00 之後或假日，顯示加班模組
-              newShouldShowOvertime = true
-            } else if (hour < 8) {
-              // 隔天早上 8:00 之前，檢查是否應該顯示加班模組
-              if (hasCompletedNormalWork) {
-                // 已完成正常工作，顯示加班模組
-                newShouldShowOvertime = true
-              } else {
-                // 尚未完成正常工作，顯示正常打卡
-                newShouldShowOvertime = false
-              }
-            } else {
-              // 隔天早上 8:00 之後，回到初始狀態（顯示正常打卡模組）
-              newShouldShowOvertime = false
-            }
+          // 只有在已經完成正常下班打卡的情況下，才考慮切換到加班模組
+          if (hasCompletedNormalWork && isOvertimePeriod()) {
+            newShouldShowOvertime = true
           } else {
-            // 在正常上班時段 (8:00-18:00)
-            if (hasCompletedNormalWork) {
-              // 已完成正常下班，可以開始加班
-              newShouldShowOvertime = true
-            } else {
-              // 尚未完成正常下班，顯示正常打卡模組
-              newShouldShowOvertime = false
-            }
+            newShouldShowOvertime = false
           }
         }
         

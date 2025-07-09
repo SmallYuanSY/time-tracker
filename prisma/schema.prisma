@@ -253,6 +253,17 @@ model ProjectToUser {
   @@id([projectId, userId])
 }
 
+model WorkTimeSettings {
+  id                  Int      @id @default(1)
+  normalWorkStart     String   @default("09:00")
+  normalWorkEnd       String   @default("18:00")
+  lunchBreakStart     String   @default("12:30")
+  lunchBreakEnd       String   @default("13:30")
+  overtimeStart       String   @default("18:00")
+  minimumOvertimeUnit Int      @default(30)
+  updatedAt          DateTime @updatedAt
+}
+
 enum UserRole {
   ADMIN
   WEB_ADMIN

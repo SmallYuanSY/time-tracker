@@ -8,6 +8,23 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getClientIP } from '@/lib/ip-utils'
 import { nowInTaiwan, getTaiwanDayRange, parseTaiwanTime } from '@/lib/timezone'
+import { calculateWorkTime } from '@/lib/utils'
+
+// 在處理工作日誌時獲取工作時間設定
+async function getWorkTimeSettings() {
+  const settings = await prisma.workTimeSettings.findFirst({
+    where: { id: 1 }
+  })
+
+  return settings || {
+    normalWorkStart: '09:00',
+    normalWorkEnd: '18:00',
+    lunchBreakStart: '12:30',
+    lunchBreakEnd: '13:30',
+    overtimeStart: '18:00',
+    minimumOvertimeUnit: 30
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
