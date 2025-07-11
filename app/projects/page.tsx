@@ -27,6 +27,7 @@ interface Project {
   category: string
   status: string
   Contact: Contact | null
+  lastUsedTime?: string | null
 }
 
 export default function ProjectsPage() {
@@ -289,12 +290,19 @@ export default function ProjectsPage() {
                       {project.description && (
                         <p className="text-gray-600 mb-2">{project.description}</p>
                       )}
-                      {project.Contact && (
-                        <div className="text-sm text-gray-500">
-                          <p>聯絡人：{project.Contact.contactName}</p>
-                          <p>公司：{project.Contact.companyName}</p>
-                        </div>
-                      )}
+                      <div className="text-sm text-gray-500 space-y-1">
+                        {sortBy === 'lastUsed' && (
+                          <p className="text-blue-600 font-medium">
+                            最後使用：{formatLastUsedTime(project.lastUsedTime || null)}
+                          </p>
+                        )}
+                        {project.Contact && (
+                          <>
+                            <p>聯絡人：{project.Contact.contactName}</p>
+                            <p>公司：{project.Contact.companyName}</p>
+                          </>
+                        )}
+                      </div>
                     </Card>
                   </Link>
                 </div>

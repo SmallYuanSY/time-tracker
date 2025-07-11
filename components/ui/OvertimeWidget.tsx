@@ -80,12 +80,22 @@ export default function OvertimeWidget({ onStatusChange, onOpenWorkLogModal, hol
     setMessage(null)
     
     try {
-      const res = await fetch(`/api/worklog/${currentOvertimeLog.id}`, {
-        method: 'PATCH',
+      // 收集設備資訊
+      const deviceInfo = {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        language: navigator.language,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        screenResolution: `${screen.width}x${screen.height}`,
+        timestamp: new Date().toISOString()
+      }
+
+      const res = await fetch('/api/overtime/end', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          endTime: new Date().toISOString(),
-          userId: (session.user as any).id
+          userId: (session.user as any).id,
+          deviceInfo
         }),
       })
       

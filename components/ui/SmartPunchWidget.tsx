@@ -195,7 +195,9 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
         const clockData = await clockResponse.json()
         const overtimeData = await overtimeResponse.json()
         
-        setClockedIn(clockData.clockedIn)
+        // 使用最新的打卡狀態
+        const currentClockedIn = clockData.clockedIn
+        setClockedIn(currentClockedIn)
         
         // API 返回按用戶分組的數據，需要提取工作記錄
         const flattenedOvertimeLogs = overtimeData.flatMap((group: any) => group.logs || [])
@@ -206,7 +208,7 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
         
         // 調試輸出
         console.log('SmartPunchWidget Debug:', {
-          clockedIn,
+          currentClockedIn,
           hasOngoingOvertime,
           flattenedOvertimeLogs: flattenedOvertimeLogs.length,
           overtimeData: overtimeData
@@ -215,7 +217,7 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
         if (hasOngoingOvertime) {
           // 1. 如果有進行中的加班記錄，顯示加班模組
           newShouldShowOvertime = true
-        } else if (clockedIn) {
+        } else if (currentClockedIn) {
           // 2. 如果目前是上班狀態，一律顯示正常打卡模組
           newShouldShowOvertime = false
         } else {

@@ -245,8 +245,12 @@ export default function PunchCardWidget({ onWorkLogSaved, holidayInfo }: PunchCa
         // 在動畫進行中更新狀態
         setTimeout(async () => {
           await reloadClockStatus()
-          // 下班打卡後也通知主頁刷新今日工作摘要（因為會結算進行中的工作）
-          if (onWorkLogSaved) onWorkLogSaved()
+          // 下班打卡後通知主頁刷新今日工作摘要（因為會結算進行中的工作）
+          // 並且重新檢查是否需要切換到加班模組
+          // 稍微延遲一下，確保狀態更新完成
+          setTimeout(() => {
+            if (onWorkLogSaved) onWorkLogSaved()
+          }, 100)
         }, 300)
       } else {
         if (process.env.NODE_ENV !== 'production') {

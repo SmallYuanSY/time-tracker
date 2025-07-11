@@ -22,8 +22,9 @@ export async function POST(req: NextRequest) {
     const userAgent = req.headers.get('user-agent') || ''
     const endTime = nowInTaiwan()
 
-    // 查找進行中的加班工作記錄
-    const ongoingWork = await prisma.workLog.findFirst({
+    // 查找進行中的加班工作記錄 - 支援兩種方式
+    // 1. 透過 /api/overtime/start 創建的 OT 專案記錄
+    const ongoingOTWork = await prisma.workLog.findFirst({
       where: {
         userId,
         endTime: null,
@@ -32,11 +33,24 @@ export async function POST(req: NextRequest) {
       orderBy: { startTime: 'desc' },
     })
 
+    // 2. 透過工作記錄模態視窗標記為加班的記錄
+    const ongoingOvertimeWork = await prisma.workLog.findFirst({
+      where: {
+        userId,
+        endTime: null,
+        isOvertime: true,
+      },
+      orderBy: { startTime: 'desc' },
+    })
+
+    // 找到任一進行中的加班記錄
+    const ongoingWork = ongoingOTWork || ongoingOvertimeWork
+
     if (!ongoingWork) {
       return new NextResponse('找不到進行中的加班記錄', { status: 400 })
     }
 
-    // 查找對應的加班記錄
+    // 查找對應的 Overtime 記錄（只有透過 /api/overtime/start 創建的才有）
     const ongoingOvertime = await prisma.overtime.findFirst({
       where: {
         userId,
@@ -45,7 +59,7 @@ export async function POST(req: NextRequest) {
       orderBy: { startTime: 'desc' },
     })
 
-    // 使用事務同時更新兩個記錄
+    // 使用事務同時更新記錄
     const result = await prisma.$transaction(async (tx) => {
       // 更新工作記錄
       const updatedWorkLog = await tx.workLog.update({
@@ -53,7 +67,7 @@ export async function POST(req: NextRequest) {
         data: { endTime },
       })
 
-      // 更新加班記錄（如果存在）
+      // 更新 Overtime 記錄（如果存在）
       let updatedOvertime = null
       if (ongoingOvertime) {
         updatedOvertime = await tx.overtime.update({
