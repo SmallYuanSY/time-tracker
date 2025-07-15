@@ -8,6 +8,7 @@ import { format, parseISO, addDays, subDays } from "date-fns"
 import { zhTW } from "date-fns/locale"
 import { nowInTaiwan } from "@/lib/timezone"
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import { timeTrackerAPI } from "@/lib/api-manager"
 
 import WorkLogModal from "@/app/worklog/WorkLogModal"
 
@@ -61,22 +62,23 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
       
       const userId = (session.user as any).id
       const dateString = format(selectedDate, 'yyyy-MM-dd')
-      const response = await fetch(`/api/worklog?userId=${userId}&date=${dateString}`)
       
-      if (response.ok) {
-        const data = await response.json()
-        
-        // API 回應是分組格式，需要提取 logs
-        if (Array.isArray(data) && data.length > 0 && data[0].logs) {
-          // 找到當前用戶的記錄
-          const userGroup = data.find((group: any) => group.user.id === userId)
-          setLogs(userGroup ? userGroup.logs : [])
-        } else if (Array.isArray(data)) {
-          // 如果是直接的記錄陣列（向後兼容）
-          setLogs(data)
-        } else {
-          setLogs([])
-        }
+      // 使用 API 管理器
+      const data = await timeTrackerAPI.getWorkLogs({ 
+        userId, 
+        date: dateString 
+      })
+      
+      // API 回應是分組格式，需要提取 logs
+      if (Array.isArray(data) && data.length > 0 && data[0].logs) {
+        // 找到當前用戶的記錄
+        const userGroup = data.find((group: any) => group.user.id === userId)
+        setLogs(userGroup ? userGroup.logs : [])
+      } else if (Array.isArray(data)) {
+        // 如果是直接的記錄陣列（向後兼容）
+        setLogs(data)
+      } else {
+        setLogs([])
       }
     } catch (error) {
       console.error('獲取工作記錄失敗:', error)

@@ -9,6 +9,7 @@ import { EndOfDayModal } from "@/components/ui/EndOfDayModal"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { getDeviceInfo, type DeviceInfo } from "@/lib/utils"
+import { PunchEventEmitter } from "@/lib/work-status-manager"
 
 interface Holiday {
   id: string
@@ -191,6 +192,12 @@ export default function PunchCardWidget({ onWorkLogSaved, holidayInfo }: PunchCa
         console.log('工作記錄已處理打卡記錄創建，跳過打卡 API 調用')
       }
       
+      // 🚀 觸發打卡事件，讓事件驅動系統處理狀態更新
+      const userId = (session?.user as any)?.id
+      if (userId) {
+        await PunchEventEmitter.emitClockIn(userId)
+      }
+      
       // 直接刷新打卡狀態
       setTimeout(async () => {
         await reloadClockStatus()
@@ -242,6 +249,12 @@ export default function PunchCardWidget({ onWorkLogSaved, holidayInfo }: PunchCa
       }
       
       if (response.ok) {
+        // 🚀 觸發下班打卡事件
+        const userId = (session?.user as any)?.id
+        if (userId) {
+          await PunchEventEmitter.emitClockOut(userId)
+        }
+        
         // 在動畫進行中更新狀態
         setTimeout(async () => {
           await reloadClockStatus()

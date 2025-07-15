@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 import { calculateWorkTime } from '@/lib/utils'
+import { PunchEventEmitter } from '@/lib/work-status-manager'
 
 interface WorkLog {
   id: string
@@ -571,6 +572,26 @@ export default function WorkLogModal({
             console.error('API 錯誤回應:', errorData)
           }
           throw new Error(errorData || `提交失敗 (${response.status})`)
+        }
+      }
+
+      // 🚀 觸發工作記錄相關事件
+      const userId = (session.user as any).id
+      if (userId) {
+        if (isOvertimeMode) {
+          // 加班記錄
+          if (initialMode === 'start' || (useQuickApi && !formData.endTime)) {
+            await PunchEventEmitter.emitOvertimeStart(userId)
+          } else if (formData.endTime || editData) {
+            await PunchEventEmitter.emitOvertimeEnd(userId)
+          }
+        } else {
+          // 一般工作記錄
+          if (initialMode === 'start' || (useQuickApi && !formData.endTime)) {
+            await PunchEventEmitter.emitWorkLogStart(userId)
+          } else if (formData.endTime || editData) {
+            await PunchEventEmitter.emitWorkLogEnd(userId)
+          }
         }
       }
 

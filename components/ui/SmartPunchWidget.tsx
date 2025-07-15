@@ -7,6 +7,8 @@ import PunchCardWidget from '@/components/ui/PunchCardWidget'
 import OvertimeWidget from '@/components/ui/OvertimeWidget'
 import { TrendingUp } from 'lucide-react'
 import { calculateWorkTime } from '@/lib/utils'
+import { timeTrackerAPI } from '@/lib/api-manager'
+import { PunchEventEmitter } from '@/lib/work-status-manager'
 
 interface SmartPunchWidgetProps {
   onWorkLogSaved?: () => void
@@ -50,11 +52,9 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
   })
 
   // 載入工作時間設定
-  const loadWorkTimeSettings = async () => {
+  const loadWorkTimeSettings = useCallback(async () => {
     try {
-      const response = await fetch('/api/work-time-settings')
-      if (!response.ok) throw new Error('無法載入工作時間設定')
-      const data = await response.json()
+      const data = await timeTrackerAPI.getWorkTimeSettings()
       setWorkTimeSettings(data)
     } catch (error) {
       console.error('載入工作時間設定失敗:', error)
@@ -68,7 +68,7 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
         minimumOvertimeUnit: 30
       })
     }
-  }
+  }, [])
 
   // 計算工作時間
   const calculateTotalTime = useCallback((startTime: string, endTime: string) => {
@@ -162,21 +162,18 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
   }
 
   // 載入假日資訊
-  const loadHolidayInfo = async () => {
+  const loadHolidayInfo = useCallback(async () => {
     try {
       const today = format(new Date(), 'yyyy-MM-dd')
-      const response = await fetch(`/api/admin/holidays/${today}`)
-      if (response.ok) {
-        const data = await response.json()
-        setHolidayInfo(data.holiday)
-      }
+      const data = await timeTrackerAPI.getHolidayInfo(today)
+      setHolidayInfo(data.holiday)
     } catch (error) {
       console.error('載入假日資訊失敗:', error)
     }
-  }
+  }, [])
 
   // 載入用戶打卡狀態
-  const loadClockStatus = async () => {
+  const loadClockStatus = useCallback(async () => {
     if (!session?.user) {
       setLoading(false)
       return
@@ -186,69 +183,64 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
       const userId = (session.user as any).id
       
       // 同時檢查打卡狀態和進行中的加班記錄
-      const [clockResponse, overtimeResponse] = await Promise.all([
-        fetch(`/api/clock?userId=${userId}`),
-        fetch(`/api/worklog?userId=${userId}&ongoing=true&overtime=true`)
+      const [clockData, overtimeData] = await Promise.all([
+        timeTrackerAPI.getClockStatus(userId),
+        timeTrackerAPI.getWorkLogs({ userId, ongoing: true, overtime: true })
       ])
       
-      if (clockResponse.ok && overtimeResponse.ok) {
-        const clockData = await clockResponse.json()
-        const overtimeData = await overtimeResponse.json()
+      // 使用最新的打卡狀態
+      const currentClockedIn = clockData.clockedIn
+      setClockedIn(currentClockedIn)
+      
+      // API 返回按用戶分組的數據，需要提取工作記錄
+      const flattenedOvertimeLogs = overtimeData.flatMap((group: any) => group.logs || [])
+      const hasOngoingOvertime = flattenedOvertimeLogs.some((log: any) => !log.endTime && log.isOvertime)
+      
+      // 決定顯示模式的邏輯：
+      let newShouldShowOvertime = false
+      
+      // 調試輸出
+      console.log('SmartPunchWidget Debug:', {
+        currentClockedIn,
+        hasOngoingOvertime,
+        flattenedOvertimeLogs: flattenedOvertimeLogs.length,
+        overtimeData: overtimeData
+      })
+      
+      if (hasOngoingOvertime) {
+        // 1. 如果有進行中的加班記錄，顯示加班模組
+        newShouldShowOvertime = true
+      } else if (currentClockedIn) {
+        // 2. 如果目前是上班狀態，一律顯示正常打卡模組
+        newShouldShowOvertime = false
+      } else {
+        // 3. 如果目前是下班狀態且沒有進行中的加班
+        const hasCompletedNormalWork = analyzeClockStatus(clockData.todayClocks || [])
         
-        // 使用最新的打卡狀態
-        const currentClockedIn = clockData.clockedIn
-        setClockedIn(currentClockedIn)
-        
-        // API 返回按用戶分組的數據，需要提取工作記錄
-        const flattenedOvertimeLogs = overtimeData.flatMap((group: any) => group.logs || [])
-        const hasOngoingOvertime = flattenedOvertimeLogs.some((log: any) => !log.endTime && log.isOvertime)
-        
-        // 決定顯示模式的邏輯：
-        let newShouldShowOvertime = false
-        
-        // 調試輸出
-        console.log('SmartPunchWidget Debug:', {
-          currentClockedIn,
-          hasOngoingOvertime,
-          flattenedOvertimeLogs: flattenedOvertimeLogs.length,
-          overtimeData: overtimeData
-        })
-        
-        if (hasOngoingOvertime) {
-          // 1. 如果有進行中的加班記錄，顯示加班模組
+        // 只有在已經完成正常下班打卡的情況下，才考慮切換到加班模組
+        if (hasCompletedNormalWork && isOvertimePeriod()) {
           newShouldShowOvertime = true
-        } else if (currentClockedIn) {
-          // 2. 如果目前是上班狀態，一律顯示正常打卡模組
+        } else {
           newShouldShowOvertime = false
-        } else {
-          // 3. 如果目前是下班狀態且沒有進行中的加班
-          const hasCompletedNormalWork = analyzeClockStatus(clockData.todayClocks || [])
-          
-          // 只有在已經完成正常下班打卡的情況下，才考慮切換到加班模組
-          if (hasCompletedNormalWork && isOvertimePeriod()) {
-            newShouldShowOvertime = true
-          } else {
-            newShouldShowOvertime = false
-          }
         }
-        
-        // 如果狀態需要切換，觸發動畫
-        if (newShouldShowOvertime !== shouldShowOvertime && !loading) {
-          await animateTransition(newShouldShowOvertime)
-        } else {
-          setShouldShowOvertime(newShouldShowOvertime)
-          setShowingWidget(newShouldShowOvertime ? 'overtime' : 'punch')
-        }
+      }
+      
+      // 如果狀態需要切換，觸發動畫
+      if (newShouldShowOvertime !== shouldShowOvertime && !loading) {
+        await animateTransition(newShouldShowOvertime)
+      } else {
+        setShouldShowOvertime(newShouldShowOvertime)
+        setShowingWidget(newShouldShowOvertime ? 'overtime' : 'punch')
       }
     } catch (error) {
       console.error('載入打卡狀態失敗:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [session, shouldShowOvertime, loading])
 
   // 動畫切換函數
-  const animateTransition = async (toOvertime: boolean) => {
+  const animateTransition = useCallback(async (toOvertime: boolean) => {
     setIsTransitioning(true)
     
     // 先淡出當前元件 (500ms 動畫的一半)
@@ -261,7 +253,7 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
     // 淡入新元件 (剩餘的 250ms)
     await new Promise(resolve => setTimeout(resolve, 250))
     setIsTransitioning(false)
-  }
+  }, [])
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -271,27 +263,44 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
     } else if (status === 'unauthenticated') {
       setLoading(false)
     }
-  }, [session, status]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session, status, loadHolidayInfo, loadClockStatus, loadWorkTimeSettings])
 
-  // 每分鐘檢查一次時間，確保在時間切換點正確切換模組
+  // 🚀 使用事件驅動模式替代定時器
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (status === 'authenticated') {
-        loadClockStatus()
-      }
-    }, 60000) // 每分鐘檢查一次
+    if (status !== 'authenticated' || !session?.user) return
 
-    return () => clearInterval(interval)
-  }, [status]) // eslint-disable-line react-hooks/exhaustive-deps
+    const userId = (session.user as any).id
+    const workStatusManager = PunchEventEmitter.getInstance()
+
+    // 訂閱所有相關的工作狀態變化事件
+    const unsubscribers = [
+      workStatusManager.subscribe('CLOCK_IN', loadClockStatus),
+      workStatusManager.subscribe('CLOCK_OUT', loadClockStatus),
+      workStatusManager.subscribe('WORKLOG_START', loadClockStatus),
+      workStatusManager.subscribe('WORKLOG_END', loadClockStatus),
+      workStatusManager.subscribe('OVERTIME_START', loadClockStatus),
+      workStatusManager.subscribe('OVERTIME_END', loadClockStatus),
+      workStatusManager.subscribe('TIME_PERIOD_CHANGE', loadClockStatus),
+      workStatusManager.subscribe('SESSION_CHANGE', loadClockStatus),
+    ]
+
+    // 初始化工作狀態管理器
+    PunchEventEmitter.emitSessionChange(userId)
+
+    // 清理訂閱
+    return () => {
+      unsubscribers.forEach(unsubscribe => unsubscribe())
+    }
+  }, [status, session, loadClockStatus])
 
   // 當加班狀態變化時重新載入 - 包含動畫觸發
-  const handleStatusChange = async () => {
+  const handleStatusChange = useCallback(async () => {
     // 立即重新載入狀態，可能觸發動畫
     await loadClockStatus()
     if (onWorkLogSaved) {
       onWorkLogSaved()
     }
-  }
+  }, [loadClockStatus, onWorkLogSaved])
 
   if (loading) {
     return (

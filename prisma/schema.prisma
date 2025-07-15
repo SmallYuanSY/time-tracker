@@ -116,9 +116,13 @@ model LeaveRequest {
   requesterId   String
   agentId       String
   status        LeaveStatus @default(PENDING_AGENT)
+  leaveType     LeaveType   @default(PERSONAL)
   reason        String
   startDate     DateTime
   endDate       DateTime
+  startTime     String      @default("09:00") // 請假開始時間 HH:mm
+  endTime       String      @default("18:00") // 請假結束時間 HH:mm
+  totalHours    Float       @default(0)       // 總請假時數
   agentApproved Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -276,6 +280,18 @@ enum LeaveStatus {
   PENDING_ADMIN
   ADMIN_REJECTED
   APPROVED
+}
+
+enum LeaveType {
+  PERSONAL     // 事假
+  SICK         // 病假
+  ANNUAL       // 特休
+  OFFICIAL     // 公假
+  FUNERAL      // 喪假
+  MARRIAGE     // 婚假
+  MATERNITY    // 產假
+  PATERNITY    // 陪產假
+  OTHER        // 其他
 }
 
 enum HolidayType {
