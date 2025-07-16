@@ -48,6 +48,12 @@ model clock {
   editedBy          String?
   editedAt          DateTime?
   editIpAddress     String?
+  ipWhitelisted     Boolean   @default(false)
+  needsIpReview     Boolean   @default(false)
+  ipReviewed        Boolean   @default(false)
+  ipReviewedBy      String?
+  ipReviewedAt      DateTime?
+  ipReviewNote      String?
   originalTimestamp DateTime?
   user              User      @relation(fields: [userId], references: [id])
 }
@@ -321,4 +327,17 @@ enum SettingKey {
 enum WorkType {
   SCHEDULED
   URGENT
+}
+
+model IpWhitelist {
+  id          String   @id @default(cuid())
+  ipAddress   String   @unique
+  description String?
+  location    String?
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String
+  
+  @@map("ip_whitelist")
 }

@@ -6,6 +6,149 @@ import { authOptions } from '@/lib/auth'
 import { getClientIP } from '@/lib/ip-utils'
 import { nowInTaiwan, getTaiwanDayRange } from '@/lib/timezone'
 
+// 檢查 IP 是否在白名單中
+async function isIpWhitelisted(ipAddress: string): Promise<boolean> {
+  try {
+    const whitelistEntry = await prisma.ipWhitelist.findFirst({
+      where: {
+        ipAddress: ipAddress,
+        isEnabled: true
+      }
+    })
+    return !!whitelistEntry
+  } catch (error) {
+    console.error('Error checking IP whitelist:', error)
+    return false // 如果檢查失敗，預設為非白名單
+  }
+}
+
+// 獲取或創建預設專案
+async function getDefaultProject(userId: string) {
+  // 先查找是否有預設專案設定
+  const defaultProject = await prisma.project.findFirst({
+    where: {
+      OR: [
+        { code: 'DEFAULT' },
+        { code: 'WORK' },
+        { name: { contains: '一般工作' } },
+      ]
+    }
+  })
+
+  if (defaultProject) {
+    return defaultProject
+  }
+
+  // 如果沒有預設專案，創建一個
+  return await prisma.project.upsert({
+    where: { code: 'DEFAULT' },
+    update: {},
+    create: {
+      code: 'DEFAULT',
+      name: '一般工作',
+      category: '日常工作',
+      description: '打卡自動創建的預設工作專案',
+      managerId: userId,
+      status: 'ACTIVE',
+    }
+  })
+}
+
+// 處理打卡後自動新增工作記錄
+async function handleAutoWorkLog(
+  userId: string, 
+  type: 'IN' | 'OUT', 
+  timestamp: Date
+) {
+  try {
+    if (type === 'IN') {
+      // 上班打卡：創建新的工作記錄
+      const defaultProject = await getDefaultProject(userId)
+      
+      // 確保用戶是專案成員
+      await prisma.$executeRaw`
+        INSERT INTO ProjectToUser (projectId, userId, assignedAt)
+        VALUES (${defaultProject.id}, ${userId}, datetime('now'))
+        ON CONFLICT(projectId, userId) DO NOTHING
+      `
+
+      // 創建打卡工作記錄
+      await prisma.workLog.create({
+        data: {
+          userId,
+          startTime: timestamp,
+          endTime: null, // 上班打卡時不設定結束時間
+          projectCode: '00',
+          projectName: '無案件編號',
+          category: '其他',
+          content: '電腦打卡',
+          projectId: defaultProject.id,
+          isOvertime: false,
+        }
+      })
+    } else if (type === 'OUT') {
+      // 下班打卡：不自動新增工作記錄
+      // 下班打卡僅結束現有進行中的工作記錄（在主要邏輯中已處理）
+      // 不再自動創建新的工作記錄
+    }
+  } catch (error) {
+    console.error('自動新增工作記錄失敗:', error)
+    // 不拋出錯誤，避免影響打卡功能
+  }
+}
+
+// 發送 IP 檢核通知給管理員
+async function sendIpReviewNotification(userId: string, ipAddress: string, type: 'IN' | 'OUT', timestamp: Date) {
+  try {
+    const { Novu } = await import('@novu/api')
+    const novu = new Novu({
+      secretKey: process.env.NOVU_SECRET_KEY || process.env.NOVU_API_KEY,
+    })
+
+    // 獲取用戶資訊
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, email: true }
+    })
+
+    if (!user) return
+
+    // 獲取所有管理員
+    const admins = await prisma.user.findMany({
+      where: { 
+        role: { in: ['ADMIN', 'WEB_ADMIN'] } 
+      },
+      select: { id: true }
+    })
+
+    const typeText = type === 'IN' ? '上班' : '下班'
+    const timeText = timestamp.toLocaleString('zh-TW', { 
+      timeZone: 'Asia/Taipei',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+
+    // 發送通知給所有管理員
+    for (const admin of admins) {
+      await novu.trigger({
+        workflowId: 'projoin-notification',
+        to: { subscriberId: `user_${admin.id}` },
+        payload: {
+          title: '非白名單 IP 打卡提醒',
+          body: `${user.name || user.email} 於 ${timeText} 使用非白名單 IP ${ipAddress} 進行${typeText}打卡`,
+          message: `用戶：${user.name || user.email}\n時間：${timeText}\n類型：${typeText}打卡\nIP 地址：${ipAddress}\n\n此 IP 地址不在白名單中，請檢核是否為正常打卡。`,
+          tags: ['ip-review', 'admin-notification']
+        }
+      })
+    }
+  } catch (error) {
+    console.error('發送 IP 檢核通知失敗:', error)
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { userId, type, deviceInfo, editReason } = await req.json()
@@ -22,9 +165,15 @@ export async function POST(req: NextRequest) {
     const ipAddress = getClientIP(req)
     const userAgent = req.headers.get('user-agent') || ''
 
+    // 獲取當前時間
+    const now = nowInTaiwan()
+
+    // 檢查 IP 是否在白名單中
+    const ipWhitelisted = await isIpWhitelisted(ipAddress)
+    const needsIpReview = !ipWhitelisted
+
     // 如果是下班打卡，需要先結算所有進行中的工作記錄
     if (type === 'OUT') {
-      const now = nowInTaiwan()
       const { start: startOfToday } = getTaiwanDayRange(now)
 
       // 取得所有未結束且開始時間早於目前時間的工作記錄
@@ -94,6 +243,8 @@ export async function POST(req: NextRequest) {
         macAddress: deviceInfo?.macAddress || null,
         userAgent,
         deviceInfo: deviceInfo ? JSON.stringify(deviceInfo) : null,
+        ipWhitelisted,
+        needsIpReview,
         // 如果有修改原因，表示這是修改過時間的打卡
         ...(editReason && {
           isEdited: true,
@@ -105,6 +256,14 @@ export async function POST(req: NextRequest) {
         }),
       },
     })
+
+    // 打卡後自動新增工作記錄
+    await handleAutoWorkLog(userId, type, result.timestamp)
+
+    // 如果是非白名單 IP 打卡，發送通知給管理員
+    if (needsIpReview) {
+      await sendIpReviewNotification(userId, ipAddress, type, result.timestamp)
+    }
 
     return NextResponse.json(result)
   } catch (error) {
@@ -131,14 +290,13 @@ export async function GET(req: NextRequest) {
 
     // 獲取今日日期範圍（台灣時間）
     const currentTime = nowInTaiwan()
-    const { start: today, end: todayEnd } = getTaiwanDayRange(currentTime)
+    const { start: today } = getTaiwanDayRange(currentTime)
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
 
     // 獲取昨日日期範圍（用於跨日判斷）
     const yesterday = new Date(today)
     yesterday.setDate(yesterday.getDate() - 1)
-    const { start: yesterdayStart } = getTaiwanDayRange(yesterday)
 
     // 獲取今日的打卡記錄，按時間排序
     const todayClocks = await prisma.clock.findMany({

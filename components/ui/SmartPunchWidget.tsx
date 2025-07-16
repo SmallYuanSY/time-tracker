@@ -353,6 +353,7 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
         <PunchCardWidget 
           onWorkLogSaved={handleStatusChange}
           holidayInfo={holidayInfo}
+          isTransitioning={isTransitioning}
         />
       )}
     </div>

@@ -23,9 +23,10 @@ interface Holiday {
 interface PunchCardWidgetProps {
   onWorkLogSaved?: () => void
   holidayInfo?: Holiday | null
+  isTransitioning?: boolean
 }
 
-export default function PunchCardWidget({ onWorkLogSaved, holidayInfo }: PunchCardWidgetProps) {
+export default function PunchCardWidget({ onWorkLogSaved, holidayInfo, isTransitioning }: PunchCardWidgetProps) {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [clockedIn, setClockedIn] = useState(false)
@@ -174,13 +175,73 @@ export default function PunchCardWidget({ onWorkLogSaved, holidayInfo }: PunchCa
     }
   }
 
-  const handleClockIn = () => {
-    // 上班打卡先顯示工作紀錄表單
-    setShowWorkLogModal(true)
+  const handleClockIn = async () => {
+    // 如果正在轉換中或已經在翻轉動畫中，直接返回
+    if (isTransitioning || isFlipping) return
+    
+    // 觸發翻轉動畫
+    setIsFlipping(true)
+    
+    try {
+      // 收集設備資訊
+      const deviceInfo = await getDeviceInfo()
+      
+      const response = await fetch('/api/clock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: (session?.user as any)?.id,
+          type: 'IN',
+          deviceInfo
+        })
+      })
+      
+      if (response.status === 401) {
+        // 401 未授權，跳轉回登入頁面
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('打卡時身份驗證失敗，跳轉至登入頁面')
+        }
+        router.push('/login')
+        return
+      }
+      
+      if (response.ok) {
+        // 🚀 觸發上班打卡事件
+        const userId = (session?.user as any)?.id
+        if (userId) {
+          await PunchEventEmitter.emitClockIn(userId)
+        }
+        
+        // 在動畫進行中更新狀態
+        setTimeout(async () => {
+          await reloadClockStatus()
+          // 上班打卡後通知主頁刷新今日工作摘要（因為會自動創建工作記錄）
+          setTimeout(() => {
+            if (onWorkLogSaved) onWorkLogSaved()
+          }, 100)
+        }, 300)
+      } else {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('上班打卡失敗，狀態碼:', response.status)
+        }
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('上班打卡失敗:', error)
+      }
+    }
+    
+    // 600ms 後重置動畫狀態（與 CSS 動畫時長一致）
+    setTimeout(() => {
+      setIsFlipping(false)
+    }, 600)
   }
 
-  const confirmClockIn = async (clockEditReason?: string) => {
+  const confirmClockIn = async (_clockEditReason?: string) => {
     setShowWorkLogModal(false)
+    
+    // 如果正在轉換中或已經在翻轉動畫中，直接返回
+    if (isTransitioning || isFlipping) return
     
     // 觸發翻轉動畫
     setIsFlipping(true)
@@ -215,12 +276,18 @@ export default function PunchCardWidget({ onWorkLogSaved, holidayInfo }: PunchCa
   }
 
   const handleClockOut = () => {
+    // 如果正在轉換中或已經在翻轉動畫中，直接返回
+    if (isTransitioning || isFlipping) return
+    
     // 下班打卡顯示結束彈窗
     setShowEndOfDayModal(true)
   }
 
   const confirmClockOut = async () => {
     setShowEndOfDayModal(false)
+    
+    // 如果正在轉換中或已經在翻轉動畫中，直接返回
+    if (isTransitioning || isFlipping) return
     
     // 觸發翻轉動畫
     setIsFlipping(true)
@@ -314,14 +381,16 @@ export default function PunchCardWidget({ onWorkLogSaved, holidayInfo }: PunchCa
             {!clockedIn ? (
               <Button 
                 onClick={handleClockIn} 
-                className="w-full bg-green-600 hover:bg-green-700 text-white py-4 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
+                disabled={isFlipping || isTransitioning}
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-500 disabled:cursor-not-allowed text-white py-4 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
               >
                 🟢 上班打卡
               </Button>
             ) : (
               <Button 
                 onClick={handleClockOut} 
-                className="w-full bg-red-600 hover:bg-red-700 text-white py-4 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
+                disabled={isFlipping || isTransitioning}
+                className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-500 disabled:cursor-not-allowed text-white py-4 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
               >
                 🔴 下班打卡
               </Button>

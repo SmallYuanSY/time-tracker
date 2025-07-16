@@ -284,7 +284,7 @@ export default function MobileSmartPunchWidget({
             <Button
               onClick={() => handlePunch('IN')}
               disabled={isLoading}
-              className="w-full h-16 bg-green-500 hover:bg-green-600 text-white font-semibold text-lg touch-manipulation active:scale-95 transition-transform"
+              className="w-full h-16 bg-green-500 hover:bg-green-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white font-semibold text-lg touch-manipulation active:scale-95 transition-transform"
             >
               <Play className="w-6 h-6 mr-2" />
               上班打卡
@@ -293,7 +293,7 @@ export default function MobileSmartPunchWidget({
             <Button
               onClick={() => handlePunch('OUT')}
               disabled={isLoading}
-              className="w-full h-16 bg-red-500 hover:bg-red-600 text-white font-semibold text-lg touch-manipulation active:scale-95 transition-transform"
+              className="w-full h-16 bg-red-500 hover:bg-red-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white font-semibold text-lg touch-manipulation active:scale-95 transition-transform"
             >
               <Square className="w-6 h-6 mr-2" />
               下班打卡
@@ -302,7 +302,7 @@ export default function MobileSmartPunchWidget({
             <Button
               onClick={() => handlePunch('IN')}
               disabled={isLoading}
-              className="w-full h-16 bg-green-500 hover:bg-green-600 text-white font-semibold text-lg touch-manipulation active:scale-95 transition-transform"
+              className="w-full h-16 bg-green-500 hover:bg-green-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white font-semibold text-lg touch-manipulation active:scale-95 transition-transform"
             >
               <Play className="w-6 h-6 mr-2" />
               重新上班
