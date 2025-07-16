@@ -322,6 +322,74 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 })
+    }
+
+    const { searchParams } = new URL(req.url)
+    const workLogId = searchParams.get('id')
+
+    if (!workLogId) {
+      return new NextResponse('缺少工作記錄 ID', { status: 400 })
+    }
+
+    // 檢查工作記錄是否存在
+    const workLog = await prisma.workLog.findUnique({
+      where: { id: workLogId }
+    })
+
+    if (!workLog) {
+      return new NextResponse('工作記錄不存在', { status: 404 })
+    }
+
+    // 檢查權限：只有記錄擁有者或管理員可以刪除
+    const currentUserId = (session.user as any).id
+    const userRole = (session.user as any).role
+    const isAdmin = userRole === 'ADMIN' || userRole === 'WEB_ADMIN'
+
+    if (workLog.userId !== currentUserId && !isAdmin) {
+      return new NextResponse('無權限刪除此工作記錄', { status: 403 })
+    }
+
+    // 使用事務刪除工作記錄和相關的打卡記錄
+    await prisma.$transaction(async (tx) => {
+      // 如果有關聯的打卡記錄，一起刪除
+      const relatedClocks = await tx.clock.findMany({
+        where: {
+          userId: workLog.userId,
+          timestamp: {
+            gte: workLog.startTime,
+            lte: workLog.endTime || workLog.startTime
+          }
+        }
+      })
+
+      if (relatedClocks.length > 0) {
+        await tx.clock.deleteMany({
+          where: {
+            id: {
+              in: relatedClocks.map(clock => clock.id)
+            }
+          }
+        })
+      }
+
+      // 刪除工作記錄
+      await tx.workLog.delete({
+        where: { id: workLogId }
+      })
+    })
+
+    return new NextResponse('工作記錄已刪除', { status: 200 })
+  } catch (error) {
+    console.error('[DELETE /api/worklog]', error)
+    return new NextResponse('伺服器內部錯誤', { status: 500 })
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)

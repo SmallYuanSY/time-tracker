@@ -1,7 +1,7 @@
 "use client"
 
 import { format } from 'date-fns'
-import { User } from 'lucide-react'
+import { User, Trash2 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useEffect, useState } from 'react'
 import { workLogCacheManager } from '@/lib/cache/worklog'
@@ -20,6 +20,7 @@ interface WorkLogGroup {
 interface WorkLogListProps {
   onRefresh?: () => void
   onEdit?: (log: WorkLog) => void
+  onDelete?: (log: WorkLog) => void
   onLogsLoaded?: (logs: WorkLog[]) => void
   mode?: 'all' | 'today' | 'date'
   date?: string
@@ -33,6 +34,7 @@ interface WorkLogListProps {
 export default function WorkLogList({
   onRefresh,
   onEdit,
+  onDelete,
   onLogsLoaded,
   mode = 'all',
   date,
@@ -46,6 +48,7 @@ export default function WorkLogList({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [logs, setLogs] = useState<WorkLog[]>([])
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const loadWorkLogs = async (useCache = true) => {
     try {
@@ -171,6 +174,44 @@ export default function WorkLogList({
     }
   }
 
+  // 處理刪除
+  const handleDelete = async (log: WorkLog) => {
+    if (!confirm(`確定要刪除這筆工作記錄嗎？\n\n專案：${log.projectName}\n內容：${log.content}`)) {
+      return
+    }
+
+    setDeletingId(log.id)
+    try {
+      const response = await fetch(`/api/worklog?id=${log.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || '刪除失敗')
+      }
+
+      // 從本地狀態中移除已刪除的記錄
+      setLogs(prevLogs => prevLogs.filter(l => l.id !== log.id))
+      
+      // 清除相關快取
+      workLogCacheManager.clearCache()
+      
+      // 通知父元件
+      if (onDelete) {
+        onDelete(log)
+      }
+
+      // 重新載入資料
+      handleRefresh()
+    } catch (error) {
+      console.error('刪除工作記錄失敗:', error)
+      alert(`刪除失敗：${error instanceof Error ? error.message : '未知錯誤'}`)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   // 處理重新整理
   const handleRefresh = () => {
     loadWorkLogs(false) // 強制重新載入，不使用快取
@@ -243,12 +284,23 @@ export default function WorkLogList({
               </div>
             </div>
             {(!projectCode || (session?.user as any)?.id === log.userId) && (
-              <button
-                onClick={() => handleEdit(log)}
-                className="text-primary hover:text-primary/80"
-              >
-                編輯
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleEdit(log)}
+                  className="text-primary hover:text-primary/80"
+                >
+                  編輯
+                </button>
+                <button
+                  onClick={() => handleDelete(log)}
+                  disabled={deletingId === log.id}
+                  className="text-red-500 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  title="刪除工作記錄"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  {deletingId === log.id ? '刪除中...' : '刪除'}
+                </button>
+              </div>
             )}
           </div>
         </div>

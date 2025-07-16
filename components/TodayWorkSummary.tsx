@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card"
 import { format, parseISO, addDays, subDays } from "date-fns"
 import { zhTW } from "date-fns/locale"
 import { nowInTaiwan } from "@/lib/timezone"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react"
 import { timeTrackerAPI } from "@/lib/api-manager"
 
 import WorkLogModal from "@/app/worklog/WorkLogModal"
@@ -40,6 +40,7 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
   const [dateAnimation, setDateAnimation] = useState<'none' | 'slide-left' | 'slide-right'>('none')
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [isDateChanging, setIsDateChanging] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
 
   // 確保在客戶端才初始化
@@ -47,7 +48,7 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
     setIsClient(true)
   }, [])
 
-  const fetchWorkLogs = useCallback(async () => {
+  const fetchWorkLogs = useCallback(async (forceRefresh = false) => {
     if (!session?.user || !isClient) {
       setLoading(false)
       setIsInitialLoad(false)
@@ -63,11 +64,16 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
       const userId = (session.user as any).id
       const dateString = format(selectedDate, 'yyyy-MM-dd')
       
+      // 如果強制刷新，先清除快取
+      if (forceRefresh) {
+        timeTrackerAPI.clearCache('worklog')
+      }
+      
       // 使用 API 管理器
       const data = await timeTrackerAPI.getWorkLogs({ 
         userId, 
         date: dateString 
-      })
+      }, forceRefresh)
       
       // API 回應是分組格式，需要提取 logs
       if (Array.isArray(data) && data.length > 0 && data[0].logs) {
@@ -98,7 +104,7 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
   // 監聽外部刷新觸發
   useEffect(() => {
     if (refreshTrigger && refreshTrigger > 0) {
-      fetchWorkLogs()
+      fetchWorkLogs(true) // 強制刷新
     }
   }, [refreshTrigger, fetchWorkLogs])
 
@@ -119,9 +125,41 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
   }
 
   const handleSave = async () => {
-    await fetchWorkLogs()
+    // 清除快取並強制刷新
+    await fetchWorkLogs(true)
     if (onRefresh) onRefresh()
     handleCloseModal()
+  }
+
+  const handleDelete = async (log: WorkLog) => {
+    if (!confirm(`確定要刪除這筆工作記錄嗎？\n\n專案：${log.projectName}\n內容：${log.content}`)) {
+      return
+    }
+
+    setDeletingId(log.id)
+    try {
+      const response = await fetch(`/api/worklog?id=${log.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || '刪除失敗')
+      }
+
+      // 清除相關快取
+      timeTrackerAPI.clearCache('worklog')
+      
+      // 重新載入資料
+      await fetchWorkLogs(true)
+      
+      if (onRefresh) onRefresh()
+    } catch (error) {
+      console.error('刪除工作記錄失敗:', error)
+      alert(`刪除失敗：${error instanceof Error ? error.message : '未知錯誤'}`)
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const handleQuickAdd = () => {
@@ -356,6 +394,16 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
                       >
                         ✏️ 編輯
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="bg-red-500/20 text-red-300 hover:bg-red-500/30 border-0 text-xs disabled:opacity-50"
+                        onClick={() => handleDelete(log)}
+                        disabled={deletingId === log.id}
+                      >
+                        <Trash2 className="w-3 h-3 mr-1" />
+                        {deletingId === log.id ? '刪除中' : '刪除'}
+                      </Button>
                     </div>
                   </div>
                 </Card>
@@ -384,7 +432,7 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
         onSave={handleSave}
         onNext={async () => {
           // 「儲存並新增」時也要刷新資料
-          await fetchWorkLogs()
+          await fetchWorkLogs(true)
           if (onRefresh) onRefresh()
         }}
         editData={editingLog}

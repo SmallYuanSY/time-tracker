@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent } from './card'
 import { Calendar } from './calendar'
 import { Popover, PopoverContent, PopoverTrigger } from './popover'
-import { User, FileText, CalendarIcon, Clock } from 'lucide-react'
+import { User, FileText, CalendarIcon, Clock, Briefcase } from 'lucide-react'
 import { format } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
 
@@ -30,6 +30,19 @@ interface LeaveRequestModalProps {
   onClose: () => void
   onSuccess: () => void
 }
+
+// 請假類型選項
+const LEAVE_TYPES = [
+  { value: 'PERSONAL', label: '事假' },
+  { value: 'SICK', label: '病假' },
+  { value: 'ANNUAL', label: '特休' },
+  { value: 'OFFICIAL', label: '公假' },
+  { value: 'FUNERAL', label: '喪假' },
+  { value: 'MARRIAGE', label: '婚假' },
+  { value: 'MATERNITY', label: '產假' },
+  { value: 'PATERNITY', label: '陪產假' },
+  { value: 'OTHER', label: '其他' }
+]
 
 export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveRequestModalProps) {
   const { data: session } = useSession()
@@ -56,6 +69,7 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
   
   const [formData, setFormData] = useState({
     agentId: '',
+    leaveType: 'PERSONAL', // 新增請假類型，預設為事假
     reason: '',
     startDate: null as Date | null,
     endDate: null as Date | null,
@@ -87,6 +101,7 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
       // 重置表單
       setFormData({
         agentId: '',
+        leaveType: 'PERSONAL',
         reason: '',
         startDate: null,
         endDate: null,
@@ -111,17 +126,12 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
     const newErrors: string[] = []
 
     if (!formData.agentId) newErrors.push('請選擇代理人')
+    if (!formData.leaveType) newErrors.push('請選擇請假類型')
     if (!formData.reason.trim()) newErrors.push('請填寫請假原因')
     if (!formData.startDate) newErrors.push('請選擇開始時間')
     if (!formData.endDate) newErrors.push('請選擇結束時間')
 
     if (formData.startDate && formData.endDate) {
-      const now = new Date()
-      
-      if (formData.startDate < now) {
-        newErrors.push('開始時間不能早於現在')
-      }
-      
       if (formData.endDate <= formData.startDate) {
         newErrors.push('結束時間必須晚於開始時間')
       }
@@ -136,11 +146,16 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
 
     setIsSubmitting(true)
     try {
+      const duration = calculateDuration()
       const submitData = {
         agentId: formData.agentId,
+        leaveType: formData.leaveType,
         reason: formData.reason,
-        startDate: formData.startDate!.toISOString(),
-        endDate: formData.endDate!.toISOString(),
+        startDate: format(formData.startDate!, "yyyy-MM-dd"),
+        endDate: format(formData.endDate!, "yyyy-MM-dd"),
+        startTime: format(formData.startDate!, "HH:mm"),
+        endTime: format(formData.endDate!, "HH:mm"),
+        totalHours: duration?.hours || 0,
       }
 
       const response = await fetch('/api/leaves', {
@@ -242,10 +257,8 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
     // 檢測水平空間
     const leftSpace = rect.left
     const rightSpace = viewportWidth - rect.right
-    const centerSpace = Math.min(leftSpace, rightSpace)
     
     // 檢測垂直空間
-    const topSpace = rect.top
     const bottomSpace = viewportHeight - rect.bottom
     
     // 決定水平對齊
@@ -290,18 +303,18 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent ref={contentRef} className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent ref={contentRef} className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <span className="text-2xl">📝</span>
             申請請假
           </DialogTitle>
           <DialogDescription>
-            填寫請假申請表單，選擇代理人和請假時間範圍
+            填寫請假申請表單，選擇請假類型、代理人和請假時間範圍
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-6">
+        <div className="flex-1 overflow-y-auto pr-2 space-y-6">
           {errors.length > 0 && (
             <Card className="border-red-200 bg-red-50">
               <CardContent className="pt-6">
@@ -318,6 +331,34 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
           )}
 
           <div className="space-y-6">
+            {/* 請假類型選擇 */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Briefcase className="h-4 w-4" />
+                請假類型 <span className="text-red-500">*</span>
+              </label>
+              <Select 
+                value={formData.leaveType} 
+                onValueChange={(value) => setFormData(prev => ({ ...prev, leaveType: value }))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="請選擇請假類型" />
+                </SelectTrigger>
+                <SelectContent 
+                  position="popper" 
+                  side="bottom" 
+                  align="start"
+                  container={contentRef.current}
+                >
+                  {LEAVE_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* 代理人選擇 */}
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
@@ -397,6 +438,7 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
                         avoidCollisions={false}
                         collisionPadding={16}
                         sideOffset={8}
+                        container={contentRef.current}
                       >
                         <Calendar
                           mode="single"
@@ -414,7 +456,6 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
                               setFormData(prev => ({ ...prev, startDate: newDate }))
                             }
                           }}
-                          initialFocus
                           className="w-auto"
                         />
                       </PopoverContent>
@@ -488,6 +529,7 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
                         avoidCollisions={false}
                         collisionPadding={16}
                         sideOffset={8}
+                        container={contentRef.current}
                       >
                         <Calendar
                           mode="single"
@@ -505,7 +547,6 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
                               setFormData(prev => ({ ...prev, endDate: newDate }))
                             }
                           }}
-                          initialFocus
                           className="w-auto"
                         />
                       </PopoverContent>
@@ -572,23 +613,24 @@ export default function LeaveRequestModal({ open, onClose, onSuccess }: LeaveReq
             </div>
           </div>
 
-          {/* 按鈕區域 */}
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button 
-              variant="outline" 
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
-              取消
-            </Button>
-            <Button 
-              onClick={handleSubmit}
-              disabled={isSubmitting || !formData.agentId || !formData.reason.trim() || !formData.startDate || !formData.endDate}
-              className="min-w-[100px]"
-            >
-              {isSubmitting ? '提交中...' : '提交申請'}
-            </Button>
-          </div>
+        </div>
+
+        {/* 按鈕區域 */}
+        <div className="flex-shrink-0 flex justify-end gap-3 pt-4 border-t mt-4">
+          <Button 
+            variant="outline" 
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            取消
+          </Button>
+          <Button 
+            onClick={handleSubmit}
+            disabled={isSubmitting || !formData.agentId || !formData.leaveType || !formData.reason.trim() || !formData.startDate || !formData.endDate}
+            className="min-w-[100px]"
+          >
+            {isSubmitting ? '提交中...' : '提交申請'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

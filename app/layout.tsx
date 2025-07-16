@@ -1,22 +1,22 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import localFont from "next/font/local";
-import "./globals.css";
 import SessionProvider from "@/components/providers/SessionProvider";
 import { PortalProvider } from "@/components/providers/PortalProvider";
+import localFont from "next/font/local";
+import "./globals.css";
 import { initializeTaiwanTimezone } from "@/lib/timezone";
 
 // 初始化台灣時區
 initializeTaiwanTimezone();
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
   subsets: ["latin"],
+  variable: "--font-geist-sans",
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
   subsets: ["latin"],
+  variable: "--font-geist-mono",
 });
 
 const sarasaGothic = localFont({
@@ -94,6 +94,7 @@ export default function RootLayout({
         <SessionProvider>
           <PortalProvider>
             {children}
+            <div id="portal-root" className="relative z-[9999]" />
           </PortalProvider>
         </SessionProvider>
       </body>

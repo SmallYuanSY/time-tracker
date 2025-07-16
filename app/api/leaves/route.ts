@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { Novu } from '@novu/api'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { isWeekend } from 'date-fns'
 
 const novu = new Novu({
   secretKey: process.env.NOVU_SECRET_KEY || process.env.NOVU_API_KEY
@@ -27,10 +28,10 @@ export async function GET(req: NextRequest) {
 
     // 獲取相關的請假記錄
     let whereCondition: any = {
-        OR: [
-          { requesterId: currentUser.id }, // 我的申請
-          { agentId: currentUser.id },     // 我需要審核的
-        ],
+      OR: [
+        { requesterId: currentUser.id }, // 我的申請
+        { agentId: currentUser.id },     // 我需要審核的
+      ],
     }
 
     // 如果是管理員（僅 ADMIN，不包括 WEB_ADMIN），也顯示等待管理員審核的申請
@@ -76,9 +77,9 @@ export async function POST(req: NextRequest) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
-    const { agentId, reason, startDate, endDate } = await req.json()
+    const { agentId, leaveType, reason, startDate, endDate, startTime, endTime, totalHours } = await req.json()
 
-    if (!agentId || !reason || !startDate || !endDate) {
+    if (!agentId || !leaveType || !reason || !startDate || !endDate || !startTime || !endTime) {
       return new NextResponse('缺少必要欄位', { status: 400 })
     }
 
@@ -105,14 +106,69 @@ export async function POST(req: NextRequest) {
       return new NextResponse('不能選擇自己作為代理人', { status: 400 })
     }
 
+    // 檢查日期是否合法
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return new NextResponse('無效的日期格式', { status: 400 })
+    }
+
+    if (end < start) {
+      return new NextResponse('結束日期不能早於開始日期', { status: 400 })
+    }
+
+    // 檢查是否為週末
+    if (isWeekend(start) || isWeekend(end)) {
+      return new NextResponse('請假日期不能包含週末', { status: 400 })
+    }
+
+    // 檢查時間格式
+    const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/
+    if (!timeRegex.test(startTime) || !timeRegex.test(endTime)) {
+      return new NextResponse('無效的時間格式', { status: 400 })
+    }
+
+    // 檢查是否有重疊的請假記錄
+    const overlappingLeaves = await prisma.leaveRequest.findMany({
+      where: {
+        requesterId: currentUser.id,
+        status: {
+          in: ['PENDING_AGENT', 'PENDING_ADMIN', 'APPROVED']
+        },
+        OR: [
+          {
+            AND: [
+              { startDate: { lte: new Date(startDate) } },
+              { endDate: { gte: new Date(startDate) } }
+            ]
+          },
+          {
+            AND: [
+              { startDate: { lte: new Date(endDate) } },
+              { endDate: { gte: new Date(endDate) } }
+            ]
+          }
+        ]
+      }
+    })
+
+    if (overlappingLeaves.length > 0) {
+      return new NextResponse('已有重疊的請假記錄', { status: 400 })
+    }
+
     // 建立請假申請
     const leaveRequest = await prisma.leaveRequest.create({
       data: {
         requesterId: currentUser.id,
         agentId,
+        leaveType,
         reason,
         startDate: new Date(startDate),
         endDate: new Date(endDate),
+        startTime,
+        endTime,
+        totalHours,
         status: 'PENDING_AGENT',
       },
       include: {
@@ -140,8 +196,8 @@ export async function POST(req: NextRequest) {
         to: { subscriberId: `user_${agent.id}` },
         payload: {
           title: '請假代理請求',
-          body: `${currentUser.name || currentUser.email} 申請請假，指定您為代理人`,
-          message: `${currentUser.name || currentUser.email} 申請請假，指定您為代理人`,
+          body: `${currentUser.name || currentUser.email} 申請${getLeaveTypeText(leaveType)}，指定您為代理人`,
+          message: `${currentUser.name || currentUser.email} 申請${getLeaveTypeText(leaveType)}，指定您為代理人\n時間：${startDate} ${startTime} ~ ${endDate} ${endTime}\n時數：${totalHours} 小時`,
         }
       })
     } catch (e) {
@@ -153,4 +209,19 @@ export async function POST(req: NextRequest) {
     console.error('[POST /api/leaves]', error)
     return new NextResponse('伺服器內部錯誤', { status: 500 })
   }
+}
+
+function getLeaveTypeText(type: string): string {
+  const typeMap: { [key: string]: string } = {
+    PERSONAL: '事假',
+    SICK: '病假',
+    ANNUAL: '特休',
+    OFFICIAL: '公假',
+    FUNERAL: '喪假',
+    MARRIAGE: '婚假',
+    MATERNITY: '產假',
+    PATERNITY: '陪產假',
+    OTHER: '其他假'
+  }
+  return typeMap[type] || '請假'
 }
