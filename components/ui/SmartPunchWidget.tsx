@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import { format } from 'date-fns'
 import PunchCardWidget from '@/components/ui/PunchCardWidget'
 import OvertimeWidget from '@/components/ui/OvertimeWidget'
-import { TrendingUp } from 'lucide-react'
+import { TrendingUp, Clock, Timer } from 'lucide-react'
 import { calculateWorkTime } from '@/lib/utils'
 import { timeTrackerAPI } from '@/lib/api-manager'
 import { PunchEventEmitter } from '@/lib/work-status-manager'
@@ -50,6 +50,7 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
     overtimeStart: '18:00',
     minimumOvertimeUnit: 30
   })
+  const [manualMode, setManualMode] = useState(false) // 手動模式狀態
 
   // 載入工作時間設定
   const loadWorkTimeSettings = useCallback(async () => {
@@ -196,33 +197,18 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
       const flattenedOvertimeLogs = overtimeData.flatMap((group: any) => group.logs || [])
       const hasOngoingOvertime = flattenedOvertimeLogs.some((log: any) => !log.endTime && log.isOvertime)
       
-      // 決定顯示模式的邏輯：
-      let newShouldShowOvertime = false
-      
-      // 調試輸出
-      console.log('SmartPunchWidget Debug:', {
-        currentClockedIn,
-        hasOngoingOvertime,
-        flattenedOvertimeLogs: flattenedOvertimeLogs.length,
-        overtimeData: overtimeData
-      })
+      // 手動模式：不自動切換，只在有進行中的加班時強制顯示加班模組
+      let newShouldShowOvertime = shouldShowOvertime
       
       if (hasOngoingOvertime) {
-        // 1. 如果有進行中的加班記錄，顯示加班模組
+        // 如果有進行中的加班記錄，強制顯示加班模組
         newShouldShowOvertime = true
-      } else if (currentClockedIn) {
-        // 2. 如果目前是上班狀態，一律顯示正常打卡模組
-        newShouldShowOvertime = false
+      } else if (manualMode) {
+        // 手動模式：保持用戶選擇的模式
+        newShouldShowOvertime = shouldShowOvertime
       } else {
-        // 3. 如果目前是下班狀態且沒有進行中的加班
-        const hasCompletedNormalWork = analyzeClockStatus(clockData.todayClocks || [])
-        
-        // 只有在已經完成正常下班打卡的情況下，才考慮切換到加班模組
-        if (hasCompletedNormalWork && isOvertimePeriod()) {
-          newShouldShowOvertime = true
-        } else {
-          newShouldShowOvertime = false
-        }
+        // 初始狀態：預設顯示正常打卡模組
+        newShouldShowOvertime = false
       }
       
       // 如果狀態需要切換，觸發動畫
@@ -237,7 +223,7 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
     } finally {
       setLoading(false)
     }
-  }, [session, shouldShowOvertime, loading])
+  }, [session, shouldShowOvertime, loading, manualMode])
 
   // 動畫切換函數
   const animateTransition = useCallback(async (toOvertime: boolean) => {
@@ -254,6 +240,14 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
     await new Promise(resolve => setTimeout(resolve, 250))
     setIsTransitioning(false)
   }, [])
+
+  // 手動切換模式
+  const handleManualToggle = useCallback(async (toOvertime: boolean) => {
+    setManualMode(true)
+    if (toOvertime !== shouldShowOvertime) {
+      await animateTransition(toOvertime)
+    }
+  }, [shouldShowOvertime, animateTransition])
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -343,6 +337,35 @@ export default function SmartPunchWidget({ onWorkLogSaved, onOpenWorkLogModal }:
           )}
         </div>
       )}
+      
+      {/* 手動切換按鈕 */}
+      <div className="mb-4 flex bg-white/10 backdrop-blur-sm rounded-lg p-1">
+        <button
+          onClick={() => handleManualToggle(false)}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-all duration-200 ${
+            !shouldShowOvertime 
+              ? 'bg-white/20 text-white shadow-sm' 
+              : 'text-white/60 hover:text-white hover:bg-white/10'
+          }`}
+          disabled={isTransitioning}
+        >
+          <Clock className="h-4 w-4" />
+          <span className="text-sm font-medium">正常打卡</span>
+        </button>
+        <button
+          onClick={() => handleManualToggle(true)}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-all duration-200 ${
+            shouldShowOvertime 
+              ? 'bg-white/20 text-white shadow-sm' 
+              : 'text-white/60 hover:text-white hover:bg-white/10'
+          }`}
+          disabled={isTransitioning}
+        >
+          <Timer className="h-4 w-4" />
+          <span className="text-sm font-medium">加班模式</span>
+        </button>
+      </div>
+      
       {showingWidget === 'overtime' ? (
         <OvertimeWidget 
           onStatusChange={handleStatusChange} 

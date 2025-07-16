@@ -9,6 +9,11 @@ import { nowInTaiwan, getTaiwanDayRange } from '@/lib/timezone'
 // 檢查 IP 是否在白名單中
 async function isIpWhitelisted(ipAddress: string): Promise<boolean> {
   try {
+    // 預設將 192.168.0.x 網段設為白名單
+    if (ipAddress.startsWith('192.168.0.')) {
+      return true
+    }
+    
     const whitelistEntry = await prisma.ipWhitelist.findFirst({
       where: {
         ipAddress: ipAddress,
