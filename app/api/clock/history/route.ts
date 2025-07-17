@@ -39,7 +39,10 @@ export async function GET(req: NextRequest) {
     }
 
     // 建立日期範圍查詢條件
-    const whereCondition: any = { userId }
+    const whereCondition: any = { 
+      userId,
+      isDeleted: false // 只顯示未被軟刪除的記錄
+    }
     
     if (from || to) {
       whereCondition.timestamp = {}

@@ -211,6 +211,7 @@ export default function MobilePage() {
             key={summaryKey}
             onRefresh={() => setSummaryKey(k => k + 1)}
             refreshTrigger={summaryKey}
+            isMobile={true}
           />
         </Card>
 

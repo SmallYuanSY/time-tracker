@@ -52,9 +52,13 @@ export default function MobileSmartPunchWidget({
       if (!session?.user) return
 
       try {
-        const today = new Date().toISOString().split('T')[0]
+        const todayStart = new Date()
+        todayStart.setHours(0, 0, 0, 0)
+        const todayEnd = new Date()
+        todayEnd.setHours(23, 59, 59, 999)
+        
         const userId = (session.user as any).id
-        const response = await fetch(`/api/clock/history?date=${today}&userId=${userId}`)
+        const response = await fetch(`/api/clock/history?from=${todayStart.toISOString()}&to=${todayEnd.toISOString()}&userId=${userId}`)
         
         if (response.ok) {
           const records = await response.json()
@@ -106,33 +110,14 @@ export default function MobileSmartPunchWidget({
         throw new Error('打卡失敗')
       }
 
-      // 如果是上班打卡，自動創建預設工作記錄
-      if (type === 'IN') {
-        try {
-          const workLogResponse = await fetch('/api/worklog/quick', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId,
-              projectCode: '00',
-              projectName: '無案件編號',
-              category: '其他',
-              content: '手機打卡'
-            })
-          })
-
-          if (!workLogResponse.ok) {
-            console.warn('自動創建工作記錄失敗')
-          }
-        } catch (workLogError) {
-          console.warn('自動創建工作記錄失敗:', workLogError)
-          // 不阻斷打卡流程，只記錄警告
-        }
-      }
+      // 上班打卡的工作記錄由 clock API 自動創建，不需要額外調用
 
       // 重新載入記錄
-      const today = new Date().toISOString().split('T')[0]
-      const historyResponse = await fetch(`/api/clock/history?date=${today}&userId=${userId}`)
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+      const todayEnd = new Date()
+      todayEnd.setHours(23, 59, 59, 999)
+      const historyResponse = await fetch(`/api/clock/history?from=${todayStart.toISOString()}&to=${todayEnd.toISOString()}&userId=${userId}`)
       
       if (historyResponse.ok) {
         const records = await historyResponse.json()
@@ -343,7 +328,7 @@ export default function MobileSmartPunchWidget({
             今日打卡記錄
           </h4>
           <div className="space-y-2 max-h-32 overflow-y-auto">
-                          {todayRecords.slice().reverse().map((record, index) => (
+                          {todayRecords.slice().reverse().map((record) => (
                 <div key={record.id} className="flex items-center justify-between text-sm">
                   <span className="text-white/70">
                     {record.type === 'IN' ? '🟢 上班打卡' : '🔴 下班打卡'}

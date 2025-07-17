@@ -8,15 +8,29 @@ import { Button } from '@/components/ui/button'
 import { ArrowLeft, Plus, Calendar, Clock, FileText, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import { zhTW } from 'date-fns/locale'
+import MobileLeaveRequestModal from '../components/MobileLeaveRequestModal'
 
 interface LeaveRequest {
   id: string
-  type: string
+  leaveType: string
   startDate: string
   endDate: string
   reason: string
-  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  status: 'PENDING_AGENT' | 'PENDING_ADMIN' | 'APPROVED' | 'AGENT_REJECTED' | 'ADMIN_REJECTED'
   createdAt: string
+  startTime: string
+  endTime: string
+  totalHours: number
+  requester: {
+    id: string
+    name: string
+    email: string
+  }
+  agent: {
+    id: string
+    name: string
+    email: string
+  }
   approvedAt?: string
   rejectedAt?: string
   approverName?: string
@@ -30,6 +44,7 @@ export default function MobileLeavePage() {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'all'>('all')
+  const [showRequestModal, setShowRequestModal] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -64,11 +79,31 @@ export default function MobileLeavePage() {
     }
   }
 
+  const handleRequestSuccess = () => {
+    loadLeaveRequests()
+  }
+
+  // 請假類型翻譯
+  const getLeaveTypeText = (type: string) => {
+    const typeMap: { [key: string]: string } = {
+      PERSONAL: '事假',
+      SICK: '病假',
+      ANNUAL: '特休',
+      OFFICIAL: '公假',
+      FUNERAL: '喪假',
+      MARRIAGE: '婚假',
+      MATERNITY: '產假',
+      PATERNITY: '陪產假',
+      OTHER: '其他假'
+    }
+    return typeMap[type] || type
+  }
+
   // 過濾請假記錄
   const filteredRequests = leaveRequests.filter(request => {
     switch (activeTab) {
       case 'pending':
-        return request.status === 'PENDING'
+        return request.status === 'PENDING_AGENT' || request.status === 'PENDING_ADMIN'
       case 'approved':
         return request.status === 'APPROVED'
       default:
@@ -79,11 +114,13 @@ export default function MobileLeavePage() {
   // 狀態顯示
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'PENDING':
+      case 'PENDING_AGENT':
+      case 'PENDING_ADMIN':
         return <AlertCircle className="w-4 h-4 text-yellow-400" />
       case 'APPROVED':
         return <CheckCircle className="w-4 h-4 text-green-400" />
-      case 'REJECTED':
+      case 'AGENT_REJECTED':
+      case 'ADMIN_REJECTED':
         return <XCircle className="w-4 h-4 text-red-400" />
       default:
         return null
@@ -92,19 +129,27 @@ export default function MobileLeavePage() {
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'PENDING': return '待審核'
+      case 'PENDING_AGENT': return '代理人審核中'
+      case 'PENDING_ADMIN': return '管理員審核中'
       case 'APPROVED': return '已核准'
-      case 'REJECTED': return '已拒絕'
+      case 'AGENT_REJECTED': return '代理人拒絕'
+      case 'ADMIN_REJECTED': return '管理員拒絕'
       default: return '未知'
     }
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'PENDING': return 'bg-yellow-500/20 text-yellow-200'
-      case 'APPROVED': return 'bg-green-500/20 text-green-200'
-      case 'REJECTED': return 'bg-red-500/20 text-red-200'
-      default: return 'bg-gray-500/20 text-gray-200'
+      case 'PENDING_AGENT':
+      case 'PENDING_ADMIN':
+        return 'bg-yellow-500/20 text-yellow-200'
+      case 'APPROVED': 
+        return 'bg-green-500/20 text-green-200'
+      case 'AGENT_REJECTED':
+      case 'ADMIN_REJECTED':
+        return 'bg-red-500/20 text-red-200'
+      default: 
+        return 'bg-gray-500/20 text-gray-200'
     }
   }
 
@@ -143,7 +188,7 @@ export default function MobileLeavePage() {
               variant="ghost"
               size="sm"
               className="text-white hover:bg-white/10"
-              onClick={() => router.push('/leave')}
+              onClick={() => setShowRequestModal(true)}
             >
               <Plus className="w-5 h-5" />
             </Button>
@@ -178,7 +223,7 @@ export default function MobileLeavePage() {
                   : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
               }`}
             >
-              待審核 ({leaveRequests.filter(r => r.status === 'PENDING').length})
+              待審核 ({leaveRequests.filter(r => r.status === 'PENDING_AGENT' || r.status === 'PENDING_ADMIN').length})
             </Button>
             <Button
               variant={activeTab === 'approved' ? 'default' : 'outline'}
@@ -204,7 +249,7 @@ export default function MobileLeavePage() {
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-white">
-                {leaveRequests.filter(r => r.status === 'PENDING').length}
+                {leaveRequests.filter(r => r.status === 'PENDING_AGENT' || r.status === 'PENDING_ADMIN').length}
               </div>
               <div className="text-sm text-white/70">待審核</div>
             </div>
@@ -241,7 +286,7 @@ export default function MobileLeavePage() {
                   variant="outline"
                   size="sm"
                   className="mt-3 bg-white/10 text-white border-white/20 hover:bg-white/20"
-                  onClick={() => router.push('/leave')}
+                  onClick={() => setShowRequestModal(true)}
                 >
                   申請請假
                 </Button>
@@ -256,7 +301,7 @@ export default function MobileLeavePage() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold text-white">{request.type}</h3>
+                      <h3 className="font-semibold text-white">{getLeaveTypeText(request.leaveType)}</h3>
                       <span className={`px-2 py-1 rounded-full text-xs flex items-center gap-1 ${getStatusColor(request.status)}`}>
                         {getStatusIcon(request.status)}
                         {getStatusText(request.status)}
@@ -267,12 +312,12 @@ export default function MobileLeavePage() {
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
                         <span>
-                          {format(new Date(request.startDate), 'yyyy/MM/dd')} - {format(new Date(request.endDate), 'yyyy/MM/dd')}
+                          {mounted ? format(new Date(request.startDate), 'yyyy/MM/dd') : request.startDate} - {mounted ? format(new Date(request.endDate), 'yyyy/MM/dd') : request.endDate}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Clock className="w-4 h-4" />
-                        <span>申請時間：{format(new Date(request.createdAt), 'yyyy/MM/dd HH:mm')}</span>
+                        <span>申請時間：{mounted ? format(new Date(request.createdAt), 'yyyy/MM/dd HH:mm') : request.createdAt}</span>
                       </div>
                     </div>
                   </div>
@@ -288,12 +333,12 @@ export default function MobileLeavePage() {
                 {request.status === 'APPROVED' && request.approverName && (
                   <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-3 text-sm">
                     <div className="text-green-200">
-                      ✓ 已由 {request.approverName} 於 {format(new Date(request.approvedAt!), 'yyyy/MM/dd HH:mm')} 核准
+                      ✓ 已由 {request.approverName} 於 {mounted && request.approvedAt ? format(new Date(request.approvedAt), 'yyyy/MM/dd HH:mm') : request.approvedAt} 核准
                     </div>
                   </div>
                 )}
 
-                {request.status === 'REJECTED' && request.rejectReason && (
+                {(request.status === 'AGENT_REJECTED' || request.status === 'ADMIN_REJECTED') && request.rejectReason && (
                   <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3 text-sm">
                     <div className="text-red-200 mb-1">
                       ✗ 已拒絕
@@ -311,7 +356,7 @@ export default function MobileLeavePage() {
         {/* 新增請假按鈕 */}
         <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-4">
           <Button
-            onClick={() => router.push('/leave')}
+            onClick={() => setShowRequestModal(true)}
             className="w-full h-12 bg-white text-orange-600 hover:bg-white/90 font-semibold text-lg touch-manipulation"
           >
             <Plus className="w-5 h-5 mr-2" />
@@ -319,6 +364,13 @@ export default function MobileLeavePage() {
           </Button>
         </Card>
       </main>
+
+      {/* 請假申請模態框 */}
+      <MobileLeaveRequestModal
+        open={showRequestModal}
+        onClose={() => setShowRequestModal(false)}
+        onSuccess={handleRequestSuccess}
+      />
     </div>
   )
 } 

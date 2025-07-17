@@ -75,12 +75,24 @@ export default function MobileWorkLogModal({
     content: editData?.content || copyData?.content || '',
     startTime: editData
       ? new Date(editData.startTime).toTimeString().slice(0, 5)
-      : initialMode === 'start'
-        ? new Date().toTimeString().slice(0, 5)
-        : '09:00',
+      : '09:00', // 避免 hydration 問題，初始化為固定值
     endTime: editData?.endTime ? new Date(editData.endTime).toTimeString().slice(0, 5) : '',
     editReason: '',
   })
+
+  // 避免 hydration 問題的日期狀態
+  const [currentDate, setCurrentDate] = useState<string>('')
+
+  // 客戶端載入後設定當前時間（避免 hydration 問題）
+  useEffect(() => {
+    const now = new Date()
+    setCurrentDate(format(now, 'yyyy年MM月dd日 EEEE', { locale: zhTW }))
+    
+    if (initialMode === 'start' && !editData) {
+      const currentTime = now.toTimeString().slice(0, 5)
+      setFormData(prev => ({ ...prev, startTime: currentTime }))
+    }
+  }, [initialMode, editData])
 
   // 專案列表
   const [projects, setProjects] = useState<Project[]>([])
@@ -120,7 +132,7 @@ export default function MobileWorkLogModal({
       projectName: '',
       category: '',
       content: '',
-      startTime: initialMode === 'start' ? new Date().toTimeString().slice(0, 5) : '09:00',
+      startTime: '09:00', // 避免 hydration 問題
       endTime: '',
       editReason: '',
     })
@@ -513,7 +525,7 @@ export default function MobileWorkLogModal({
                         <div className="flex items-center gap-2 text-white">
                           <Calendar className="w-5 h-5" />
                           <span className="font-medium">日期：</span>
-                          <span>{format(new Date(), 'yyyy年MM月dd日 EEEE', { locale: zhTW })}</span>
+                          <span>{currentDate || '載入中...'}</span>
                         </div>
                       </Card>
                     </div>

@@ -5,7 +5,7 @@ import { format, parseISO, startOfWeek, endOfWeek, eachDayOfInterval, isWithinIn
 import { zhTW } from 'date-fns/locale'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Clock, LogIn, LogOut, Calendar, Edit3, Plane, CalendarIcon } from 'lucide-react'
+import { Clock, LogIn, LogOut, Calendar, Edit3, Plane, CalendarIcon, Trash2 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import DeviceInfoDisplay from '@/components/ui/DeviceInfoDisplay'
 import { Portal } from '@/components/ui/portal'
@@ -51,6 +51,12 @@ interface ClockModalProps {
   onSave: () => void
   userId: string
   mode: 'add' | 'edit'
+}
+
+interface DeleteClockModalProps {
+  record: ClockRecord | null
+  onClose: () => void
+  onConfirm: (deleteReason: string) => void
 }
 
 function ClockModal({ record, onClose, onSave, userId, mode }: ClockModalProps) {
@@ -446,12 +452,118 @@ function ClockModal({ record, onClose, onSave, userId, mode }: ClockModalProps) 
   )
 }
 
+function DeleteClockModal({ record, onClose, onConfirm }: DeleteClockModalProps) {
+  const [deleteReason, setDeleteReason] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async () => {
+    if (!deleteReason.trim()) {
+      setError('刪除原因為必填欄位')
+      return
+    }
+
+    setIsSubmitting(true)
+    setError('')
+
+    try {
+      await onConfirm(deleteReason.trim())
+      onClose()
+    } catch (error) {
+      setError('刪除失敗，請稍後再試')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  if (!record) return null
+
+  return (
+    <Portal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md">
+        <div className="bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-lg border border-white/20 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+          <h2 className="text-lg font-semibold mb-4 text-white flex items-center gap-2">
+            <Trash2 className="h-5 w-5 text-red-400" />
+            刪除打卡記錄
+          </h2>
+
+          {error && (
+            <div className="mb-4 p-3 rounded-xl bg-red-500/20 text-red-100 border border-red-400/30">
+              <p className="text-sm">{error}</p>
+            </div>
+          )}
+
+          {/* 記錄資訊 */}
+          <div className="mb-4 p-4 bg-white/10 rounded-lg">
+            <div className="text-sm text-white/60 mb-2">將要刪除的記錄</div>
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-full ${
+                record.type === 'IN' 
+                  ? 'bg-green-500/20 text-green-400' 
+                  : 'bg-red-500/20 text-red-400'
+              }`}>
+                {record.type === 'IN' ? <LogIn className="w-4 h-4" /> : <LogOut className="w-4 h-4" />}
+              </div>
+              <div>
+                <div className="text-white font-medium">
+                  {record.type === 'IN' ? '上班打卡' : '下班打卡'}
+                </div>
+                <div className="text-white/70 text-sm">
+                  {format(new Date(record.timestamp), 'yyyy/MM/dd HH:mm:ss')}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 刪除原因 */}
+          <div className="space-y-2 mb-6">
+            <label className="text-sm text-white font-medium block">
+              刪除原因 <span className="text-red-400">*</span>
+            </label>
+            <textarea
+              rows={3}
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+              placeholder="請說明刪除此打卡記錄的原因..."
+              className="w-full rounded-xl bg-red-500/20 border border-red-400/50 px-4 py-2 text-white placeholder:text-red-200/60 focus:outline-none focus:border-red-400"
+            />
+            <p className="text-xs text-red-200/80">
+              ⚠️ 刪除操作將記錄您的IP地址和時間，供管理員審核使用
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="flex-1 bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white"
+              disabled={isSubmitting}
+            >
+              取消
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting || !deleteReason.trim()}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white disabled:bg-gray-600"
+            >
+              {isSubmitting ? '刪除中...' : '確認刪除'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Portal>
+  )
+}
+
 export default function ClockRecordList({ userId, currentWeek, timeRange = 'week' }: ClockRecordListProps) {
   const [clockRecords, setClockRecords] = useState<ClockRecord[]>([])
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [editingRecord, setEditingRecord] = useState<ClockRecord | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [deletingRecord, setDeletingRecord] = useState<ClockRecord | null>(null)
 
   const fetchClockRecords = async () => {
     try {
@@ -536,6 +648,36 @@ export default function ClockRecordList({ userId, currentWeek, timeRange = 'week
 
   const handleSaveAdd = () => {
     fetchClockRecords()
+  }
+
+  const handleDeleteRecord = (record: ClockRecord) => {
+    setDeletingRecord(record)
+  }
+
+  const handleConfirmDelete = async (deleteReason: string) => {
+    if (!deletingRecord) return
+
+    try {
+      const response = await fetch(`/api/clock/${deletingRecord.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deleteReason
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || '刪除失敗')
+      }
+
+      // 刷新記錄列表
+      fetchClockRecords()
+      setDeletingRecord(null)
+    } catch (error) {
+      console.error('刪除打卡記錄失敗:', error)
+      throw error // 重新拋出錯誤讓組件處理
+    }
   }
 
   const groupRecordsByDate = () => {
@@ -1039,15 +1181,26 @@ export default function ClockRecordList({ userId, currentWeek, timeRange = 'week
                                 </div>
                                 <DeviceInfoDisplay record={record} />
                               </div>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => handleEditRecord(record)}
-                                className="bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border-0"
-                              >
-                                <Edit3 className="w-3 h-3 mr-1" />
-                                編輯
-                              </Button>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => handleEditRecord(record)}
+                                  className="bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border-0"
+                                >
+                                  <Edit3 className="w-3 h-3 mr-1" />
+                                  編輯
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => handleDeleteRecord(record)}
+                                  className="bg-red-500/20 text-red-300 hover:bg-red-500/30 border-0"
+                                >
+                                  <Trash2 className="w-3 h-3 mr-1" />
+                                  刪除
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -1086,6 +1239,15 @@ export default function ClockRecordList({ userId, currentWeek, timeRange = 'week
           onSave={handleSaveAdd}
           userId={userId}
           mode="add"
+        />
+      )}
+
+      {/* 刪除確認彈窗 */}
+      {deletingRecord && (
+        <DeleteClockModal
+          record={deletingRecord}
+          onClose={() => setDeletingRecord(null)}
+          onConfirm={handleConfirmDelete}
         />
       )}
     </div>

@@ -81,21 +81,15 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   }
 }
 
-// 刪除打卡記錄
+// 刪除打卡記錄（支援軟刪除和硬刪除）
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
-    const editReason = searchParams.get('editReason')
+    const { deleteReason, permanent = false } = await req.json()
     const { id } = params
 
-    if (!userId) {
-      return new NextResponse('缺少 userId', { status: 400 })
-    }
-
-    // 刪除也需要編輯原因
-    if (!editReason || editReason.trim() === '') {
+    // 刪除原因為必填
+    if (!deleteReason || deleteReason.trim() === '') {
       return new NextResponse('刪除原因為必填欄位', { status: 400 })
     }
 
@@ -112,17 +106,12 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
     })
 
     const isAdmin = sessionUser?.role === 'ADMIN' || sessionUser?.role === 'WEB_ADMIN'
-    const isOwner = sessionUserId === userId
-
-    if (!isAdmin && !isOwner) {
-      return new NextResponse('無權限刪除此打卡記錄', { status: 403 })
-    }
 
     // 檢查打卡記錄是否存在
     const existingRecord = await prisma.clock.findFirst({
       where: {
         id,
-        userId,
+        ...(permanent ? {} : { isDeleted: false }), // 永久刪除時不檢查 isDeleted
       },
     })
 
@@ -130,11 +119,53 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
       return new NextResponse('打卡記錄不存在', { status: 404 })
     }
 
-    await prisma.clock.delete({
-      where: { id },
-    })
+    // 檢查權限：只有管理員或記錄所有者可以刪除
+    const isOwner = sessionUserId === existingRecord.userId
 
-    return new NextResponse('刪除成功', { status: 200 })
+    if (!isAdmin && !isOwner) {
+      return new NextResponse('無權限刪除此打卡記錄', { status: 403 })
+    }
+
+    // 永久刪除只允許管理員操作
+    if (permanent && !isAdmin) {
+      return new NextResponse('只有管理員可以永久刪除打卡記錄', { status: 403 })
+    }
+
+    if (permanent) {
+      // 硬刪除：完全從資料庫移除
+      await prisma.clock.delete({
+        where: { id },
+      })
+
+      return NextResponse.json({
+        message: '打卡記錄已永久刪除',
+        permanent: true
+      })
+    } else {
+      // 軟刪除：更新記錄狀態並記錄刪除資訊
+      const result = await prisma.clock.update({
+        where: { id },
+        data: {
+          isDeleted: true,
+          deletedBy: sessionUserId,
+          deletedAt: new Date(),
+          deleteReason: deleteReason.trim(),
+          deleteIpAddress: getClientIP(req),
+        },
+      })
+
+      return NextResponse.json({
+        message: '打卡記錄已成功刪除',
+        permanent: false,
+        deletedRecord: {
+          id: result.id,
+          timestamp: result.timestamp,
+          type: result.type,
+          deletedAt: result.deletedAt,
+          deleteReason: result.deleteReason,
+        }
+      })
+    }
   } catch (error) {
     console.error('[DELETE /api/clock/[id]]', error)
     return new NextResponse('伺服器內部錯誤', { status: 500 })

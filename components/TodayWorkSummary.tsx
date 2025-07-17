@@ -29,9 +29,10 @@ interface TodayWorkSummaryProps {
   onRefresh?: () => void
   onRefreshWithClock?: () => void // 當刪除打卡記錄時的刷新函數
   refreshTrigger?: number // 外部觸發刷新的信號
+  isMobile?: boolean // 是否為手機版，手機版不顯示編輯刪除按鈕
 }
 
-export default function TodayWorkSummary({ onRefresh, onRefreshWithClock, refreshTrigger }: TodayWorkSummaryProps) {
+export default function TodayWorkSummary({ onRefresh, onRefreshWithClock, refreshTrigger, isMobile = false }: TodayWorkSummaryProps) {
   const { data: session } = useSession()
   const [logs, setLogs] = useState<WorkLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -458,34 +459,36 @@ export default function TodayWorkSummary({ onRefresh, onRefreshWithClock, refres
                       <p className="text-white/70 text-sm">{log.content}</p>
                     </div>
                     
-                    <div className="flex gap-2 ml-4">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="bg-white/20 text-white hover:bg-white/30 border-0 text-xs"
-                        onClick={() => handleCopy(log)}
-                      >
-                        📋 複製
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="bg-white/20 text-white hover:bg-white/30 border-0 text-xs"
-                        onClick={() => handleEdit(log)}
-                      >
-                        ✏️ 編輯
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="bg-red-500/20 text-red-300 hover:bg-red-500/30 border-0 text-xs disabled:opacity-50"
-                        onClick={() => handleDelete(log)}
-                        disabled={deletingId === log.id}
-                      >
-                        <Trash2 className="w-3 h-3 mr-1" />
-                        {deletingId === log.id ? '刪除中' : '刪除'}
-                      </Button>
-                    </div>
+                    {!isMobile && (
+                      <div className="flex gap-2 ml-4">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="bg-white/20 text-white hover:bg-white/30 border-0 text-xs"
+                          onClick={() => handleCopy(log)}
+                        >
+                          📋 複製
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="bg-white/20 text-white hover:bg-white/30 border-0 text-xs"
+                          onClick={() => handleEdit(log)}
+                        >
+                          ✏️ 編輯
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="bg-red-500/20 text-red-300 hover:bg-red-500/30 border-0 text-xs disabled:opacity-50"
+                          onClick={() => handleDelete(log)}
+                          disabled={deletingId === log.id}
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          {deletingId === log.id ? '刪除中' : '刪除'}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </Card>
               )

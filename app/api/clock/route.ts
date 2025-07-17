@@ -86,7 +86,7 @@ async function handleAutoWorkLog(
           projectCode: '00',
           projectName: '無案件編號',
           category: '其他',
-          content: '電腦打卡',
+          content: '自動打卡',
           projectId: defaultProject.id,
           isOvertime: false,
         }
@@ -303,7 +303,7 @@ export async function GET(req: NextRequest) {
     const yesterday = new Date(today)
     yesterday.setDate(yesterday.getDate() - 1)
 
-    // 獲取今日的打卡記錄，按時間排序
+    // 獲取今日的打卡記錄，按時間排序（排除軟刪除的記錄）
     const todayClocks = await prisma.clock.findMany({
       where: {
         userId,
@@ -311,13 +311,14 @@ export async function GET(req: NextRequest) {
           gte: today,
           lt: tomorrow,
         },
+        isDeleted: false,
       },
       orderBy: {
         timestamp: 'desc',
       },
     })
 
-    // 獲取昨日的打卡記錄（用於跨日判斷）
+    // 獲取昨日的打卡記錄（用於跨日判斷，排除軟刪除的記錄）
     const yesterdayClocks = await prisma.clock.findMany({
       where: {
         userId,
@@ -325,6 +326,7 @@ export async function GET(req: NextRequest) {
           gte: yesterday,
           lt: today,
         },
+        isDeleted: false,
       },
       orderBy: {
         timestamp: 'desc',

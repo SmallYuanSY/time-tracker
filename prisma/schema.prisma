@@ -55,6 +55,11 @@ model clock {
   ipReviewedAt      DateTime?
   ipReviewNote      String?
   originalTimestamp DateTime?
+  isDeleted         Boolean   @default(false)
+  deletedBy         String?
+  deletedAt         DateTime?
+  deleteReason      String?
+  deleteIpAddress   String?
   user              User      @relation(fields: [userId], references: [id])
 }
 
