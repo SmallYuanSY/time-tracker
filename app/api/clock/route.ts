@@ -9,8 +9,16 @@ import { nowInTaiwan, getTaiwanDayRange } from '@/lib/timezone'
 // 檢查 IP 是否在白名單中
 async function isIpWhitelisted(ipAddress: string): Promise<boolean> {
   try {
-    // 預設將 192.168.0.x 網段設為白名單
-    if (ipAddress.startsWith('192.168.0.')) {
+    // 預設將 localhost 地址設為白名單
+    if (ipAddress === '127.0.0.1' || ipAddress === '::1' || ipAddress === 'localhost') {
+      return true
+    }
+    
+    // 預設將常見的私有網路地址設為白名單
+    if (ipAddress.startsWith('192.168.0.') || 
+        ipAddress.startsWith('192.168.1.') || 
+        ipAddress.startsWith('10.0.0.') ||
+        ipAddress.startsWith('172.16.')) {
       return true
     }
     
