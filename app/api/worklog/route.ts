@@ -331,6 +331,7 @@ export async function DELETE(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const workLogId = searchParams.get('id')
+    const confirmDeleteClocks = searchParams.get('confirmDeleteClocks') === 'true'
 
     if (!workLogId) {
       return new NextResponse('缺少工作記錄 ID', { status: 400 })
@@ -354,27 +355,69 @@ export async function DELETE(req: NextRequest) {
       return new NextResponse('無權限刪除此工作記錄', { status: 403 })
     }
 
-    // 使用事務刪除工作記錄和相關的打卡記錄
-    await prisma.$transaction(async (tx) => {
-      // 如果有關聯的打卡記錄，一起刪除
-      const relatedClocks = await tx.clock.findMany({
+    // 檢查當天是否還有其他工作記錄
+    const dayStart = new Date(workLog.startTime)
+    dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(workLog.startTime)
+    dayEnd.setHours(23, 59, 59, 999)
+
+    const otherWorkLogsInDay = await prisma.workLog.findMany({
+      where: {
+        userId: workLog.userId,
+        id: { not: workLogId }, // 排除當前要刪除的記錄
+        startTime: {
+          gte: dayStart,
+          lt: dayEnd
+        }
+      }
+    })
+
+    // 如果這是當天唯一的工作記錄，且沒有確認刪除打卡記錄，則返回確認請求
+    if (otherWorkLogsInDay.length === 0 && !confirmDeleteClocks) {
+      // 檢查當天是否有打卡記錄
+      const clocksInDay = await prisma.clock.findMany({
         where: {
           userId: workLog.userId,
           timestamp: {
-            gte: workLog.startTime,
-            lte: workLog.endTime || workLog.startTime
+            gte: dayStart,
+            lt: dayEnd
           }
         }
       })
 
-      if (relatedClocks.length > 0) {
-        await tx.clock.deleteMany({
+      if (clocksInDay.length > 0) {
+        return NextResponse.json({
+          needsConfirmation: true,
+          message: '這是當天唯一的工作記錄，刪除後將同時刪除當天的打卡記錄',
+          clocksCount: clocksInDay.length,
+          workLogId: workLogId
+        }, { status: 409 })
+      }
+    }
+
+    // 使用事務刪除工作記錄，如果需要也刪除打卡記錄
+    await prisma.$transaction(async (tx) => {
+      // 只有當這是當天唯一的工作記錄且用戶確認時，才刪除打卡記錄
+      if (otherWorkLogsInDay.length === 0 && confirmDeleteClocks) {
+        const relatedClocks = await tx.clock.findMany({
           where: {
-            id: {
-              in: relatedClocks.map(clock => clock.id)
+            userId: workLog.userId,
+            timestamp: {
+              gte: dayStart,
+              lt: dayEnd
             }
           }
         })
+
+        if (relatedClocks.length > 0) {
+          await tx.clock.deleteMany({
+            where: {
+              id: {
+                in: relatedClocks.map(clock => clock.id)
+              }
+            }
+          })
+        }
       }
 
       // 刪除工作記錄

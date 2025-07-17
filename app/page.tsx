@@ -123,6 +123,12 @@ export default function HomePage() {
     handleWorkLogModalClose();
   };
 
+  // 處理包含打卡記錄的刷新（當刪除工作記錄同時刪除打卡記錄時）
+  const handleRefreshWithClock = () => {
+    setSummaryKey(k => k + 1);
+    setPunchWidgetKey(k => k + 1); // 觸發 SmartPunchWidget 刷新
+  };
+
   // 載入使用者設定
   useEffect(() => {
     const loadSettings = async () => {
@@ -254,6 +260,7 @@ export default function HomePage() {
                 <TodayWorkSummary 
                   key={summaryKey} 
                   onRefresh={() => setSummaryKey(k => k + 1)}
+                  onRefreshWithClock={handleRefreshWithClock}
                   refreshTrigger={summaryKey}
                 />
               </div>
@@ -369,6 +376,7 @@ export default function HomePage() {
               <TodayWorkSummary 
                 key={summaryKey} 
                 onRefresh={() => setSummaryKey(k => k + 1)}
+                onRefreshWithClock={handleRefreshWithClock}
                 refreshTrigger={summaryKey}
               />
             </div>

@@ -6,6 +6,8 @@ import { useSession } from 'next-auth/react'
 import { useEffect, useState } from 'react'
 import { workLogCacheManager } from '@/lib/cache/worklog'
 import { WorkLog } from '@/lib/types/worklog'
+import { WorkLogDeleteConfirmDialog } from '@/components/ui/WorkLogDeleteConfirmDialog'
+import { DeleteConfirmDialog } from '@/components/ui/DeleteConfirmDialog'
 
 interface WorkLogGroup {
   user: {
@@ -49,6 +51,24 @@ export default function WorkLogList({
   const [error, setError] = useState<string | null>(null)
   const [logs, setLogs] = useState<WorkLog[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    log: WorkLog | null
+    message: string
+    clocksCount: number
+  }>({
+    open: false,
+    log: null,
+    message: '',
+    clocksCount: 0
+  })
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean
+    log: WorkLog | null
+  }>({
+    open: false,
+    log: null
+  })
 
   const loadWorkLogs = async (useCache = true) => {
     try {
@@ -174,17 +194,40 @@ export default function WorkLogList({
     }
   }
 
-  // 處理刪除
-  const handleDelete = async (log: WorkLog) => {
-    if (!confirm(`確定要刪除這筆工作記錄嗎？\n\n專案：${log.projectName}\n內容：${log.content}`)) {
-      return
-    }
+  // 處理刪除（顯示初始確認對話框）
+  const handleDelete = (log: WorkLog) => {
+    setDeleteDialog({
+      open: true,
+      log
+    })
+  }
 
+  // 處理確認初始刪除
+  const handleConfirmInitialDelete = async () => {
+    const log = deleteDialog.log
+    if (!log) return
+
+    setDeleteDialog({ open: false, log: null })
     setDeletingId(log.id)
+
     try {
+      // 第一次嘗試刪除，檢查是否需要確認
       const response = await fetch(`/api/worklog?id=${log.id}`, {
         method: 'DELETE',
       })
+
+      if (response.status === 409) {
+        // 需要確認刪除打卡記錄
+        const data = await response.json()
+        setConfirmDialog({
+          open: true,
+          log,
+          message: data.message,
+          clocksCount: data.clocksCount
+        })
+        setDeletingId(null)
+        return
+      }
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -200,6 +243,44 @@ export default function WorkLogList({
       // 通知父元件
       if (onDelete) {
         onDelete(log)
+      }
+
+      // 重新載入資料
+      handleRefresh()
+    } catch (error) {
+      console.error('刪除工作記錄失敗:', error)
+      alert(`刪除失敗：${error instanceof Error ? error.message : '未知錯誤'}`)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  // 處理確認刪除（包含打卡記錄）
+  const handleConfirmDelete = async () => {
+    if (!confirmDialog.log) return
+
+    setDeletingId(confirmDialog.log.id)
+    setConfirmDialog({ open: false, log: null, message: '', clocksCount: 0 })
+
+    try {
+      const response = await fetch(`/api/worklog?id=${confirmDialog.log.id}&confirmDeleteClocks=true`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || '刪除失敗')
+      }
+
+      // 從本地狀態中移除已刪除的記錄
+      setLogs(prevLogs => prevLogs.filter(l => l.id !== confirmDialog.log!.id))
+      
+      // 清除相關快取
+      workLogCacheManager.clearCache()
+      
+      // 通知父元件
+      if (onDelete) {
+        onDelete(confirmDialog.log)
       }
 
       // 重新載入資料
@@ -305,6 +386,21 @@ export default function WorkLogList({
           </div>
         </div>
       ))}
+      
+      <DeleteConfirmDialog
+        open={deleteDialog.open}
+        onOpenChange={(open) => setDeleteDialog(prev => ({ ...prev, open }))}
+        onConfirm={handleConfirmInitialDelete}
+        description={deleteDialog.log ? `確定要刪除這筆工作記錄嗎？\n\n專案：${deleteDialog.log.projectName}\n內容：${deleteDialog.log.content}` : ''}
+      />
+
+      <WorkLogDeleteConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+        onConfirm={handleConfirmDelete}
+        message={confirmDialog.message}
+        clocksCount={confirmDialog.clocksCount}
+      />
     </div>
   )
 } 

@@ -11,6 +11,8 @@ import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react"
 import { timeTrackerAPI } from "@/lib/api-manager"
 
 import WorkLogModal from "@/app/worklog/WorkLogModal"
+import { WorkLogDeleteConfirmDialog } from "@/components/ui/WorkLogDeleteConfirmDialog"
+import { DeleteConfirmDialog } from "@/components/ui/DeleteConfirmDialog"
 
 interface WorkLog {
   id: string
@@ -25,10 +27,11 @@ interface WorkLog {
 
 interface TodayWorkSummaryProps {
   onRefresh?: () => void
+  onRefreshWithClock?: () => void // 當刪除打卡記錄時的刷新函數
   refreshTrigger?: number // 外部觸發刷新的信號
 }
 
-export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWorkSummaryProps) {
+export default function TodayWorkSummary({ onRefresh, onRefreshWithClock, refreshTrigger }: TodayWorkSummaryProps) {
   const { data: session } = useSession()
   const [logs, setLogs] = useState<WorkLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -41,6 +44,24 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [isDateChanging, setIsDateChanging] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    log: WorkLog | null
+    message: string
+    clocksCount: number
+  }>({
+    open: false,
+    log: null,
+    message: '',
+    clocksCount: 0
+  })
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean
+    log: WorkLog | null
+  }>({
+    open: false,
+    log: null
+  })
 
 
   // 確保在客戶端才初始化
@@ -131,14 +152,69 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
     handleCloseModal()
   }
 
-  const handleDelete = async (log: WorkLog) => {
-    if (!confirm(`確定要刪除這筆工作記錄嗎？\n\n專案：${log.projectName}\n內容：${log.content}`)) {
-      return
-    }
+  const handleDelete = (log: WorkLog) => {
+    setDeleteDialog({
+      open: true,
+      log
+    })
+  }
 
+  // 處理確認初始刪除
+  const handleConfirmInitialDelete = async () => {
+    const log = deleteDialog.log
+    if (!log) return
+
+    setDeleteDialog({ open: false, log: null })
     setDeletingId(log.id)
+
     try {
+      // 第一次嘗試刪除，檢查是否需要確認
       const response = await fetch(`/api/worklog?id=${log.id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.status === 409) {
+        // 需要確認刪除打卡記錄
+        const data = await response.json()
+        setConfirmDialog({
+          open: true,
+          log,
+          message: data.message,
+          clocksCount: data.clocksCount
+        })
+        setDeletingId(null)
+        return
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || '刪除失敗')
+      }
+
+      // 清除相關快取
+      timeTrackerAPI.clearCache('worklog')
+      
+      // 重新載入資料
+      await fetchWorkLogs(true)
+      
+      if (onRefresh) onRefresh()
+    } catch (error) {
+      console.error('刪除工作記錄失敗:', error)
+      alert(`刪除失敗：${error instanceof Error ? error.message : '未知錯誤'}`)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  // 處理確認刪除（包含打卡記錄）
+  const handleConfirmDelete = async () => {
+    if (!confirmDialog.log) return
+
+    setDeletingId(confirmDialog.log.id)
+    setConfirmDialog({ open: false, log: null, message: '', clocksCount: 0 })
+
+    try {
+      const response = await fetch(`/api/worklog?id=${confirmDialog.log.id}&confirmDeleteClocks=true`, {
         method: 'DELETE',
       })
 
@@ -153,7 +229,12 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
       // 重新載入資料
       await fetchWorkLogs(true)
       
-      if (onRefresh) onRefresh()
+      // 當刪除打卡記錄時，需要同時刷新打卡 widget
+      if (onRefreshWithClock) {
+        onRefreshWithClock()
+      } else if (onRefresh) {
+        onRefresh()
+      }
     } catch (error) {
       console.error('刪除工作記錄失敗:', error)
       alert(`刪除失敗：${error instanceof Error ? error.message : '未知錯誤'}`)
@@ -438,6 +519,23 @@ export default function TodayWorkSummary({ onRefresh, refreshTrigger }: TodayWor
         editData={editingLog}
         copyData={copyingLog}
         showNext={!!copyingLog || (!editingLog && !copyingLog)} // 複製模式或新增模式下顯示「儲存並新增」
+      />
+
+      {/* 初始刪除確認對話框 */}
+      <DeleteConfirmDialog
+        open={deleteDialog.open}
+        onOpenChange={(open) => setDeleteDialog(prev => ({ ...prev, open }))}
+        onConfirm={handleConfirmInitialDelete}
+        description={deleteDialog.log ? `確定要刪除這筆工作記錄嗎？\n\n專案：${deleteDialog.log.projectName}\n內容：${deleteDialog.log.content}` : ''}
+      />
+
+      {/* 刪除打卡記錄確認對話框 */}
+      <WorkLogDeleteConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+        onConfirm={handleConfirmDelete}
+        message={confirmDialog.message}
+        clocksCount={confirmDialog.clocksCount}
       />
     </>
   )
