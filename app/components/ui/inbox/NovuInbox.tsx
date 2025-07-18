@@ -126,6 +126,33 @@ export default function NovuInbox() {
           tabs={tabs}
           open={undefined}
           renderBell={undefined}
+          onActionClick={(actionType, notification) => {
+            console.log('Action clicked:', actionType, notification);
+            
+            // 處理 primary action 點擊
+            if (actionType === 'primary' && notification.cta?.data?.url) {
+              const url = notification.cta.data.url;
+              const target = notification.cta.data.target || '_self';
+              
+              if (target === '_blank') {
+                window.open(url, '_blank');
+              } else {
+                window.location.href = url;
+              }
+            }
+            
+            // 處理 secondary action 點擊
+            if (actionType === 'secondary' && notification.cta?.data?.url) {
+              const url = notification.cta.data.url;
+              const target = notification.cta.data.target || '_self';
+              
+              if (target === '_blank') {
+                window.open(url, '_blank');
+              } else {
+                window.location.href = url;
+              }
+            }
+          }}
           appearance={{
             // To enable dark theme support, uncomment the following line:
             // baseTheme: dark,

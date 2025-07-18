@@ -198,6 +198,9 @@ export async function POST(req: NextRequest) {
           title: '請假代理請求',
           body: `${currentUser.name || currentUser.email} 申請${getLeaveTypeText(leaveType)}，指定您為代理人`,
           message: `${currentUser.name || currentUser.email} 申請${getLeaveTypeText(leaveType)}，指定您為代理人\n時間：${startDate} ${startTime} ~ ${endDate} ${endTime}\n時數：${totalHours} 小時`,
+          // CTA 按鈕在 Novu Dashboard workflow 中設定
+          actionUrl: "/leave",
+          actionLabel: "查看請假申請"
         }
       })
     } catch (e) {

@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Plus, Edit, Trash2, Settings, Shield, Eye, EyeOff, X } from 'lucide-react'
+import { Plus, Edit, Trash2, Settings, Shield, Eye, EyeOff, X, Building2, Tags } from 'lucide-react'
 import DashboardLayout from '@/components/layouts/DashboardLayout'
 
 interface WorkCategory {
@@ -26,13 +26,31 @@ interface WorkCategory {
   updatedAt: string
 }
 
+interface ProjectType {
+  id: string
+  typeId: string
+  name: string
+  description: string | null
+  color: string
+  icon: string | null
+  isActive: boolean
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+type CategoryType = 'work' | 'project'
+
 export default function CategoriesPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const [currentTab, setCurrentTab] = useState<CategoryType>('work')
   const [categories, setCategories] = useState<WorkCategory[]>([])
+  const [projectTypes, setProjectTypes] = useState<ProjectType[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingCategory, setEditingCategory] = useState<WorkCategory | null>(null)
+  const [editingProjectType, setEditingProjectType] = useState<ProjectType | null>(null)
   const [formData, setFormData] = useState({
     categoryId: '',
     title: '',
@@ -43,6 +61,14 @@ export default function CategoriesPage() {
     colorText: 'text-blue-200',
     colorBorder: 'border-blue-400/30',
     colorAccent: 'bg-blue-500',
+    sortOrder: 0
+  })
+  const [projectTypeFormData, setProjectTypeFormData] = useState({
+    typeId: '',
+    name: '',
+    description: '',
+    color: '#3B82F6',
+    icon: '📁',
     sortOrder: 0
   })
 
@@ -101,11 +127,32 @@ export default function CategoriesPage() {
     }
   }
 
+  // 載入案件類別列表
+  const loadProjectTypes = async () => {
+    try {
+      const response = await fetch('/api/project-types')
+      const data = await response.json()
+      
+      if (response.ok) {
+        setProjectTypes(data.projectTypes || [])
+      } else {
+        alert(data.error || '載入案件類別失敗')
+      }
+    } catch (error) {
+      console.error('載入案件類別失敗:', error)
+      alert('載入案件類別失敗')
+    }
+  }
+
   useEffect(() => {
     if (session) {
-      loadCategories()
+      if (currentTab === 'work') {
+        loadCategories()
+      } else {
+        loadProjectTypes()
+      }
     }
-  }, [session])
+  }, [session, currentTab])
 
   // 初始化預設分類
   const initializeCategories = async () => {
@@ -278,26 +325,59 @@ export default function CategoriesPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Settings className="h-8 w-8 text-white" />
-              <h1 className="text-3xl font-bold text-white">工作分類管理</h1>
+              <h1 className="text-3xl font-bold text-white">分類管理</h1>
               <Shield className="h-6 w-6 text-yellow-400" />
             </div>
             <div className="flex gap-3">
-              <Button 
-                onClick={initializeCategories}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {categories.length === 0 ? '初始化預設分類' : '重新載入預設分類'}
-              </Button>
+              {currentTab === 'work' && (
+                <Button 
+                  onClick={initializeCategories}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {categories.length === 0 ? '初始化預設分類' : '重新載入預設分類'}
+                </Button>
+              )}
               <Button 
                 onClick={handleAdd}
                 className="bg-green-600 hover:bg-green-700 text-white"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                新增分類
+                {currentTab === 'work' ? '新增工作分類' : '新增案件類別'}
               </Button>
             </div>
           </div>
-          <p className="text-white/70 mt-2">管理系統工作分類，只有管理員可以進行此操作</p>
+
+          {/* 標籤切換 */}
+          <div className="mt-6 flex bg-white/10 rounded-lg p-1">
+            <button
+              onClick={() => setCurrentTab('work')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${
+                currentTab === 'work'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-white hover:bg-white/10'
+              }`}
+            >
+              <Tags className="h-4 w-4" />
+              工作分類
+            </button>
+            <button
+              onClick={() => setCurrentTab('project')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${
+                currentTab === 'project'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-white hover:bg-white/10'
+              }`}
+            >
+              <Building2 className="h-4 w-4" />
+              案件類別
+            </button>
+          </div>
+          <p className="text-white/70 mt-2">
+            {currentTab === 'work' 
+              ? '管理系統工作分類，用於工作記錄的分類標記' 
+              : '管理案件類別，用於專案的類別分類'
+            }
+          </p>
         </div>
 
         {/* 分類列表 */}

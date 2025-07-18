@@ -5,6 +5,13 @@ import { NextRequest } from 'next/server'
  * 處理各種代理服務器設置，並清理 IPv6 映射前綴
  */
 export function getClientIP(request: NextRequest): string {
+  // 新增：印出所有 header 方便 debug
+  try {
+    console.log('x-forwarded-for:', request.headers.get('x-forwarded-for'))
+  } catch (e) {
+    // ignore
+  }
+
   const xForwardedFor = request.headers.get('x-forwarded-for')
   const xRealIP = request.headers.get('x-real-ip')
   const cfConnectingIP = request.headers.get('cf-connecting-ip')

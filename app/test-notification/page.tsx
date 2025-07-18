@@ -145,9 +145,9 @@ export default function TestNotificationPage() {
           </div>
 
           <div className="mt-6 text-center">
-            <a href="/notifications" className="text-blue-300 hover:text-blue-200">
-              → 查看通知收件箱
-            </a>
+            <p className="text-white/70 text-sm">
+              通知已整合到首頁時鐘區域，點擊未讀通知即可查看
+            </p>
           </div>
         </div>
       </div>

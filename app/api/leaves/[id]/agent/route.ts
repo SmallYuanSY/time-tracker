@@ -43,7 +43,14 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
           payload: { 
             title: '請假申請進度',
             body: messageToRequester,
-            message: messageToRequester
+            message: messageToRequester,
+            primaryAction: {
+              label: "查看請假狀態",
+              redirect: {
+                url: "/leave",
+                target: "_self"
+              }
+            }
           }
         })
 
@@ -62,7 +69,14 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
               payload: { 
                 title: '請假申請待審核',
                 body: `${leaveWithDetails.requester.name || leaveWithDetails.requester.email} 的請假申請已由代理人確認，等待您的最終審核`,
-                message: `${leaveWithDetails.requester.name || leaveWithDetails.requester.email} 的請假申請已由代理人確認，等待您的最終審核`
+                message: `${leaveWithDetails.requester.name || leaveWithDetails.requester.email} 的請假申請已由代理人確認，等待您的最終審核`,
+                primaryAction: {
+                  label: "處理請假申請",
+                  redirect: {
+                    url: "/leave",
+                    target: "_self"
+                  }
+                }
               }
             })
           }

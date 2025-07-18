@@ -95,7 +95,7 @@ export default function WorkLogModal({
   const [formData, setFormData] = useState({
     projectCode: editData?.projectCode || copyData?.projectCode || defaultProjectCode || '',
     projectName: editData?.projectName || copyData?.projectName || '',
-    category: editData?.category || copyData?.category || '', // 保留分類
+    category: editData?.category || copyData?.category || '', // 不再從 project.category 取得預設值
     content: editData?.content || copyData?.content || '', // 在複製模式下也保留工作內容
     date: editData
       ? new Date(editData.startTime).toISOString().split('T')[0]
@@ -123,9 +123,9 @@ export default function WorkLogModal({
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjects, setSelectedProjects] = useState<Project[]>(
     editData
-      ? [{ projectCode: editData.projectCode, projectName: editData.projectName, category: editData.category }]
+      ? [{ projectCode: editData.projectCode, projectName: editData.projectName, category: '' }]
       : copyData
-        ? [{ projectCode: copyData.projectCode, projectName: copyData.projectName, category: copyData.category }]
+        ? [{ projectCode: copyData.projectCode, projectName: copyData.projectName, category: '' }]
         : []
   )
   const [selectedExtraTasks, setSelectedExtraTasks] = useState<string[]>([])
@@ -145,7 +145,7 @@ export default function WorkLogModal({
           const convertedProjects = allProjects.map((p: any) => ({
             projectCode: p.code || p.projectCode,
             projectName: p.name || p.projectName,
-            category: p.category || ''
+            category: '' // 不再使用 project.category
           }))
           console.log('轉換後的專案資料:', convertedProjects)
           setProjects(convertedProjects)
@@ -166,13 +166,13 @@ export default function WorkLogModal({
       setSelectedProjects([{
         projectCode: editData.projectCode,
         projectName: editData.projectName,
-        category: editData.category,
+        category: '', // 不再使用 project.category
       }])
     } else if (copyData) {
       setSelectedProjects([{
         projectCode: copyData.projectCode,
         projectName: copyData.projectName,
-        category: copyData.category,
+        category: '', // 不再使用 project.category
       }])
     } else {
       setSelectedProjects([])
@@ -202,7 +202,7 @@ export default function WorkLogModal({
       setFormData({
         projectCode: editData.projectCode,
         projectName: editData.projectName,
-        category: editData.category,
+        category: editData.category, // 編輯模式保留原有分類
         content: editData.content,
         date: new Date(editData.startTime).toISOString().split('T')[0],
         startTime: new Date(editData.startTime).toTimeString().slice(0, 5),
@@ -213,7 +213,7 @@ export default function WorkLogModal({
       setFormData({
         projectCode: copyData.projectCode,
         projectName: copyData.projectName,
-        category: copyData.category,
+        category: copyData.category, // 複製模式保留原有分類
         content: copyData.content,
         date: new Date().toISOString().split('T')[0],
         startTime: initialMode === 'quick' ? '' : initialMode === 'start' ? originalStartTime : '09:00',
@@ -244,12 +244,12 @@ export default function WorkLogModal({
       }
     }
 
-    // 更新表單數據
+    // 更新表單數據 - 不再從 project.category 取得預設分類
     setFormData(prev => ({
       ...prev,
       projectCode: project.projectCode,
       projectName: project.projectName,
-      category: project.category || prev.category,
+      // category 保持不變，讓用戶手動選擇工作分類
     }))
   }
 
@@ -263,7 +263,7 @@ export default function WorkLogModal({
         ...prev,
         projectCode: '',
         projectName: '',
-        category: '',
+        // category 保持不變，讓用戶手動選擇工作分類
       }))
     }
   }
@@ -273,7 +273,7 @@ export default function WorkLogModal({
     const newProject: Project = {
       projectCode: code,
       projectName: name,
-      category: formData.category,
+      category: '', // 新專案不設定預設分類
     }
     setSelectedProjects([newProject])
     setFormData(prev => ({

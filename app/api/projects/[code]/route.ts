@@ -12,6 +12,7 @@ type RouteParams = {
 
 const projectInclude = {
   Contact: true,
+  projectType: true,
   manager: {
     select: {
       id: true,
@@ -28,6 +29,11 @@ const projectInclude = {
           email: true,
         }
       }
+    }
+  },
+  workCategories: {
+    include: {
+      category: true
     }
   }
 } as const
@@ -85,6 +91,7 @@ export async function GET(
             code: workLog.projectCode,
             name: workLog.projectName,
             category: workLog.category,
+            projectTypeId: null, // 從 workLog 創建的專案暫時沒有 projectType
             managerId: workLog.userId,
             status: 'ACTIVE',
             description: '從工作記錄自動創建',
@@ -121,28 +128,56 @@ export async function PUT(
 ) {
   try {
     const body = await request.json()
-    const { managerId } = body
+    const { managerId, projectTypeId, name, description, status, workCategoryIds = [] } = body
 
-    // 驗證管理者是否存在
-    const manager = await prisma.user.findUnique({
-      where: { id: managerId }
-    })
+    // 驗證管理者是否存在（如果有提供的話）
+    if (managerId) {
+      const manager = await prisma.user.findUnique({
+        where: { id: managerId }
+      })
 
-    if (!manager) {
-      return NextResponse.json(
-        { error: '找不到指定的管理者' },
-        { status: 404 }
-      )
+      if (!manager) {
+        return NextResponse.json(
+          { error: '找不到指定的管理者' },
+          { status: 404 }
+        )
+      }
     }
 
     const { code } = await params
 
-    // 更新專案管理者
+    // 更新專案
+    const updateData: any = {}
+    if (managerId) updateData.managerId = managerId
+    if (projectTypeId !== undefined) updateData.projectTypeId = projectTypeId
+    if (name) updateData.name = name
+    if (description !== undefined) updateData.description = description
+    if (status) updateData.status = status
+
     const updatedProject = await prisma.project.update({
       where: { code },
-      data: { managerId },
+      data: updateData,
       include: projectInclude
     }) as ProjectWithRelations
+
+    // 更新工作分類關聯
+    if (workCategoryIds.length >= 0) {
+      // 先删除現有的關聯
+      await prisma.projectWorkCategory.deleteMany({
+        where: { projectId: updatedProject.id }
+      })
+
+      // 如果有新的工作分類，建立關聯
+      if (workCategoryIds.length > 0) {
+        await prisma.projectWorkCategory.createMany({
+          data: workCategoryIds.map((categoryId: string) => ({
+            projectId: updatedProject.id,
+            categoryId
+          })),
+          skipDuplicates: true
+        })
+      }
+    }
 
     // 轉換回應格式
     const { userAssignments, ...projectData } = updatedProject

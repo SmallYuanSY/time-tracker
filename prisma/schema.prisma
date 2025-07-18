@@ -101,6 +101,8 @@ model WorkCategory {
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  projectCategories ProjectWorkCategory[]
 }
 
 model ScheduledWork {
@@ -161,22 +163,53 @@ model Overtime {
   user            User      @relation(fields: [userId], references: [id])
 }
 
+model ProjectType {
+  id          String    @id @default(cuid())
+  typeId      String    @unique
+  name        String
+  description String?
+  color       String    @default("#3B82F6")
+  icon        String?
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  projects    Project[]
+}
+
 model Project {
   id             String          @id @default(cuid())
   code           String          @unique
   name           String
   description    String?
-  category       String
+  category       String          // 保留以向後相容
+  projectTypeId  String?
   status         String          @default("ACTIVE")
   managerId      String
   contactId      String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+  
+  projectType    ProjectType?    @relation(fields: [projectTypeId], references: [id])
   Contact        Contact?        @relation(fields: [contactId], references: [id])
   manager        User            @relation("ProjectManager", fields: [managerId], references: [id])
   userAssignments ProjectToUser[]
   workLogs       workLog[]
   scheduledWorks ScheduledWork[]
+  workCategories ProjectWorkCategory[]
+}
+
+model ProjectWorkCategory {
+  id         String @id @default(cuid())
+  projectId  String
+  categoryId String
+  createdAt  DateTime @default(now())
+  
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category   WorkCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  @@unique([projectId, categoryId])
 }
 
 model Contact {

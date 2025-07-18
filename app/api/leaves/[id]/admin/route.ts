@@ -39,7 +39,14 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
           payload: { 
             title: '請假申請結果',
             body: message,
-            message: message
+            message: message,
+            primaryAction: {
+              label: "查看請假狀態",
+              redirect: {
+                url: "/leave",
+                target: "_self"
+              }
+            }
           }
         })
       }

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { 
-  ArrowLeft, User, Mail, Lock, Bell, Palette, 
+  ArrowLeft, User, Mail, Lock, Palette, 
   Globe, Shield, HelpCircle, LogOut, ChevronRight,
   Settings, Smartphone
 } from 'lucide-react'
@@ -77,14 +77,6 @@ export default function MobileSettingsPage() {
     {
       title: '應用程式設定',
       items: [
-        {
-          id: 'notifications',
-          title: '通知設定',
-          description: '管理推播通知偏好',
-          icon: <Bell className="w-5 h-5" />,
-          href: '/notifications',
-          color: 'bg-yellow-500'
-        },
         {
           id: 'theme',
           title: '外觀主題',

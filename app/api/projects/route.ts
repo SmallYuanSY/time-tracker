@@ -11,10 +11,16 @@ export async function GET(req: NextRequest) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
-    // 從 Project 表獲取專案
+    // 從 Project 表獲取專案，包含案件類別和工作分類
     const projects = await prisma.project.findMany({
       include: {
         Contact: true,
+        projectType: true,
+        workCategories: {
+          include: {
+            category: true
+          }
+        }
       },
       orderBy: {
         code: 'asc',
@@ -36,9 +42,10 @@ export async function GET(req: NextRequest) {
         id: p.projectCode,
         code: p.projectCode,
         name: p.projectName,
-        category: p.category,
+        category: p.category, // 保留向後相容
         status: 'ACTIVE', // 從工作記錄來的案件預設為進行中
         Contact: null,
+        projectType: null, // 從 workLog 來的案件暫時沒有 projectType
       }))
 
     // 合併兩個來源的專案並排序
@@ -62,7 +69,7 @@ export async function POST(req: NextRequest) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
-    const { code, name, category, description } = await req.json()
+    const { code, name, category, description, projectTypeId, workCategoryIds = [] } = await req.json()
 
     if (!code || !name) {
       return new NextResponse('缺少必要欄位', { status: 400 })
@@ -91,12 +98,49 @@ export async function POST(req: NextRequest) {
       data: {
         code,
         name,
-        category: category || '',
+        category: category || '', // 保留向後相容
         description,
+        projectTypeId: projectTypeId || null,
         managerId: (session.user as any).id,
         status: 'ACTIVE',
       },
+      include: {
+        projectType: true,
+        Contact: true,
+        workCategories: {
+          include: {
+            category: true
+          }
+        }
+      },
     })
+
+    // 如果有提供工作分類，建立關聯
+    if (workCategoryIds.length > 0) {
+      await prisma.projectWorkCategory.createMany({
+        data: workCategoryIds.map((categoryId: string) => ({
+          projectId: newProject.id,
+          categoryId
+        })),
+        skipDuplicates: true
+      })
+
+      // 重新查詢以獲取完整的關聯資料
+      const updatedProject = await prisma.project.findUnique({
+        where: { id: newProject.id },
+        include: {
+          projectType: true,
+          Contact: true,
+          workCategories: {
+            include: {
+              category: true
+            }
+          }
+        }
+      })
+
+      return NextResponse.json(updatedProject)
+    }
 
     return NextResponse.json(newProject)
   } catch (error) {

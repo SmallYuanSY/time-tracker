@@ -1,5 +1,33 @@
 import { ContactType } from '@prisma/client'
 
+export interface ProjectType {
+  id: string
+  typeId: string
+  name: string
+  description: string | null
+  color: string
+  icon: string | null
+  isActive: boolean
+  sortOrder: number
+}
+
+export interface WorkCategory {
+  id: string
+  content: string
+  description: string | null
+  color: string | null
+  icon: string | null
+  isActive: boolean
+  sortOrder: number
+}
+
+export interface ProjectWorkCategory {
+  id: string
+  projectId: string
+  categoryId: string
+  category: WorkCategory
+}
+
 export interface User {
   id: string
   name: string | null
@@ -28,4 +56,6 @@ export interface Project {
   Contact: Contact | null
   manager: User
   users: User[]
+  projectType: ProjectType | null
+  workCategories: ProjectWorkCategory[]
 } 

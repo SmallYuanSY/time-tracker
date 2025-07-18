@@ -65,12 +65,19 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
         : `管理員已拒絕您的請假申請`
 
       await novu.trigger({
-        workflowId: 'test-notification',
+        workflowId: 'projoin-notification',
         to: { subscriberId: `user_${existingLeave.requesterId}` },
         payload: { 
           title: messageTitle,
           body: messageBody,
-          message: messageBody
+          message: messageBody,
+          primaryAction: {
+            label: "查看請假狀態",
+            redirect: {
+              url: "/leave",
+              target: "_self"
+            }
+          }
         }
       })
     } catch (e) {

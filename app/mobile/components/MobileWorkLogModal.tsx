@@ -111,7 +111,7 @@ export default function MobileWorkLogModal({
           const convertedProjects = allProjects.map((p: any) => ({
             projectCode: p.code || p.projectCode,
             projectName: p.name || p.projectName,
-            category: p.category || ''
+            category: '' // 不再使用 project.category
           }))
           setProjects(convertedProjects)
         }
@@ -192,12 +192,13 @@ export default function MobileWorkLogModal({
     return newErrors.length === 0
   }
 
-  // 選擇專案
+  // 選擇專案 - 不再從 project.category 取得預設分類
   const handleProjectSelect = (project: Project) => {
     setFormData(prev => ({
       ...prev,
       projectCode: project.projectCode,
       projectName: project.projectName
+      // category 保持不變，讓用戶手動選擇工作分類
     }))
     setShowProjectSelector(false)
   }

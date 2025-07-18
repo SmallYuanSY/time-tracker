@@ -164,7 +164,17 @@ export default function ProjectSelector({
               >
                 <div className="text-gray-800 font-bold text-sm">{project.projectCode}</div>
                 <div className="text-gray-700 text-sm font-medium">{project.projectName}</div>
-                <div className="text-gray-500 text-xs mt-1 bg-gray-100 px-2 py-1 rounded inline-block">{project.category}</div>
+                <div className="flex items-center gap-2 mt-1">
+                  {project.projectType && (
+                    <div className="text-gray-500 text-xs bg-blue-100 px-2 py-1 rounded inline-block flex items-center gap-1">
+                      <span>{project.projectType.icon}</span>
+                      <span>{project.projectType.name}</span>
+                    </div>
+                  )}
+                  {project.category && (
+                    <div className="text-gray-500 text-xs bg-gray-100 px-2 py-1 rounded inline-block">{project.category}</div>
+                  )}
+                </div>
               </div>
             ))}
           </div>

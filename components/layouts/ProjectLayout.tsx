@@ -129,8 +129,8 @@ export function ProjectLayout({ children, project }: ProjectLayoutProps) {
       </div>
 
       {/* 主要內容區域 */}
-      <div className="flex-1 md:pl-64">
-        <div className="container p-4">
+      <div className="flex-1 md:pl-64 h-screen overflow-y-auto">
+        <div className="container p-4 min-h-full">
           {children}
         </div>
       </div>
